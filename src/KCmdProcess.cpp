@@ -30,7 +30,10 @@ KUpstream *KSPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 #ifdef KSOCKET_UNIX
 	if (unix_path.empty()) {
 #endif
-		ksocket_getaddr("127.0.0.1", st->getPort(), AF_UNSPEC, AI_NUMERICHOST, &addr);
+		if (!ksocket_getaddr("127.0.0.1", st->getPort(), AF_UNSPEC, AI_NUMERICHOST, &addr)) {
+			stLock.Unlock();
+			return NULL;
+		}
 #ifdef KSOCKET_UNIX
 	}
 #endif
@@ -118,7 +121,11 @@ KUpstream *KMPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 	} else {
 #endif
 		int port = st->getPort();
-		ksocket_getaddr("127.0.0.1", port, AF_UNSPEC, AI_NUMERICHOST, &st->addr);
+		if (!ksocket_getaddr("127.0.0.1", port, AF_UNSPEC, AI_NUMERICHOST, &st->addr)) {
+			st->killChild();
+			gcProcess(st);
+			return NULL;
+		}
 #ifdef KSOCKET_UNIX
 	}
 #endif
@@ -128,6 +135,8 @@ KUpstream *KMPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 		st->bind(us);
 		return us;
 	}
+	st->killChild();
+	gcProcess(st);
 	return NULL;
 }
 KUpstream* KMPCmdProcess::get_connection(KHttpRequest* rq, KSingleListenPipeStream* sp)
@@ -269,39 +278,38 @@ bool KMPCmdProcess::killProcess(int pid)
 	bool successKilled = false;
 	stLock.Lock();
 	klist_foreach(st, busyProcessList) {
-		if (pid == 0) {
-			st->killChild();
-			st->unlink_unix();
-			continue;
-		}
-		if (st->process.getProcessId() == pid) {
+		if (pid == 0 || st->process.getProcessId() == pid) {
 			st->killChild();
 			st->unlink_unix();
 			successKilled = true;
-			break;
+			if (pid != 0) {
+				break;
+			}
 		}
 	}
-	if (!successKilled) {
+	if (pid == 0) {
+		while (!klist_empty(freeProcessList)) {
+			st = klist_head(freeProcessList);
+			klist_remove(st);
+			st->killChild();
+			st->unlink_unix();
+			delete st;
+		}
+		successKilled = true;
+	} else if (!successKilled) {
 		klist_foreach(st, freeProcessList) {
-			if (pid == 0) {
-				st->killChild();
-				st->unlink_unix();
-				continue;
-			}
 			if (pid == st->process.getProcessId()) {
 				st->killChild();
 				st->unlink_unix();
 				klist_remove(st);
 				delete st;
+				successKilled = true;
 				break;
 			}
 		}		
 	}
 	stLock.Unlock();
-	if (pid==0) {
-		return true;
-	}
-	return false;
+	return successKilled;
 }
 bool KMPCmdProcess::canDestroy(time_t nowTime)
 {

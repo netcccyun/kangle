@@ -242,7 +242,11 @@ public:
 		obj_lock[hh].Unlock();
 	}
 	unsigned get_current_age(time_t now_time) {
-		return (unsigned)(now_time - index.last_verified);
+		if (now_time <= index.last_verified) {
+			return 0;
+		}
+		uint64_t current_age = (uint64_t)(now_time - index.last_verified);
+		return current_age > UINT_MAX ? UINT_MAX : (unsigned)current_age;
 	}
 #ifdef ENABLE_FORCE_CACHE
 	//Ç¿ÖÆ»º´æ

@@ -70,9 +70,10 @@ public:
 			return nullptr;
 		}
 		KModelPtr<KAcl> m((*it).second->new_instance());
-		if (m.m) {
-			m.m->isGlobal = isGlobal();
+		if (!m.m) {
+			return nullptr;
 		}
+		m.m->isGlobal = isGlobal();
 		m.parse_config(xml);
 		m.m->parse_config(xml);
 		return m;
@@ -83,9 +84,10 @@ public:
 			return nullptr;
 		}
 		KModelPtr<KMark> m((*it).second->new_instance());
-		if (m.m) {
-			m.m->isGlobal = isGlobal();
+		if (!m.m) {
+			return nullptr;
 		}
+		m.m->isGlobal = isGlobal();
 		m.parse_config(xml);
 		m.m->parse_config(xml);
 		return m;
@@ -96,7 +98,7 @@ public:
 		}
 		return "response"_CS;
 	}
-	void parse_config(const KXmlAttribute& attr);
+	bool parse_config(const KXmlAttribute& attr);
 	bool on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) override;
 	kgl_jump_type check(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo);
 	int get_chain(WhmContext *ctx, const KString& table_name);

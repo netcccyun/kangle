@@ -53,7 +53,7 @@ inline bool is_internal_header(KHttpHeader *av) {
 }
 class KHttpEnv;
 
-void upstream_sign_request(KHttpRequest *rq, KHttpEnv *s);
+bool upstream_sign_request(KHttpRequest *rq, KHttpEnv *s);
 KFetchObject *bindVirtualHost(KHttpRequest *rq, RequestError *error, KApacheHtaccessContext &htresponse);
 //void prepare_write_stream(KHttpRequest *rq);
 KGL_RESULT load_object_from_source(KHttpRequest* rq);
@@ -107,7 +107,7 @@ inline bool check_object_expiration(KHttpRequest *rq,KHttpObject *obj) {
 
 	if (KBIT_TEST(rq->ctx.filter_flags,RF_DOUBLE_CACHE_EXPIRE)) {
 		//双倍过期时间，并清除强制刷新
-		freshness_lifetime = freshness_lifetime<<1;
+		freshness_lifetime = freshness_lifetime > UINT_MAX / 2 ? UINT_MAX : freshness_lifetime << 1;
 		KBIT_CLR(rq->sink->data.flags,RQ_HAS_NO_CACHE);
 	}
 	//debug("current_age=%d,refreshness_lifetime=%d\n",current_age,freshness_lifetime);

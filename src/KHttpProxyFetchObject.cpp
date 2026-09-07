@@ -14,7 +14,29 @@
 #include "KRewriteMarkEx.h"
 #include "kmalloc.h"
 #include "KSimulateRequest.h"
+#include "KHttpFieldValue.h"
 
+static bool is_connection_option(KHttpRequest* rq, const kgl_str_t& attr)
+{
+	for (KHttpHeader* header = rq->sink->data.get_header(); header; header = header->next) {
+		if (!kgl_is_attr(header, _KS("Connection"))) {
+			continue;
+		}
+		const char* value = header->buf + header->val_offset;
+		KHttpFieldValue field(value, value + header->val_len);
+		do {
+			const char* field_end = field.get_field_end();
+			while (field_end > field.val && isspace((unsigned char)field_end[-1])) {
+				field_end--;
+			}
+			if ((size_t)(field_end - field.val) == attr.len &&
+				kgl_mem_case_same(field.val, attr.len, attr.data, attr.len)) {
+				return true;
+			}
+		} while (field.next());
+	}
+	return false;
+}
 
 bool http2_header_callback(KUpstream *us, void *arg, const char *attr, int attr_len, const char *val, int val_len,bool flag)
 {
@@ -26,7 +48,7 @@ bool http2_header_callback(KUpstream *us, void *arg, const char *attr, int attr_
 	}
 	return true;
 }
-void upstream_sign_request(KHttpRequest *rq, KHttpEnv *s)
+bool upstream_sign_request(KHttpRequest *rq, KHttpEnv *s)
 {
 	KStringBuf v;
 	if (KBIT_TEST(rq->sink->data.raw_url.flags, KGL_URL_SSL)) {
@@ -55,7 +77,7 @@ void upstream_sign_request(KHttpRequest *rq, KHttpEnv *s)
 	make_digest(buf, digest);
 	v.WSTR("|");
 	v.write_all(buf, 32);
-	s->add(kgl_expand_string(X_REAL_IP_SIGN), v.buf(), v.size());
+	return s->add(kgl_expand_string(X_REAL_IP_SIGN), v.buf(), v.size());
 }
 KGL_RESULT KHttpProxyFetchObject::buildHead(KHttpRequest *rq)
 {	
@@ -67,7 +89,9 @@ KGL_RESULT KHttpProxyFetchObject::buildHead(KHttpRequest *rq)
 	} else {
 		pop_header.proto = Proto_http;
 	}
-	build_http_header(rq);
+	if (!build_http_header(rq)) {
+		return KGL_ECAN_RETRY_SOCKET_BROKEN;
+	}
 	return client->send_header_complete();
 }
 bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
@@ -86,7 +110,9 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 #ifdef HTTP_PROXY
 	if (rq->sink->data.meth == METH_CONNECT) {
 		build_url_host_port(url, s);
-		client->send_method_path(METH_CONNECT, s.buf(), (hlen_t)s.size());
+		if (!client->send_method_path(METH_CONNECT, s.buf(), (hlen_t)s.size())) {
+			return false;
+		}
 	} else {
 #endif
 		char* path = url->path;
@@ -113,19 +139,28 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		if (KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && client->IsMultiStream()) {
 			meth = METH_CONNECT;
 		}
-		client->send_method_path(meth, s.buf(), (hlen_t)s.size());
+		bool method_sent = client->send_method_path(meth, s.buf(), (hlen_t)s.size());
 		if (path != url->path) {
 			xfree(path);
 			path = NULL;
 		}
+		if (!method_sent) {
+			return false;
+		}
 		s.clear();
 		build_url_host_port(url, s);
-		client->send_host(s.buf(), (hlen_t)s.size());
+		if (!client->send_host(s.buf(), (hlen_t)s.size())) {
+			return false;
+		}
 		if (client->IsMultiStream()) {
 			if (KBIT_TEST(rq->sink->data.raw_url.flags, KGL_URL_SSL)) {
-				client->send_header(kgl_header_scheme, kgl_expand_string("https"));
+				if (!client->send_header(kgl_header_scheme, kgl_expand_string("https"))) {
+					return false;
+				}
 			} else {
-				client->send_header(kgl_header_scheme, kgl_expand_string("http"));
+				if (!client->send_header(kgl_header_scheme, kgl_expand_string("http"))) {
+					return false;
+				}
 			}
 		}
 #ifdef HTTP_PROXY
@@ -137,6 +172,13 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		kgl_get_header_name(av, &attr);
 		if (kgl_is_attr(av, _KS("Keep-Alive")) ||
 			kgl_is_attr(av, _KS("Proxy-Connection")) ||
+			kgl_is_attr(av, _KS("Connection")) ||
+			kgl_is_attr(av, _KS("TE")) ||
+			kgl_is_attr(av, _KS("Trailer")) ||
+			kgl_is_attr(av, _KS("Transfer-Encoding")) ||
+			(!KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && kgl_is_attr(av, _KS("Upgrade"))) ||
+			(is_connection_option(rq, attr) &&
+				!(KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && kgl_is_attr(av, _KS("Upgrade")))) ||
 			(!av->name_is_know && *(av->buf)==':')) {
 			goto do_not_insert;
 		}
@@ -194,7 +236,9 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 	int64_t content_length = in->f->body.get_left(in->body_ctx);
 	if (rq_has_content_length(rq, content_length)) {
 		int len = int2string2(content_length, tmpbuff);
-		client->send_header(kgl_expand_string("Content-Length"), tmpbuff, len);
+		if (!client->send_header(kgl_expand_string("Content-Length"), tmpbuff, len)) {
+			return false;
+		}
 	} else {	
 		if (pop_header.post_is_chunk) {
 			assert(content_length == -1);
@@ -209,15 +253,15 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		if (KBIT_TEST(flag,kgl_precondition_if_time)) {
 			char* end = make_http_time(condition->time, tmpbuff, sizeof(tmpbuff));
 			if (KBIT_TEST(flag, kgl_precondition_if_match_unmodified)) {
-				client->send_header(kgl_header_if_modified_since, tmpbuff, (hlen_t)(end - tmpbuff));
+				if (!client->send_header(kgl_header_if_modified_since, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
 			} else {
-				client->send_header(kgl_header_if_unmodified_since, tmpbuff, (hlen_t)(end - tmpbuff));
+				if (!client->send_header(kgl_header_if_unmodified_since, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
 			}
 		} else {
 			if (KBIT_TEST(flag, kgl_precondition_if_match_unmodified)) {
-				client->send_header(kgl_header_if_match, condition->entity->data, (int)condition->entity->len);
+				if (!client->send_header(kgl_header_if_match, condition->entity->data, (int)condition->entity->len)) return false;
 			} else {
-				client->send_header(kgl_header_if_none_match, condition->entity->data, (int)condition->entity->len);
+				if (!client->send_header(kgl_header_if_none_match, condition->entity->data, (int)condition->entity->len)) return false;
 			}
 		}
 	}
@@ -233,15 +277,17 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		} else {
 			s << range->from;
 		}
-		client->send_header(kgl_header_range, s.buf(), s.size());
+		if (!client->send_header(kgl_header_range, s.buf(), s.size())) return false;
 		if (range->if_range_entity) {
 			if (KBIT_TEST(flag, kgl_precondition_if_range_date)) {
 				char* end = make_http_time(range->if_range_date, tmpbuff, sizeof(tmpbuff));
-				client->send_header(kgl_header_if_range, tmpbuff, (hlen_t)(end - tmpbuff));
+				if (!client->send_header(kgl_header_if_range, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
 			} else {
 				/* if-range not allowed weak etag */
-				assert(*range->if_range_entity->data != 'W' || *range->if_range_entity->data != 'w');
-				client->send_header(kgl_header_if_range, range->if_range_entity->data, (hlen_t)range->if_range_entity->len);
+				bool weak_etag = range->if_range_entity->len >= 2 &&
+					(range->if_range_entity->data[0] == 'W' || range->if_range_entity->data[0] == 'w') &&
+					range->if_range_entity->data[1] == '/';
+				if (!weak_etag && !client->send_header(kgl_header_if_range, range->if_range_entity->data, (hlen_t)range->if_range_entity->len)) return false;
 			}
 		}
 	}
@@ -252,25 +298,25 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 			KHttpHeader* header = container->get_proxy_header(rq->sink->pool);
 			while (header) {
 				kgl_get_header_name(header, &attr);
-				env.add(attr.data, (hlen_t)attr.len, header->buf + header->val_offset, header->val_len);
+				if (!env.add(attr.data, (hlen_t)attr.len, header->buf + header->val_offset, header->val_len)) return false;
 				header = header->next;
 			}
 		}
 	}
 #endif
 	if (rq->ctx.upstream_sign) {
-		upstream_sign_request(rq, &env);
+		if (!upstream_sign_request(rq, &env)) return false;
 	}
 	if (rq->ctx.internal) {
-		client->send_header(kgl_expand_string("User-Agent"), kgl_expand_string(PROGRAM_NAME "/" VERSION));
+		if (!client->send_header(kgl_expand_string("User-Agent"), kgl_expand_string(PROGRAM_NAME "/" VERSION))) return false;
 	}
 	if (KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE)) {
-		client->send_connection(kgl_expand_string("upgrade"));
+		if (!client->send_connection(kgl_expand_string("upgrade"))) return false;
 	} else if (KBIT_TEST(rq->ctx.filter_flags, RF_UPSTREAM_NOKA) || client->GetLifeTime() <= 0) {
-		client->send_connection(kgl_expand_string("close"));
+		if (!client->send_connection(kgl_expand_string("close"))) return false;
 	}
 	if (!KBIT_TEST(rq->ctx.filter_flags, RF_NO_X_FORWARDED_FOR) && !x_forwarded_for_inserted) {
-		client->send_header(kgl_expand_string("X-Forwarded-For"), ips, ips_len);
+		if (!client->send_header(kgl_expand_string("X-Forwarded-For"), ips, ips_len)) return false;
 	}
 	if (KBIT_TEST(rq->ctx.filter_flags, RF_VIA) && !via_inserted) {
 		s.clear();
@@ -280,12 +326,12 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		}
 	}
 	if (KBIT_TEST(rq->ctx.filter_flags, RF_X_REAL_IP)) {
-		client->send_header(kgl_expand_string(X_REAL_IP_HEADER), ips, ips_len);
+		if (!client->send_header(kgl_expand_string(X_REAL_IP_HEADER), ips, ips_len)) return false;
 		if (!client->IsMultiStream()) {
 			if (KBIT_TEST(rq->sink->data.raw_url.flags, KGL_URL_SSL)) {
-				client->send_header(kgl_expand_string("X-Forwarded-Proto"), kgl_expand_string("https"));
+				if (!client->send_header(kgl_expand_string("X-Forwarded-Proto"), kgl_expand_string("https"))) return false;
 			} else {
-				client->send_header(kgl_expand_string("X-Forwarded-Proto"), kgl_expand_string("http"));
+				if (!client->send_header(kgl_expand_string("X-Forwarded-Proto"), kgl_expand_string("http"))) return false;
 			}
 		}
 	}

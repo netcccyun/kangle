@@ -38,10 +38,13 @@ KUpstream* KApiProcess::PowerResult(KHttpRequest* rq, KPipeStream* st2)
 		KStringBuf s;
 		s << "/tmp/extworker." << st->info.port << ".sock";
 		s.str().swap(unix_path);
+		ksocket_unix_addr(unix_path.c_str(), &unix_addr);
 	} else {
 #endif
 		if (!ksocket_getaddr("127.0.0.1", st->info.port, AF_UNSPEC, AI_NUMERICHOST, &addr)) {
 			klog(KLOG_ERR, "cann't get 127.0.0.1 addr\n");
+			stLock.Unlock();
+			return NULL;
 		}
 #ifdef KSOCKET_UNIX	
 	}

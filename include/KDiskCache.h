@@ -10,7 +10,7 @@
 #ifndef _WIN32
 #define KGL_DISK_CACHE_ALIGN_HEAD 1
 #endif
-#define CACHE_DISK_VERSION  4
+#define CACHE_DISK_VERSION  5
 #define CACHE_FIX_STR      "HXJW"
 #pragma pack(push,4)
 struct KHttpObjectKey

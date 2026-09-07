@@ -332,7 +332,15 @@ static bool on_begin_parse(kconfig::KConfigFile* file, khttpd::KXmlNode* node) {
 				}
 			}
 		}
-		auto vh_database = kconfig::find_child(node->get_first(), _KS("vh_database"));
+		auto root = node->get_first();
+		auto vh_database = kconfig::find_child(root, _KS("vh_database"));
+		if (!vh_database) {
+			// Legacy configurations put vh_database inside the global vhs node.
+			auto vhs = kconfig::find_child(root, _KS("vhs"));
+			if (vhs) {
+				vh_database = kconfig::find_child(vhs->get_first(), _KS("vh_database"));
+			}
+		}
 		if (vh_database) {
 			vhd.parse_config(vh_database->get_first());
 		}

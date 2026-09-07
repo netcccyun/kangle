@@ -351,6 +351,10 @@ public:
 			if (buf != NULL) {
 				kgl_memcpy(hot, buf, write_len);
 				buf += write_len;
+			} else {
+				// NULL adds disk-cache alignment padding. Never persist stale
+				// heap contents in that padding.
+				memset(hot, 0, write_len);
 			}
 			hot += write_len;
 			len -= write_len;

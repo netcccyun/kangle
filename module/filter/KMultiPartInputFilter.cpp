@@ -218,6 +218,9 @@ KMultiPartInputFilter::KMultiPartInputFilter(const char* val, size_t len) {
 	const char* hot = (char*)kgl_memstr(val, len, _KS("boundary"));
 	if (!hot) {
 		char* content_type_lcase = kgl_strndup(val, len);
+		if (content_type_lcase == NULL) {
+			return;
+		}
 		string2lower2(content_type_lcase, len);
 		hot = strstr(content_type_lcase, "boundary");
 		if (hot) {
@@ -232,10 +235,14 @@ KMultiPartInputFilter::KMultiPartInputFilter(const char* val, size_t len) {
 	}
 	hot++;
 	size_t boundary_len = end - hot;
+	if (boundary_len == 0) {
+		return;
+	}
 
 	const char* boundary_end;
 	if (hot[0] == '"') {
 		hot++;
+		boundary_len--;
 		boundary_end = (char*)memchr(hot, '"', boundary_len);
 		if (!boundary_end) {
 			//  sapi_module.sapi_error(E_WARNING, "Invalid boundary in multipart/form-data POST data");
@@ -248,12 +255,25 @@ KMultiPartInputFilter::KMultiPartInputFilter(const char* val, size_t len) {
 	if (boundary_end) {
 		boundary_len = boundary_end - hot;
 	}
+	if (boundary_len == 0) {
+		return;
+	}
 	mb = new multipart_buffer;
 	mb->boundary = (char*)malloc(boundary_len + 3);
+	if (mb->boundary == NULL) {
+		delete mb;
+		mb = NULL;
+		return;
+	}
 	mb->boundary[0] = mb->boundary[1] = '-';
 	kgl_memcpy(mb->boundary + 2, hot, boundary_len);
 	mb->boundary[boundary_len + 2] = '\0';
 	mb->boundary_next = (char*)malloc(boundary_len + 4);
+	if (mb->boundary_next == NULL) {
+		delete mb;
+		mb = NULL;
+		return;
+	}
 	mb->boundary_next[0] = '\n';
 	kgl_memcpy(mb->boundary_next + 1, mb->boundary, boundary_len + 2);
 	mb->boundary_next_len = (int)(boundary_len + 3);
@@ -264,7 +284,11 @@ bool KMultiPartInputFilter::match(KInputFilterContext* rq, const char* str, int 
 		return false;
 	}
 	if (str) {
-		mb->add(str, len);
+		if (!mb->add(str, len)) {
+			delete mb;
+			mb = NULL;
+			return false;
+		}
 	}
 	while (!multipart_eof(mb, isLast)) {
 		if (mb->model == MULTIPART_BODY_MODEL) {
@@ -347,7 +371,7 @@ bool KMultiPartInputFilter::match(KInputFilterContext* rq, const char* str, int 
 				}
 			}
 			if (hm.header) {
-				xfree_header(hm.header);
+				free_header_list(hm.header);
 				memset(&hm, 0, sizeof(hm));
 			}
 
@@ -371,7 +395,9 @@ kgl_parse_result KMultiPartInputFilter::parse_header() {
 		case kgl_parse_error:
 			return ret;
 		case kgl_parse_success:
-			hm.add_header(rs.attr, rs.attr_len, rs.val, rs.val_len);
+			if (!hm.add_header(rs.attr, rs.attr_len, rs.val, rs.val_len)) {
+				return kgl_parse_error;
+			}
 			continue;
 		case kgl_parse_finished:
 			mb->model = MULTIPART_BODY_MODEL;
@@ -403,17 +429,16 @@ bool KMultiPartInputFilter::match_body(bool& success) {
 		}
 		if (filename) {
 			if (match_file_content(buf, len)) {
+				free(buf);
 				return true;
 			}
 			if (all) {
-				if (match_file_content(buf, len)) {
-					return true;
-				}
 				file_list.clear();
 			}
 		} else if (param) {
 			len = url_decode(buf, len, NULL, true);
 			if (match_param(param, param_len, buf, len)) {
+				free(buf);
 				return true;
 			}
 		}
@@ -442,6 +467,9 @@ char* KMultiPartInputFilter::parse_body(int* len, bool& all) {
 	*len = max;
 	if (*len > 0) {
 		char* buf = (char*)malloc(*len + 1);
+		if (buf == NULL) {
+			return NULL;
+		}
 		kgl_memcpy(buf, mb->buf_begin, *len);
 		buf[*len] = '\0';
 		if (bound && buf[*len - 1] == '\r') {

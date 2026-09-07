@@ -5,27 +5,25 @@
 
 bool KDiskCacheStream::Open(KHttpObject *obj)
 {
-	assert(filename == nullptr && fp == nullptr);
-	if (filename) {
-		unlink(filename);
-		xfree(filename);
-		filename = nullptr;
-	}
-	if (fp) {
-		kfiber_file_close(fp);
-		fp = nullptr;
-	}
+	/* Keep a successfully closed cache file, but discard an incomplete one. */
+	reset(fp != nullptr);
 	filename = obj->get_filename().release();
+	if (filename == nullptr) {
+		return false;
+	}
 	fp = kfiber_file_open(filename, fileWrite, 0);
 	if (fp == nullptr) {
+		reset(false);
 		return false;
 	}
 	if (!kasync_file_direct(fp,true)) {
-		kfiber_file_close(fp);
-		fp = nullptr;
+		reset(true);
 		return false;
 	}
-	kfiber_file_seek(fp, seekBegin, obj->GetHeaderSize(0));
+	if (kfiber_file_seek(fp, seekBegin, obj->GetHeaderSize(0)) != 0) {
+		reset(true);
+		return false;
+	}
 	return true;
 }
 int64_t KDiskCacheStream::GetLength(KHttpObject* obj)
@@ -35,6 +33,9 @@ int64_t KDiskCacheStream::GetLength(KHttpObject* obj)
 }
 bool KDiskCacheStream::Write(KHttpObject *obj, const char *buf, int len)
 {
+	if (fp == nullptr || len < 0 || (len > 0 && buf == nullptr)) {
+		return false;
+	}
 	while (len > 0) {
 		if (buffer == NULL) {
 			buffer_size = conf.io_buffer;
@@ -43,6 +44,10 @@ bool KDiskCacheStream::Write(KHttpObject *obj, const char *buf, int len)
 			}
 			buffer_left = buffer_size;
 			buffer = (char *)aio_alloc_buffer(buffer_size);
+			if (buffer == nullptr) {
+				buffer_left = buffer_size = 0;
+				return false;
+			}
 			hot = buffer;
 		}
 		int this_len = KGL_MIN(buffer_left, len);
@@ -62,16 +67,26 @@ bool KDiskCacheStream::Write(KHttpObject *obj, const char *buf, int len)
 
 bool KDiskCacheStream::Close(KHttpObject *obj)
 {
-	if (!FlushBuffer()) {
+	if (fp == nullptr || !FlushBuffer()) {
 		return false;
 	}
-	obj->index.content_length = GetLength(obj);
+	int64_t content_length = GetLength(obj);
+	if (content_length < 0) {
+		return false;
+	}
+	obj->index.content_length = content_length;
 	kfiber_file_close(fp);
 	fp = NULL;
 	return true;
 }
 bool KDiskCacheStream::FlushBuffer()
 {
+	if (fp == nullptr) {
+		return false;
+	}
+	if (buffer == nullptr) {
+		return true;
+	}
 	int size = (int)(hot - buffer);
 	hot = buffer;
 	while (size > 0) {

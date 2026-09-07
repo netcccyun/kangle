@@ -31,8 +31,12 @@ KSafeChain KTable::parse_chain(const khttpd::KXmlNodeBody* xml) {
 	KSafeChain chain(new KChain());
 	try {
 		chain->parse_config(access, xml);
-	} catch (std::exception e) {
+	} catch (const std::exception& e) {
 		klog(KLOG_ERR, "parse chain error [%s]\n", e.what());
+		// Do not activate a chain that was only partly parsed.  A fresh chain
+		// is a harmless no-op (JUMP_CONTINUE), while the partial chain may have
+		// already accumulated marks before a later model threw an exception.
+		chain = KSafeChain(new KChain());
 	}
 	return chain;
 }

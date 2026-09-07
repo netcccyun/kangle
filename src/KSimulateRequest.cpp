@@ -37,6 +37,9 @@ static int simuate_start_fiber(void* arg, int got) {
 }
 KHttpRequest *kgl_create_simulate_request(kgl_async_http *ctx)
 {
+	if (ctx == NULL || ctx->url == NULL || ctx->meth == NULL) {
+		return NULL;
+	}
 	if (ctx->post_len > 0 && ctx->post == NULL) {
 		return NULL;
 	}
@@ -46,6 +49,10 @@ KHttpRequest *kgl_create_simulate_request(kgl_async_http *ctx)
 		return NULL;
 	}
 	KSimulateSink* ss = new KSimulateSink;
+	if (ss->cn == NULL) {
+		delete ss;
+		return NULL;
+	}
 	KHttpRequest* rq = new KHttpRequest(ss);
 	selectable_bind(&ss->cn->st, selector);	
 	selectable_bind_opaque(&ss->cn->st, rq);
@@ -129,6 +136,9 @@ KHttpRequest *kgl_create_simulate_request(kgl_async_http *ctx)
 }
 int kgl_simuate_start_as_new_fiber(simulate_request*rq,kfiber **fiber)
 {
+	if (rq == NULL) {
+		return -1;
+	}
 	int ret = kfiber_create(simuate_start_fiber, rq, 0, http_config.fiber_stack_size, fiber);
 	if (ret!=0) {
 		kgl_simulate_free(rq);
@@ -271,8 +281,14 @@ int WINAPI async_download_body_hook(void *arg, const char *data, int len)
 int kgl_async_download(const char *url, const char *file, int *status)
 {
 	assert(!kfiber_is_main());
+	if (url == NULL || file == NULL || status == NULL) {
+		return -1;
+	}
 	async_download_worker download_ctx;
-	memset(&download_ctx, 0, sizeof(async_download_worker));
+	download_ctx.last_modified = 0;
+	download_ctx.code = 0;
+	download_ctx.gzip = false;
+	download_ctx.st = NULL;
 	download_ctx.save_file = file;
 	kgl_async_http ctx;
 	memset(&ctx, 0, sizeof(ctx));
@@ -310,9 +326,11 @@ clean:
 }
 void async_download(const char* url, const char* file, result_callback cb, void* arg)
 {
-	int status;
-	int got = kgl_async_download(url, file, &status);
-	cb(NULL, arg, status);
+	int status = 0;
+	kgl_async_download(url, file, &status);
+	if (cb != NULL) {
+		cb(NULL, arg, status);
+	}
 }
 kev_result test_simulate_callback(KOPAQUE data, void *arg, int code)
 {
@@ -366,4 +384,3 @@ bool test_simulate_request()
 	return true;
 }
 #endif
-

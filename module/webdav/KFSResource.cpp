@@ -106,13 +106,22 @@ bool KFSResource::close()
 }
 int KFSResource::write(const char* buf, int len)
 {
-	if (fp == NULL) {
+	if (fp == NULL || len < 0 || (len > 0 && buf == NULL)) {
 		return -1;
+	}
+	if (len == 0) {
+		return 0;
 	}
 	return (int)fwrite(buf, 1, len, fp);
 }
 int KFSResource::read(char* buf, int len)
 {
+	if (fp == NULL || len < 0 || (len > 0 && buf == NULL)) {
+		return -1;
+	}
+	if (len == 0) {
+		return 0;
+	}
 	return (int)fread(buf, 1, len, fp);
 }
 KResource* KFSResourceMaker::makeFile(const char* name, const char* path)
@@ -146,11 +155,14 @@ KResource* KFSResourceMaker::makeDirectory(const char* name, const char* path)
 	if (wname == NULL) {
 		return false;
 	}
-	_wmkdir(wname);
+	int ret = _wmkdir(wname);
 	xfree(wname);
 #else
-	mkdir(name, 0755);
+	int ret = mkdir(name, 0755);
 #endif
+	if (ret != 0) {
+		return NULL;
+	}
 	return bindResource(name, path);
 }
 KResource* KFSResourceMaker::bindResource(const char* name, const char* path)
@@ -204,7 +216,7 @@ KAttribute* KFSResource::getAttribute()
 	if (isDirectory()) {
 		ab->emplace("getcontenttype", "httpd/unix-directory");
 	} else {
-		sprintf(tbuf, "%d", (int)buf->st_size);
+		snprintf(tbuf, sizeof(tbuf), "%lld", (long long)buf->st_size);
 		ab->emplace("getcontentlength", (const char*)tbuf);
 	}
 	return ab;

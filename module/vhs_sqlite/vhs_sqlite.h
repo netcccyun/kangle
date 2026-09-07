@@ -23,6 +23,7 @@ public:
 	friend class KVirtualHostSqliteConnection;
 private:
 	sqlite3_stmt *stmt;
+	bool bind_ok;
 };
 class KDyamicItem
 {
@@ -185,9 +186,7 @@ public:
 	}
 	KVirtualHostData *getFlow(const char *name)
 	{
-		std::stringstream s;
-		s << "SELECT flow,hcount FROM vhost WHERE name='" << name << "'";
-		return querySql(s.str().c_str());
+		return querySql("SELECT flow,hcount FROM vhost WHERE name=?", name);
 	}
 	KVirtualHostSqliteStmt *setFlow()
 	{
@@ -217,6 +216,7 @@ public:
 	sqlite3 *db;
 	void executeSqls(const char *sql[]);
 	KVirtualHostData *querySql(const char *sql);
+	KVirtualHostData *querySql(const char *sql,const char *value);
 	KVirtualHostSqliteStmt *createStmt(const char *sql);
 private:
 };

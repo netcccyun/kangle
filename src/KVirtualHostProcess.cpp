@@ -84,6 +84,9 @@ kconnection * KVirtualHostProcess::try_connect(sockaddr_i* addr)
 {
 	for (int i = 0; i < 10; i++) {
 		kconnection* cn = kfiber_net_open(addr);
+		if (cn == NULL) {
+			return NULL;
+		}
 		if (kfiber_net_connect(cn, NULL, 0) == 0) {
 			return cn;
 		}
@@ -116,7 +119,7 @@ KUpstream* KVirtualHostProcess::GetUpstream(KHttpRequest* rq, KExtendProgram* rd
 		}
 		KUpstream *us = PowerResult(rq, st);
 		//cmd->UnlockCommand();
-		NoticePowerResult(true);
+		NoticePowerResult(us != NULL);
 		return us;
 	}
 	kfiber* fiber = kfiber_self2();

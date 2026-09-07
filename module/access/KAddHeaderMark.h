@@ -9,6 +9,9 @@ public:
 	{
 		attr = NULL;
 		val = NULL;
+		attr_len = 0;
+		val_len = 0;
+		force = false;
 	}
 	~KAddHeaderMark()
 	{
@@ -69,6 +72,7 @@ public:
 	}
 	void parse_config(const khttpd::KXmlNodeBody* xml) override {
 		auto attribute = xml->attr();
+		force = (attribute["force"] == "1");
 		if(attr){
 			free(attr);
 			attr = NULL;
@@ -100,6 +104,8 @@ public:
 	{
 		attr = NULL;
 		val = NULL;
+		attr_len = 0;
+		val_len = 0;
 	}
 	~KAddResponseHeaderMark()
 	{
@@ -117,6 +123,7 @@ public:
 				return true;
 			}
 			rq->response_header((const char *)attr, attr_len, s->c_str(), s->size());
+			delete s;
 		}
 		return KF_STATUS_REQ_TRUE;
 	}

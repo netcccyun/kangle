@@ -119,7 +119,7 @@ void KLogZeroManageTask::handle()
 			totalSize += (*it)->get_file_size();
 		}
 		for(;;){
-			if(totalSize < log_size){
+			if(totalSize <= log_size){
 				break;
 			}
 			it = files.begin();
@@ -162,7 +162,7 @@ void KLogHandle::addLogTask(KLogTask *task)
 {
 	unsigned maxLogHandle = conf.maxLogHandle;
 	if (maxLogHandle==0) {
-		//Ä¬ÈÏÆôÓÃ20¸öÏß³Ì´¦Àí
+		//é»˜è®¤å¯ç”¨20ä¸ªçº¿ç¨‹å¤„ç†
 		maxLogHandle = 20;
 	}
 	bool threadStarted = true;
@@ -176,9 +176,8 @@ void KLogHandle::addLogTask(KLogTask *task)
 	lock.Unlock();
 	if (threadStarted) {	
 		if (!kthread_pool_start(log_task, this)) {
-			lock.Lock();
-			threads--;
-			lock.Unlock();
+			// Keep queued work from being stranded when thread creation fails.
+			this->task();
 		}
 	}
 }
@@ -206,4 +205,3 @@ void KLogHandle::task()
 		delete task;
 	}
 }
-

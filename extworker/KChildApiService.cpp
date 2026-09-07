@@ -35,11 +35,12 @@ KGL_RESULT KChildApiService::start(KFastcgiStream<KSocketStream>* st)
 }
 int KChildApiService::writeClient(const char* str, int len)
 {
-	headSended = true;
 	if (!headSended) {
 		headSended = true;
 		const char* defaultHeaders = "Status: 500 Server Error\r\n\r\n";
-		st->write_data(defaultHeaders, (int)strlen(defaultHeaders));
+		if (!st->write_data(defaultHeaders, (int)strlen(defaultHeaders))) {
+			return -1;
+		}
 	}
 	if (st->write_data(str, len)) {
 		return len;
@@ -135,4 +136,3 @@ bool KChildApiService::initECB(EXTENSION_CONTROL_BLOCK* ecb)
 	ecb->ReadClient = ReadClient;
 	return true;
 }
-

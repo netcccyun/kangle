@@ -42,7 +42,7 @@ public:
 		return false;
 	}
 	bool enable_scan() override {
-		return true;
+		return isLoad();
 	}
 private:
 	KFiberLocker get_locker() {
@@ -54,6 +54,7 @@ private:
 	kfiber_mutex* lock;
 	vh_module vhm;
 	bool lastStatus;
+	bool configured;
 	KDsoModule vhm_handle;
 };
 extern KVirtualHostDatabase vhd;

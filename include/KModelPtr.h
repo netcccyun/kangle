@@ -35,7 +35,7 @@ public:
 		return m != nullptr;
 	}
 	KModelPtr& operator =(const KModelPtr& ptr) {
-		if (this == *ptr) {
+		if (this == &ptr) {
 			return *this;
 		}
 		if (m) {

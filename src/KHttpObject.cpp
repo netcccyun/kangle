@@ -200,7 +200,7 @@ int KHttpObject::GetHeaderSize(int url_len)
 		if (data->i.condition_is_time) {
 			len += sizeof(data->last_modified);
 		} else {
-			len += (int)data->etag->len;
+			len += sizeof(int) + (int)data->etag->len;
 		}
 	} else {
 		data->i.has_condition = 0;
@@ -267,7 +267,9 @@ bool KHttpObjectBody::restore_header(KHttpObject* obj, char* buffer, int len)
 	int hotlen = len - sizeof(KHttpObjectFileHeader);
 	char* hot = (char*)(fileHeader + 1);
 	//skip url
-	kgl_dc_skip_string(&hot, hotlen);
+	if (!kgl_dc_skip_string(&hot, hotlen)) {
+		return false;
+	}
 	kgl_safe_copy_body_data(&this->i, &fileHeader->body);
 	if (this->i.status_code == 0) {
 		this->i.status_code = STATUS_OK;
@@ -354,7 +356,7 @@ int KHttpObject::build_header(char* buf, char* end, const char* url, int url_len
 	while (header) {
 		int buf_len = header->val_len + header->val_offset;
 		hot += kgl_dc_write_string(hot, header->buf, buf_len);
-		*((uint32_t*)hot) = header->name_attribute;
+		kgl_memcpy(hot, &header->name_attribute, sizeof(uint32_t));
 		hot += sizeof(uint32_t);
 		//printf("after header offset=[%d]\n", hot - buf);
 		header = header->next;
@@ -362,15 +364,17 @@ int KHttpObject::build_header(char* buf, char* end, const char* url, int url_len
 	hot += kgl_dc_write_string(hot, NULL, 0);
 	if (data->etag) {
 		if (data->i.condition_is_time) {
-			*(time_t*)hot = data->last_modified;
+			kgl_memcpy(hot, &data->last_modified, sizeof(data->last_modified));
 			hot += sizeof(data->last_modified);
 		} else {
-			memcpy(hot, data->etag->data, data->etag->len);
-			hot += data->etag->len;
+			hot += kgl_dc_write_string(hot, data->etag->data, (int)data->etag->len);
 		}
 	}
 	//printf("end header offset=[%d]\n", hot - buf);
 	int header_length = (int)(hot - buf);
+	if (header_length < (int)index.head_size) {
+		memset(hot, 0, index.head_size - header_length);
+	}
 #ifndef KGL_DISK_CACHE_ALIGN_HEAD
 	assert(header_length == index.head_size);
 #endif
@@ -389,6 +393,10 @@ kgl_auto_aio_buffer KHttpObject::build_aio_header(int& len, const char* url, int
 	}
 	len = GetHeaderSize(url_len);
 	char* buf = (char*)aio_alloc_buffer(len);
+	if (buf == nullptr) {
+		len = 0;
+		return nullptr;
+	}
 	build_header(buf, buf + len, url, url_len);
 	return kgl_auto_aio_buffer(buf);
 }

@@ -71,7 +71,7 @@ void KDsoExtendManage::html(KWStream &s)
 			<< (orign_filename ? orign_filename : "")
 			<< "</a></td><td>";
 		dso->ListUpstream(s);	
-		s << "</td><td>" << HIWORD(dso->version.module_version) << "." << LOWORD(dso->version.module_version) << "</td>";
+		s << "</td><td>" << HIWORD(dso->version.module_version) << "." << LOWORD(dso->version.module_version) << "</td></tr>";
 	}
 	lock.Unlock();
 	s << "</table>";

@@ -1145,6 +1145,6 @@ bool KVirtualHostManage::add_ssl(const char* domain, const char* cert_file, cons
 	if (!result) {
 		delete cert;
 	}
-	return true;
+	return result;
 }
 #endif

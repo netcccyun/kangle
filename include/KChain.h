@@ -66,6 +66,7 @@ public:
 				return result;
 			}
 			result = (!!result != (*it).revers) ? KF_STATUS_REQ_TRUE : KF_STATUS_REQ_FALSE;
+			last_or = (*it).is_or;
 			if (!result && !last_or) {
 				break;
 			}

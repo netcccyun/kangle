@@ -108,6 +108,7 @@ static const char* getSystemEnv(void* param, const char* name) {
 KVirtualHostDatabase::KVirtualHostDatabase() {
 	lock = kfiber_mutex_init();
 	lastStatus = false;
+	configured = false;
 	memset(&vhm, 0, sizeof(vhm));
 	vhm.vhi_version = 2;
 	vhm.cbsize = sizeof(vhm);
@@ -128,13 +129,18 @@ bool KVirtualHostDatabase::check() {
 	return result;
 }
 bool KVirtualHostDatabase::isLoad() {
-	return (vhm.createConnection != NULL);
+	return configured;
 }
 bool KVirtualHostDatabase::parse_config(khttpd::KXmlNodeBody* xml) {
 	auto attribute = xml->attr();
 	bool result = false;
 	kfiber_mutex_lock(lock);
 	auto driver = attribute["driver"];
+	if (driver.empty()) {
+		kfiber_mutex_unlock(lock);
+		klog(KLOG_ERR, "vh_database driver is empty\n");
+		return false;
+	}
 	if (vhm.createConnection == NULL) {
 
 		if (!isAbsolutePath(driver.c_str())) {
@@ -162,8 +168,13 @@ bool KVirtualHostDatabase::parse_config(khttpd::KXmlNodeBody* xml) {
 	if (vhm.parseConfig) {
 		vh_data vd;
 		init_vh_data(&vd, xml);
-		vhm.parseConfig(&vd);
+		if (!vhm.parseConfig(&vd)) {
+			kfiber_mutex_unlock(lock);
+			klog(KLOG_ERR, "Cann't parse vh_database config\n");
+			return false;
+		}
 	}
+	configured = true;
 	result = true;
 	kfiber_mutex_unlock(lock);
 	return result;
@@ -195,32 +206,35 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 	query_param.st = st;
 	query_param.data = &vd;
 	int result;
-	auto attribute = tvh->attr();
 	for (;;) {
+		// The query callback fills this temporary node.  It must be reset before
+		// every row: keeping attributes from the preceding row makes omitted
+		// columns inherit stale values.
+		tvh->clear();
 		if (kfiber_thread_call(thread_vhd_query, &query_param, 1, &result) != 0) {
 			break;
 		}
 		if (!result) {
 			break;
 		}
-		const char* type = attribute["type"].c_str();
-		const char* name = attribute["name"].c_str();
-		const char* value = attribute["value"].c_str();
+		const auto& attribute = tvh->attr();
 		if (attribute["skip_kangle"] == "1") {
 			continue;
 		}
-		if (type == NULL || name == NULL) {
-			tvh->clear();
+		const KString type = attribute["type"];
+		const KString name = attribute["name"];
+		const KString value = attribute["value"];
+		if (type.empty() || name.empty()) {
 			continue;
 		}
-		int t = atoi(type);
+		int t = atoi(type.c_str());
 		switch (t) {
 		case VH_INFO_HOST:
 		case VH_INFO_HOST2:
 		{
 			auto svh = kconfig::new_child(vh, _KS("host"));
-			svh->set_text(name);
-			svh->attributes("dir", value);
+			svh->set_text(name.c_str());
+			svh->attributes("dir", value.c_str());
 			break;
 		}
 		case VH_INFO_ERROR_PAGE:
@@ -239,7 +253,10 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 		}
 		case VH_INFO_ALIAS:
 		{
-			char* buf = strdup(value);
+			char* buf = strdup(value.c_str());
+			if (buf == NULL) {
+				break;
+			}
 			char* to = buf;
 			char* p = strchr(buf, ',');
 			if (p) {
@@ -264,11 +281,14 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 		{
 			//name格式       是否文件扩展名1|0,值
 			//value格式      是否验证文件存在1|0,target,allowMethod
-			const char* map_val = strchr(name, ',');
+			const char* map_val = strchr(name.c_str(), ',');
 			if (map_val) {
 				map_val++;
-				bool file_ext = (*name == '1');
-				char* buf = strdup(value);
+				bool file_ext = (name[0] == '1');
+				char* buf = strdup(value.c_str());
+				if (buf == NULL) {
+					break;
+				}
 				char* p = strchr(buf, ',');
 				if (p) {
 					*p = '\0';
@@ -297,7 +317,10 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 		}
 		case VH_INFO_MIME:
 		{
-			char* buf = strdup(value);
+			char* buf = strdup(value.c_str());
+			if (buf == NULL) {
+				break;
+			}
 			char* p = strchr(buf, ',');
 			if (p) {
 				*p = '\0';
@@ -332,7 +355,6 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 			env->attributes.emplace("value", value);
 			break;
 		}
-		tvh->clear();
 	}
 	return true;
 }
@@ -451,6 +473,9 @@ khttpd::KSafeXmlNode KVirtualHostDatabase::load(kconfig::KConfigFile* file) {
 		query_param.data = &vd;
 		int result;
 		if (kfiber_thread_call(thread_vhd_query, &query_param, 1, &result) != 0) {
+			return nullptr;
+		}
+		if (!result) {
 			return nullptr;
 		}
 	}

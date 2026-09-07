@@ -54,7 +54,7 @@ void KPipeStream::closeAllOtherFile() {
 	int start_fd = 3;
 	if (m_debug > 0) {
 		/*
-		 * Èç¹ûÊÇµ÷ÊÔ£¬ÎÒÃÇ²»¹Østdin,stdout,stderr,·½±ãµ÷ÊÔ¡£
+		 * å¦‚æœæ˜¯è°ƒè¯•ï¼Œæˆ‘ä»¬ä¸å…³stdin,stdout,stderr,æ–¹ä¾¿è°ƒè¯•ã€‚
 		 */
 		start_fd = 3;
 	}
@@ -173,7 +173,7 @@ bool KPipeStream::writeString(const char *str) {
 	if (str) {
 		len = (int)strlen(str);
 	}
-	if (!write_all((char *) &len, sizeof(len))) {
+	if (write_all((char*)&len, sizeof(len)) != STREAM_WRITE_SUCCESS) {
 		return false;
 	}
 	if (str) {

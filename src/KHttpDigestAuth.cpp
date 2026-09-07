@@ -11,6 +11,7 @@
 #include "KHttpField.h"
 #include "http.h"
 #include "kmd5.h"
+#include <ctype.h>
 
 #include "kmalloc.h"
 #ifdef ENABLE_DIGEST_AUTH
@@ -31,7 +32,7 @@ bool KHttpDigestSession::verify_rq(KHttpRequest* rq) {
 	//int inc = atoi(nc);
 	//	debug("last_nc = %x,inc=%x\n",last_nc,inc);
 	if (inc == last_nc) {
-		//重放攻击
+		//閲嶆斁鏀诲嚮
 		//		debug("replay attack,last_nc=%d,inc=%d\n",last_nc,inc);
 		return false;
 	} else if (inc < last_nc) {
@@ -51,7 +52,7 @@ bool KHttpDigestSession::verify_rq(KHttpRequest* rq) {
 		}
 		//		debug("\nresult=%d\n",result);
 	} else {
-		//更新最后的nc
+		//鏇存柊鏈�鍚庣殑nc
 		last_nc = inc;
 	}
 	if (result) {
@@ -110,12 +111,16 @@ bool KHttpDigestAuth::verifySession(KHttpRequest* rq) {
 		return false;
 	}
 	KSafeUrl url2(new KUrl(true));
-	parse_url(uri, url2.get());
+	if (!parse_url(uri, url2.get())) {
+		return false;
+	}
+	const char* request_param = rq->sink->data.raw_url.param;
 	if (
-		(url2->host && strcmp(url2->host, rq->sink->data.raw_url.host) != 0)
+		(url2->host && strcasecmp(url2->host, rq->sink->data.raw_url.host) != 0)
 		|| (url2->path == NULL)
 		|| (strcmp(url2->path, rq->sink->data.raw_url.path) != 0)
-		|| (url2->param && (rq->sink->data.raw_url.param == NULL || strcmp(url2->param, rq->sink->data.raw_url.param) != 0))
+		|| ((url2->param == NULL) != (request_param == NULL))
+		|| (url2->param && strcmp(url2->param, request_param) != 0)
 		) {
 
 		return false;
@@ -143,10 +148,13 @@ bool KHttpDigestAuth::verifySession(KHttpRequest* rq) {
 }
 
 bool KHttpDigestAuth::parse(KHttpRequest* rq, const char* str) {
+	if (str == NULL) {
+		return false;
+	}
 	/*
 	 if (rq->auth == NULL || rq->auth->getType() != AUTH_DIGEST) {
-	 debug("没有上一次的数据\n");
-	 //没有上一次的数据
+	 debug("娌℃湁涓婁竴娆＄殑鏁版嵁\n");
+	 //娌℃湁涓婁竴娆＄殑鏁版嵁
 	 return false;
 	 }
 	 */
@@ -218,38 +226,48 @@ bool KHttpDigestAuth::parse(KHttpRequest* rq, const char* str) {
 	}
 	//check the digest
 	if (user == NULL) {
-		//		debug("没有用户名\n");
+		//		debug("娌℃湁鐢ㄦ埛鍚峔n");
 		return false;
 	}
 	if (realm == NULL) {
 		//|| this->realm == NULL || strcmp(realm, this->realm) != 0) {
-		//		debug("realm 不对\n");
+		//		debug("realm 涓嶅\n");
 		return false;
 	}
 	if (nonce == NULL) {//|| this->nonce == NULL || strcmp(nonce, this->nonce) != 0) {
-		//		debug("nonce不对\n");
+		//		debug("nonce涓嶅\n");
 		return false;
 	}
 
 	if (uri == NULL) {
 		return false;
 	}
-	if (response == NULL) {
-		//		debug("response不能为空\n");
+	if (response == NULL || strlen(response) != 32) {
+		//		debug("response涓嶈兘涓虹┖\n");
 		return false;
 	}
 
-	if (nc == NULL) {
-		//		debug("nc不能为空\n");
+	if (nc == NULL || strlen(nc) != 8) {
+		//		debug("nc涓嶈兘涓虹┖\n");
 		return false;
 	}
-	if (cnonce == NULL) {
+	if (cnonce == NULL || *cnonce == '\0') {
 		//		debug("cnonce empty\n");
 		return false;
 	}
-	if (qop == NULL) {
+	if (qop == NULL || strcasecmp(qop, "auth") != 0) {
 		//		debug("qop empty\n");
 		return false;
+	}
+	for (const char* p = response; *p; ++p) {
+		if (!isxdigit((unsigned char)*p)) {
+			return false;
+		}
+	}
+	for (const char* p = nc; *p; ++p) {
+		if (!isxdigit((unsigned char)*p)) {
+			return false;
+		}
 	}
 	this->response = xstrdup(response);
 	this->nc = xstrdup(nc);
@@ -282,7 +300,7 @@ bool KHttpDigestAuth::verify(KHttpRequest* rq, const char* password,
 	//	printf("response=[%s]\n", ar.getString());
 	char hresponse[33];
 	KMD5(ar.c_str(), ar.size(), hresponse);
-	if (this->response && strcmp(this->response, hresponse) == 0) {
+	if (this->response && strcasecmp(this->response, hresponse) == 0) {
 		//		debug("verified success\n");
 		return true;
 	}

@@ -20,9 +20,9 @@ std::string dbname;
 static const char *load_sql = "SELECT uid AS user,gid AS `group`,* FROM vhost";
 static const char* load_vh_name_sql = "SELECT name FROM vhost";
 static const char *load_black_list_sql = "SELECT ip,flags FROM black_list";
-static std::string flush_sql;
-static const char *load_info_sql2 = "SELECT * FROM vhost_info WHERE vhost='%s' AND type<1000 order by id";
-static const char *load_info_sql = "SELECT * FROM vhost_info WHERE vhost='%s' AND type<1000";
+static const char *flush_sql = "SELECT uid AS user,gid AS `group`,* FROM vhost WHERE name=?";
+static const char *load_info_sql2 = "SELECT * FROM vhost_info WHERE vhost=? AND type<1000 order by id";
+static const char *load_info_sql = "SELECT * FROM vhost_info WHERE vhost=? AND type<1000";
 static int sqliteBusyHandle(void *db,int count)
 {
 	if (count>5) {
@@ -254,8 +254,6 @@ static int parseConfig(vh_data *data)
 
 int initVirtualHostModule(vh_module *ctx)
 {
-	flush_sql = load_sql;
-	flush_sql += " WHERE name='%s'";
 	const char *value = ctx->getConfigValue(ctx->ctx,"kangle_home");
 	if(value==NULL){
 		return 0;
@@ -287,6 +285,7 @@ int initVirtualHostModule(vh_module *ctx)
 KVirtualHostSqliteStmt::KVirtualHostSqliteStmt()
 {
 	stmt = NULL;
+	bind_ok = true;
 }
 KVirtualHostSqliteStmt::~KVirtualHostSqliteStmt()
 {
@@ -302,20 +301,26 @@ const char *KVirtualHostDataSqliteResult::getColumnName(int columnIndex)
 bool KVirtualHostSqliteStmt::bindInt64(unsigned columnIndex,sqlite_int64 value)
 {
 	int ret = sqlite3_bind_int64(stmt,columnIndex+1,value);
+	bind_ok = bind_ok && ret == SQLITE_OK;
 	return ret == SQLITE_OK;
 }
 bool KVirtualHostSqliteStmt::bindInt(unsigned columnIndex,int value)
 {
 	int ret = sqlite3_bind_int(stmt,columnIndex+1,value);
+	bind_ok = bind_ok && ret == SQLITE_OK;
 	return ret == SQLITE_OK;
 }
 bool KVirtualHostSqliteStmt::bindString(unsigned columnIndex,const char *value)
 {
 	int ret = sqlite3_bind_text(stmt,columnIndex+1,value,-1,NULL);
+	bind_ok = bind_ok && ret == SQLITE_OK;
 	return ret == SQLITE_OK;
 }
 bool KVirtualHostSqliteStmt::execute()
 {
+	if (!bind_ok) {
+		return false;
+	}
 	int ret = sqlite3_step(stmt);
 	return SQLITE_DONE == ret;
 }
@@ -381,25 +386,33 @@ KVirtualHostData *KVirtualHostSqliteConnection::loadBlackList()
 }
 KVirtualHostData *KVirtualHostSqliteConnection::flushVirtualHost(const char *name)
 {
-	char sql[512];
-	snprintf(sql,sizeof(sql)-1,flush_sql.c_str(),name);
-	return querySql(sql);
+	return querySql(flush_sql, name);
 }
 KVirtualHostData *KVirtualHostSqliteConnection::loadInfo(const char *name)
 {
-	char sql[512];
-	snprintf(sql,sizeof(sql)-1,load_info_sql2,name);
-	KVirtualHostData *vd = querySql(sql);
+	KVirtualHostData *vd = querySql(load_info_sql2, name);
 	if (vd) {
 		return vd;
 	}
-	snprintf(sql,sizeof(sql)-1,load_info_sql,name);
-	return querySql(sql);;
+	return querySql(load_info_sql, name);
+}
+KVirtualHostData *KVirtualHostSqliteConnection::querySql(const char *sql,const char *value)
+{
+	KVirtualHostDataSqliteResult *rs = new KVirtualHostDataSqliteResult;
+	if (SQLITE_OK != sqlite3_prepare_v2(db,sql,-1,&rs->stmt,NULL)) {
+		delete rs;
+		return NULL;
+	}
+	if (SQLITE_OK != sqlite3_bind_text(rs->stmt,1,value,-1,SQLITE_TRANSIENT)) {
+		delete rs;
+		return NULL;
+	}
+	return rs;
 }
 KVirtualHostData *KVirtualHostSqliteConnection::querySql(const char *sql)
 {
 	KVirtualHostDataSqliteResult *rs = new KVirtualHostDataSqliteResult;
-	if(SQLITE_OK == sqlite3_prepare(db,sql,-1,&rs->stmt,NULL)){
+	if(SQLITE_OK == sqlite3_prepare_v2(db,sql,-1,&rs->stmt,NULL)){
 		return rs;
 	}
 	delete rs;

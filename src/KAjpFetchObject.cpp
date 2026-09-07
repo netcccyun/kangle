@@ -53,7 +53,7 @@ KAjpFetchObject::KAjpFetchObject() {
 
 KAjpFetchObject::~KAjpFetchObject() {
 }
-//¥¥Ω®∑¢ÀÕÕ∑µΩbuffer÷–°£
+//ÂàõÂª∫ÂèëÈÄÅÂ§¥Âà∞buffer‰∏≠„ÄÇ
 KGL_RESULT KAjpFetchObject::buildHead(KHttpRequest* rq)
 {
 	assert(buffer == NULL);
@@ -191,7 +191,9 @@ KGL_RESULT KAjpFetchObject::buildHead(KHttpRequest* rq)
 		kstring_release(param);
 	}
 	b.putByte(0xFF);
-	b.end();
+	if (!b.end()) {
+		return KGL_EDATA_FORMAT;
+	}
 	return KGL_OK;
 }
 void KAjpFetchObject::BuildPostEnd()
@@ -230,8 +232,11 @@ KGL_RESULT KAjpFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end)
 		case JK_AJP13_END_RESPONSE:
 			ReadBodyEnd(rq);
 			break;
-		case JK_AJP13_SEND_BODY_CHUNK:
+		case JK_AJP13_SEND_BODY_CHUNK: {
 			if (!msg.getShort(&chunk_length)) {
+				return KGL_EDATA_FORMAT;
+			}
+			if (msg.getLen() < (int)chunk_length + 1 || msg.getBytes()[chunk_length] != '\0') {
 				return KGL_EDATA_FORMAT;
 			}
 			//printf("chunk_length=[%d]\n",chunk_length);
@@ -241,6 +246,9 @@ KGL_RESULT KAjpFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end)
 				return ret;
 			}
 			break;
+		}
+		default:
+			return KGL_EDATA_FORMAT;
 		}
 	}
 	return KGL_OK;
@@ -259,6 +267,9 @@ kgl_parse_result KAjpFetchObject::parse_unknow_header(KHttpRequest* rq, char** d
 			return kgl_parse_error;
 		}
 		unsigned char type = parseMessage(rq, rq->ctx.obj, &msg);
+		if (type == JK_AJP13_ERROR) {
+			return kgl_parse_error;
+		}
 		//printf("type=[%d]\n",type);
 		switch (type) {
 		case JK_AJP13_SEND_HEADERS:
@@ -343,7 +354,7 @@ unsigned char KAjpFetchObject::parseMessage(KHttpRequest* rq, KHttpObject* obj, 
 	}
 	return type;
 }
-//¥¥Ω®post ˝æ›µΩbuffer÷–°£
+//ÂàõÂª∫postÊï∞ÊçÆÂà∞buffer‰∏≠„ÄÇ
 void KAjpFetchObject::buildPost(KHttpRequest* rq)
 {
 	unsigned len = buffer->getLen();
@@ -382,7 +393,7 @@ kgl_parse_result KAjpFetchObject::parse(char** str, char* end, KAjpMessageParser
 			return kgl_parse_error;
 		}
 		body_len = ajp_header[2] << 8 | ajp_header[3];
-		if (body_len > AJP_PACKAGE) {
+		if (body_len > AJP_PACKAGE - 4) {
 			klog(KLOG_ERR, "recv wrong package length %d.\n", body_len);
 			return kgl_parse_error;
 		}

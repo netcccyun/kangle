@@ -237,7 +237,7 @@ void KMultiAcserver::dump(kgl::serializable* sl) {
 		assert(node);
 		auto sl_node = sl->add_obj_array("nodes");
 		if (!sl_node) {
-			continue;
+			break;
 		}
 		node->dump(sl_node,true);
 		node = node->next;
@@ -311,6 +311,9 @@ KSockPoolHelper* KMultiAcserver::nextActiveNode(KSockPoolHelper* node, unsigned 
 	KSockPoolHelper* helper = node;
 	bool use_next = (index & 1) > 0;
 	while (helper) {
+		if (!helper->disable_flag) {
+			return helper;
+		}
 		KSockPoolHelper* n = (use_next) ? helper->next : helper->prev;
 		if (use_next) {
 			if (index >= vnodes.size() - 1) {
@@ -324,9 +327,6 @@ KSockPoolHelper* KMultiAcserver::nextActiveNode(KSockPoolHelper* node, unsigned 
 			} else {
 				index--;
 			}
-		}
-		if (!helper->disable_flag) {
-			return helper;
 		}
 		if (n == node) {
 			return NULL;

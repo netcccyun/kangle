@@ -74,6 +74,8 @@ KDsoExtend::KDsoExtend(const char* name) {
 	this->name = xstrdup(name);
 	filename = NULL;
 	orign_filename = NULL;
+	kgl_dso_init = NULL;
+	kgl_dso_finit = NULL;
 	memset(&version, 0, sizeof(version));
 }
 KDsoExtend::~KDsoExtend() {
@@ -197,6 +199,9 @@ static kgl_pool_function pool_function = {
 	(void  (*)(kgl_cleanup_t* , void*))kgl_cleanup_set_data
 };
 bool KDsoExtend::load(const char* filename, const KXmlAttribute& attribute) {
+	if (filename == NULL || *filename == '\0') {
+		return false;
+	}
 	this->attribute = attribute;
 	orign_filename = strdup(filename);
 	KDynamicString ds;
@@ -236,6 +241,7 @@ bool KDsoExtend::load(const char* filename, const KXmlAttribute& attribute) {
 void KDsoExtend::shutdown() {
 	if (kgl_dso_finit) {
 		kgl_dso_finit(0);
+		kgl_dso_finit = NULL;
 	}
 }
 void KDsoExtend::dump(kgl::serializable* sl) {

@@ -123,31 +123,42 @@ bool KApacheConfig::process(const char* cmd, std::vector<char*>& item)
 		return false;
 	}
 	if (strcasecmp(cmd, "ServerRoot") == 0) {
+		if (item.empty()) {
+			return true;
+		}
 		serverRoot = item[0];
 		return true;
 	}
 	if (strcasecmp(cmd, "Listen") == 0) {
+		if (item.empty()) {
+			return true;
+		}
 		char* v = item[0];
 		KListenHost listen;
-		char* p = strchr(v, ':');
 		const char* ip = "*";
-		int port = 0;
-		if (p) {
-			port = atoi(p + 1);
-			*p = '\0';
-			if (*v == '[') {
-				v++;
-				p = strchr(v, ']');
-				if (*p) {
-					*p = '\0';
-				}
+		const char* port_text = v;
+		if (*v == '[') {
+			char* bracket = strchr(v + 1, ']');
+			if (bracket == NULL || bracket[1] != ':') {
+				klog(KLOG_ERR, "invalid IPv6 Listen address [%s]\n", v);
+				return true;
 			}
+			*bracket = '\0';
+			ip = v + 1;
+			port_text = bracket + 2;
+		} else if (char* colon = strrchr(v, ':')) {
+			*colon = '\0';
 			ip = v;
-		} else {
-			port = atoi(v);
+			port_text = colon + 1;
+		}
+		char* port_end = NULL;
+		long parsed_port = strtol(port_text, &port_end, 10);
+		if (*port_text == '\0' || *port_end != '\0' || parsed_port <= 0 || parsed_port > 65535) {
+			klog(KLOG_ERR, "invalid Listen port [%s]\n", port_text);
+			return true;
 		}
 		listen.ip = ip;
-		listen.port = port;
+		listen.port = (int)parsed_port;
 		listen.model = 0;
 		if (item.size() > 1 && strcasecmp(item[1], "https") == 0) {
 			listen.model = WORK_MODEL_SSL;
@@ -156,6 +167,9 @@ bool KApacheConfig::process(const char* cmd, std::vector<char*>& item)
 		return true;
 	}
 	if (strcasecmp(cmd, "Include") == 0) {
+		if (item.empty()) {
+			return true;
+		}
 		if (includeLevel > 128) {
 			klog(KLOG_ERR, "Include level is too large,ignore Include\n");
 			return true;
@@ -167,6 +181,9 @@ bool KApacheConfig::process(const char* cmd, std::vector<char*>& item)
 			std::stringstream p;
 			p << serverRoot << PATH_SPLIT_CHAR << item[0];
 			path = strdup(p.str().c_str());
+		}
+		if (path == NULL) {
+			return true;
 		}
 		if (strchr(path, '*') != NULL) {
 			//Ŀ¼
@@ -288,11 +305,12 @@ bool KApacheConfig::load(KFileName* file)
 		return false;
 	}
 	defer(kfiber_file_close(fp));
-	auto size = (int)kfiber_file_size(fp);
-	if (size > kconfig::max_file_size) {
-		klog(KLOG_ERR, "config file [%s] is too big. size=[%d]\n", file->getName(), size);
+	int64_t file_size = kfiber_file_size(fp);
+	if (file_size < 0 || file_size > kconfig::max_file_size) {
+		klog(KLOG_ERR, "config file [%s] has invalid size=[" INT64_FORMAT "]\n", file->getName(), file_size);
 		return false;
 	}
+	int size = (int)file_size;
 	char* buf = (char*)malloc(size + 1);
 	if (!buf) {
 		klog(KLOG_ERR, "no memory to alloc %s:%d", __FILE__, __LINE__);

@@ -9,6 +9,10 @@ struct brotli_context : kgl_forward_body
 KGL_RESULT brotli_compress(brotli_context *ctx, const uint8_t** str, size_t len, BrotliEncoderOperation op)
 {
 	char out[8192];
+	const uint8_t* empty = NULL;
+	if (str == NULL) {
+		str = &empty;
+	}
 	do {
 		size_t available_out = sizeof(out);
 		uint8_t* next_out = (uint8_t*)out;
@@ -22,19 +26,22 @@ KGL_RESULT brotli_compress(brotli_context *ctx, const uint8_t** str, size_t len,
 				return ret;
 			}
 		}
-	} while (BrotliEncoderHasMoreOutput(ctx->state));
+	} while (len > 0 || BrotliEncoderHasMoreOutput(ctx->state));
 	return KGL_OK;
 }
 static KGL_RESULT brotli_write(kgl_response_body_ctx * rq, const char* str, int len) 
 {
+	if (len < 0 || (len > 0 && str == NULL)) {
+		return KGL_EINVALID_PARAMETER;
+	}
 	return brotli_compress((brotli_context*)rq, (const uint8_t**)&str, (size_t)len, BROTLI_OPERATION_PROCESS);
 }
 static KGL_RESULT brotli_flush(kgl_response_body_ctx* rq) {
 	KGL_RESULT result2 = brotli_compress((brotli_context*)rq, NULL, 0, BROTLI_OPERATION_FLUSH);
 	if (result2 != KGL_OK) {
-		return forward_flush((kgl_response_body_ctx*)rq);
+		return result2;
 	}
-	return KGL_OK;
+	return forward_flush(rq);
 }
 static KGL_RESULT brotli_close(kgl_response_body_ctx* rq,KGL_RESULT result) {
 	brotli_context* ctx = (brotli_context*)rq;
@@ -61,7 +68,10 @@ bool pipe_brotli_compress(int level, kgl_response_body* body) {
 	if (!state) {
 		return false;
 	}
-	BrotliEncoderSetParameter(state, BROTLI_PARAM_QUALITY, level);
+	if (!BrotliEncoderSetParameter(state, BROTLI_PARAM_QUALITY, level)) {
+		BrotliEncoderDestroyInstance(state);
+		return false;
+	}
 	brotli_context* br = new brotli_context;
 	br->state = state;
 	pipe_response_body(br, &brotli_function, body);

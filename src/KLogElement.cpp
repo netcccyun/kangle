@@ -51,6 +51,9 @@ KLogElement::~KLogElement() {
 }
 bool KLogElement::open() {
 	assert(!fp.opened());
+	if (path.empty()) {
+		return false;
+	}
 	if (path == "/nolog") {
 		place = LOG_NONE;
 		return true;
@@ -60,7 +63,7 @@ bool KLogElement::open() {
 	}
 	log_file_size = 0;
 #ifdef ENABLE_PIPE_LOG
-	if (path[0] == '|') {
+	if (!path.empty() && path[0] == '|') {
 		//pipe log
 		std::vector<char*> args;
 		char* cmd_buf = xstrdup(path.c_str() + 1);
@@ -144,7 +147,7 @@ void KLogElement::rotateLog() {
 		return;
 	}
 #ifdef ENABLE_PIPE_LOG
-	if (path[0] == '|') {
+	if (!path.empty() && path[0] == '|') {
 		//pipe
 		return;
 	}

@@ -30,19 +30,11 @@ public:
 #endif
 class KDiskCacheStream {
 public:
-	KDiskCacheStream() {
-		memset(this, 0, sizeof(KDiskCacheStream));
-	}
+	KDiskCacheStream() : filename(nullptr), fp(nullptr), buffer(nullptr),
+		hot(nullptr), buffer_left(0), buffer_size(0) {}
 	~KDiskCacheStream()
 	{
-		if (fp) {
-			kfiber_file_close(fp);
-			kassert(filename);
-			unlink(filename);
-		}
-		if (filename) {
-			xfree(filename);
-		}
+		reset(fp != nullptr);
 		if (buffer) {
 			aio_free_buffer(buffer);
 		}
@@ -52,6 +44,21 @@ public:
 	bool Write(KHttpObject *obj,const char *buf, int len);
 	bool Close(KHttpObject *obj);
 private:
+	void reset(bool remove_file) {
+		if (fp) {
+			kfiber_file_close(fp);
+			fp = nullptr;
+		}
+		if (filename) {
+			if (remove_file) {
+				unlink(filename);
+			}
+			xfree(filename);
+			filename = nullptr;
+		}
+		hot = buffer;
+		buffer_left = buffer ? buffer_size : 0;
+	}
 	bool FlushBuffer();
 	char *filename;
 	kfiber_file* fp;

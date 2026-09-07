@@ -33,13 +33,20 @@ KTempFile::KTempFile() {
 	lock = kfiber_mutex_init();
 }
 void KTempFile::Close() {
+	kfiber* fiber = NULL;
 	kfiber_mutex_lock(lock);
 	if (fp) {
 		kfiber_file_close(fp);
 		tunlink(file.c_str());
 		fp = NULL;
 	}
+	write_is_end = true;
+	fiber = wait_read;
+	wait_read = NULL;
 	kfiber_mutex_unlock(lock);
+	if (fiber) {
+		kfiber_wakeup(fiber, this, -1);
+	}
 }
 KTempFile::~KTempFile() {
 	Close();
@@ -72,10 +79,14 @@ bool KTempFile::write_all(const char* buf, int len) {
 	return true;
 }
 void KTempFile::WriteEnd() {
+	kfiber_mutex_lock(lock);
 	write_is_end = true;
 	kfiber* fiber = wait_read;
 	if (fiber != NULL) {
 		wait_read = NULL;
+	}
+	kfiber_mutex_unlock(lock);
+	if (fiber != NULL) {
 		kfiber_wakeup(fiber, this, 0);
 	}
 }
@@ -85,45 +96,54 @@ int KTempFile::Write(const char* buf, int len) {
 		kfiber_mutex_unlock(lock);
 		return -1;
 	}
-	kfiber_file_seek(fp, seekBegin, write_offset);
-	int got = kfiber_file_write(fp, buf, len);
-	kfiber_mutex_unlock(lock);
-	//printf("write got=[%d]\n", got);
+	int got = -1;
+	if (kfiber_file_seek(fp, seekBegin, write_offset) == 0) {
+		got = kfiber_file_write(fp, buf, len);
+	}
+	kfiber* fiber = NULL;
 	if (got > 0) {
 		write_offset += got;
-		kfiber* fiber = wait_read;
+		fiber = wait_read;
 		if (write_offset > read_offset && fiber != NULL) {
 			wait_read = NULL;
-			//printf("write wakeup wait_read fiber=[%p]\n", fiber);
-			kfiber_wakeup(fiber, this, 0);
 		}
+	}
+	kfiber_mutex_unlock(lock);
+	if (fiber != NULL) {
+		kfiber_wakeup(fiber, this, 0);
 	}
 	return got;
 }
 int KTempFile::Read(char* buf, int len) {
-	if (fp == NULL || wait_read) {
-		return -1;
-	}
 	for (;;) {
-		int64_t have_data = GetLeft();
+		kfiber_mutex_lock(lock);
+		if (fp == NULL || wait_read) {
+			kfiber_mutex_unlock(lock);
+			return -1;
+		}
+		int64_t have_data = write_offset - read_offset;
 		if (have_data <= 0) {
 			if (write_is_end) {
+				kfiber_mutex_unlock(lock);
 				return 0;
 			}
 			wait_read = kfiber_self2();
+			kfiber* fiber = wait_read;
+			kfiber_mutex_unlock(lock);
 			//printf("no more data to read now wait write. fiber=[%p]\n", wait_read);
-			__kfiber_wait(wait_read, this);
+			__kfiber_wait(fiber, this);
 			continue;
 		}
 		assert(wait_read == NULL);
 		len = (int)KGL_MIN((int64_t)len, have_data);
-		kfiber_mutex_lock(lock);
-		kfiber_file_seek(fp, seekBegin, read_offset);
-		int got = kfiber_file_read(fp, buf, len);
-		kfiber_mutex_unlock(lock);
+		int got = -1;
+		if (kfiber_file_seek(fp, seekBegin, read_offset) == 0) {
+			got = kfiber_file_read(fp, buf, len);
+		}
 		if (got > 0) {
 			read_offset += got;
 		}
+		kfiber_mutex_unlock(lock);
 		return got;
 	}
 	return -1;
@@ -182,6 +202,10 @@ bool new_tempfile_input_stream(kgl_input_stream* in) {
 		return false;
 	}
 	char* buf = (char*)malloc(TEMPFILE_POST_CHUNK_SIZE);
+	if (buf == NULL) {
+		delete st;
+		return false;
+	}
 	bool result = false;
 	while ((in)->f->body.get_left(in->body_ctx) != 0) {
 		int got = in->f->body.read(in->body_ctx, buf, TEMPFILE_POST_CHUNK_SIZE);
@@ -210,6 +234,9 @@ int tempfile_write_fiber(void* arg, int got) {
 	kgl_tempfile_output_ctx* out = (kgl_tempfile_output_ctx*)arg;
 	KGL_RESULT result = KGL_OK;
 	char* buf = (char*)malloc(8192);
+	if (buf == NULL) {
+		return (int)KGL_ENO_MEMORY;
+	}
 	for (;;) {
 		int len = out->tmp_file.Read(buf, 8192);
 		if (len == 0) {
@@ -240,7 +267,10 @@ int tempfile_end(kgl_tempfile_output_ctx* tmp_out) {
 }
 KGL_RESULT tempfile_close(kgl_response_body_ctx* out, KGL_RESULT result) {
 	kgl_tempfile_output_ctx* tmp_out = (kgl_tempfile_output_ctx*)out;
-	tempfile_end(tmp_out);
+	int tempfile_result = tempfile_end(tmp_out);
+	if (result == KGL_OK && tempfile_result != KGL_OK) {
+		result = (KGL_RESULT)tempfile_result;
+	}
 	result = forward_close(out, result);
 	delete tmp_out;
 	return result;

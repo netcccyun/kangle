@@ -17,6 +17,8 @@
  */
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include <vector>
 #include "ksocket.h"
 #include "KAcserver.h"
@@ -971,6 +973,9 @@ KRedirect* KAcserverManager::refsRedirect(const KString& target) {
 	if (strncasecmp(target.c_str(), "cdn:", 4) == 0) {
 		KRedirect* rd = NULL;
 		char* tmp = strdup(target.c_str() + 4);
+		if (tmp == NULL) {
+			return NULL;
+		}
 		char* p = strchr(tmp, ':');
 		if (p) {
 			*p = '\0';
@@ -978,14 +983,32 @@ KRedirect* KAcserverManager::refsRedirect(const KString& target) {
 			p = strchr(host, ':');
 			if (p) {
 				*p = '\0';
-				int port = atoi(p + 1);
-				p = strchr(p + 1, ':');
-				int life_time = 0;
+				char* port_text = p + 1;
+				p = strchr(port_text, ':');
+				char* life_time_text = NULL;
 				if (p) {
 					*p = '\0';
-					life_time = atoi(p + 1);
+					life_time_text = p + 1;
 				}
-				rd = server_container->refsRedirect(NULL, host, port, NULL, life_time, KPoolableRedirect::parseProto(tmp));
+				char* end = NULL;
+				errno = 0;
+				long parsed_port = strtol(port_text, &end, 10);
+				int life_time = 0;
+				bool valid = *tmp && *host && *port_text && !errno && *end == '\0'
+					&& parsed_port > 0 && parsed_port <= 65535;
+				if (valid && life_time_text) {
+					errno = 0;
+					long parsed_life_time = strtol(life_time_text, &end, 10);
+					valid = *life_time_text && !errno && *end == '\0'
+						&& parsed_life_time >= 0 && parsed_life_time <= INT_MAX;
+					if (valid) {
+						life_time = (int)parsed_life_time;
+					}
+				}
+				if (valid) {
+					rd = server_container->refsRedirect(NULL, host, (int)parsed_port, NULL,
+						life_time, KPoolableRedirect::parseProto(tmp));
+				}
 			}
 		}
 		free(tmp);

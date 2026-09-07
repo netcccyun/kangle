@@ -83,8 +83,8 @@ namespace kangle {
 			assert(rq->ctx.obj);
 			KBIT_CLR(rq->ctx.filter_flags, RQ_SWAP_OLD_OBJ);
 			if (rq->ctx.obj->data->i.status_code == STATUS_NOT_MODIFIED) {
-				//¸üÐÂobj
-				//É¾³ýÐÂobj
+				//æ›´æ–°obj
+				//åˆ é™¤æ–°obj
 				assert(rq->ctx.old_obj->in_cache);
 				cache.rate(rq->ctx.old_obj);
 				return;
@@ -98,9 +98,9 @@ namespace kangle {
 			if (KBIT_TEST(rq->ctx.filter_flags, RF_ALWAYS_ONLINE) ||
 				(KBIT_TEST(rq->ctx.old_obj->index.flags, OBJ_IS_GUEST) && !KBIT_TEST(rq->ctx.filter_flags, RF_GUEST))
 				) {
-				//ÓÀ¾ÃÔÚÏß£¬²¢ÇÒÐÂÍøÒ³Ã»ÓÐ´æ´¢
-				//»òÕßÊÇ»áÔ±·ÃÎÊÁËÓÎ¿Í»º´æ
-				//¾ÉÍøÒ³¼ÌÐøÊ¹ÓÃ
+				//æ°¸ä¹…åœ¨çº¿ï¼Œå¹¶ä¸”æ–°ç½‘é¡µæ²¡æœ‰å­˜å‚¨
+				//æˆ–è€…æ˜¯ä¼šå‘˜è®¿é—®äº†æ¸¸å®¢ç¼“å­˜
+				//æ—§ç½‘é¡µç»§ç»­ä½¿ç”¨
 				cache.rate(rq->ctx.old_obj);
 			} else {
 				cache.dead(rq->ctx.old_obj, __FILE__, __LINE__);
@@ -200,7 +200,7 @@ kgl_auto_cstr KHttpRequest::map_url_path(const char* url, KBaseRedirect* caller)
 		path = u.path;
 		conf.gvm->queryVirtualHost((KVirtualHostContainer*)sink->get_server_opaque(), &nsvh, u.host, 0);
 		if (nsvh && nsvh->vh == svh->vh) {
-			//ÏàÍ¬µÄvh
+			//ç›¸åŒçš„vh
 			svh = nsvh;
 		}
 	}
@@ -208,7 +208,7 @@ kgl_auto_cstr KHttpRequest::map_url_path(const char* url, KBaseRedirect* caller)
 	if (caller != NULL) {
 		auto rd = svh->vh->refsPathRedirect(path, (int)strlen(path));
 		if (rd != caller) {
-			//ÎÞÈ¨ÏÞ
+			//æ— æƒé™
 			brd_check_passed = false;
 		}
 		if (rd) {
@@ -237,17 +237,18 @@ KHttpHeaderIteratorResult handle_http_header(void* arg, KHttpHeader* header) {
 			char* end = header->buf + header->val_offset + header->val_len;
 
 			char* p = header->buf + header->val_offset;
-			while (*p && !IS_SPACE(*p)) {
+			while (p < end && !IS_SPACE(*p)) {
 				p++;
 			}
 			char* p2 = p;
-			while (*p2 && IS_SPACE(*p2)) {
+			while (p2 < end && IS_SPACE(*p2)) {
 				p2++;
 			}
 			KHttpAuth* tauth = NULL;
-			if (strncasecmp(header->buf + header->val_offset, "basic", p - (header->buf + header->val_offset)) == 0) {
+			size_t auth_type_len = p - (header->buf + header->val_offset);
+			if (auth_type_len == 5 && strncasecmp(header->buf + header->val_offset, "basic", 5) == 0) {
 				tauth = new KHttpBasicAuth;
-			} else if (strncasecmp(header->buf + header->val_offset, "digest", p - (header->buf + header->val_offset)) == 0) {
+			} else if (auth_type_len == 6 && strncasecmp(header->buf + header->val_offset, "digest", 6) == 0) {
 #ifdef ENABLE_DIGEST_AUTH
 				tauth = new KHttpDigestAuth;
 #endif
@@ -434,7 +435,7 @@ kgl_auto_cstr KHttpRequest::build_vary(const char* vary) {
 					value++;
 				}
 				if (!build_vary_extend(this, &s, name, value)) {
-					//Èç¹û´æÔÚ²»ÄÜÊ¶±ðµÄÀ©Õ¹vary£¬Ôò²»»º´æ
+					//å¦‚æžœå­˜åœ¨ä¸èƒ½è¯†åˆ«çš„æ‰©å±•varyï¼Œåˆ™ä¸ç¼“å­˜
 					KBIT_SET(this->ctx.filter_flags, RF_NO_CACHE);
 					return nullptr;
 				}
@@ -456,7 +457,7 @@ kgl_auto_cstr KHttpRequest::build_vary(const char* vary) {
 
 void KHttpRequest::append_source(KFetchObject* fo) {
 	if (!KBIT_TEST(fo->flags,KGL_UPSTREAM_FILTER) && KBIT_TEST(ctx.filter_flags, RQ_NO_EXTEND) && !KBIT_TEST(sink->data.flags, RQ_IS_ERROR_PAGE)) {
-		//ÎÞÀ©Õ¹´¦Àí
+		//æ— æ‰©å±•å¤„ç†
 		if (KBIT_TEST(fo->flags,KGL_UPSTREAM_NEED_QUEUE)) {
 			delete fo;
 			fo = new KStaticFetchObject();

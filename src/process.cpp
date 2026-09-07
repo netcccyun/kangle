@@ -1670,13 +1670,13 @@ bool createProcess(KPipeStream *st, Token_t token, char * args[],KCmdEnv *envs, 
 }
 KPipeStream * createProcess(Token_t token, char * args[],
 							KCmdEnv *envs, int rdstd) {
-								if (args == NULL && args[0] == NULL) {
-									return NULL;
-								}
-								KPipeStream *st = new KPipeStream();
-								if (!createProcess(st, token, args, envs, rdstd)) {
-									delete st;
-									return NULL;
-								}
-								return st;
+	if (args == NULL || args[0] == NULL) {
+		return NULL;
+	}
+	KPipeStream *st = new KPipeStream();
+	if (!createProcess(st, token, args, envs, rdstd)) {
+		delete st;
+		return NULL;
+	}
+	return st;
 }

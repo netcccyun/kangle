@@ -57,9 +57,9 @@ int WhmCallMap::call(WhmContext *context) {
 		if(ret != WHM_OK && !(*it)->force){
 			return ret;
 		}
-		ret = (*it)->whmCall( WHM_EVENT_AFTER, context);
-		if (ret != WHM_OK) {
-			return ret;
+		int event_ret = (*it)->whmCall(WHM_EVENT_AFTER, context);
+		if (event_ret != WHM_OK) {
+			return event_ret;
 		}
 	}
 	return ret;

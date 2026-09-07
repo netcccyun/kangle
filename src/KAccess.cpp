@@ -637,59 +637,74 @@ KString KAccess::htmlAccess(const char* vh) {
 	return s.str();
 }
 bool KAccess::parseChainAction(const KString& action, kgl_jump_type& jumpType, KString& jumpName) {
+	jumpName.clear();
 	if (strcasecmp(action.c_str(), "deny") == 0) {
 		jumpType = JUMP_DENY;
+		return true;
 	}
 	if (strcasecmp(action.c_str(), "drop") == 0) {
 		jumpType = JUMP_DROP;
+		return true;
 	}
 	if (strcasecmp(action.c_str(), "allow") == 0) {
 		jumpType = JUMP_ALLOW;
+		return true;
 	}
 	if (strcasecmp(action.c_str(), "continue") == 0) {
 		jumpType = JUMP_CONTINUE;
+		return true;
 	}
 	if (strcasecmp(action.c_str(), "return") == 0 || strcasecmp(action.c_str(), "default") == 0) {
 		jumpType = JUMP_RETURN;
+		return true;
 	}
-	if (strncasecmp(action.c_str(), "table:", 6) == 0) {
+	if (strncasecmp(action.c_str(), "table:", 6) == 0 && action.size() > 6) {
 		jumpType = JUMP_TABLE;
 		jumpName = action.substr(6);
+		return true;
 	}
-	if (strncasecmp(action.c_str(), "wback:", 6) == 0) {
+	if (strncasecmp(action.c_str(), "wback:", 6) == 0 && action.size() > 6) {
 		jumpType = JUMP_WBACK;
 		jumpName = action.substr(6);
+		return true;
 	}
 	if (strcasecmp(action.c_str(), "proxy") == 0) {
 		jumpType = JUMP_PROXY;
+		return true;
 	}
-	if (strncasecmp(action.c_str(), "server:", 7) == 0) {
+	if (strncasecmp(action.c_str(), "server:", 7) == 0 && action.size() > 7) {
 		jumpType = JUMP_SERVER;
 		jumpName = action.substr(7);
+		return true;
 	}
 	//user access not support this action
 	if (isGlobal()) {
-		if (strncasecmp(action.c_str(), "vhs", 4) == 0) {
+		if (strcasecmp(action.c_str(), "vhs") == 0) {
 			jumpType = JUMP_VHS;
+			return true;
 		}
-		if (strncasecmp(action.c_str(), "cgi:", 4) == 0) {
+		if (strncasecmp(action.c_str(), "cgi:", 4) == 0 && action.size() > 4) {
 			jumpType = JUMP_CGI;
 			jumpName = action.substr(4);
+			return true;
 		}
-		if (strncasecmp(action.c_str(), "api:", 4) == 0) {
+		if (strncasecmp(action.c_str(), "api:", 4) == 0 && action.size() > 4) {
 			jumpType = JUMP_API;
 			jumpName = action.substr(4);
+			return true;
 		}
-		if (strncasecmp(action.c_str(), "cmd:", 4) == 0) {
+		if (strncasecmp(action.c_str(), "cmd:", 4) == 0 && action.size() > 4) {
 			jumpType = JUMP_CMD;
 			jumpName = action.substr(4);
+			return true;
 		}
-		if (strncasecmp(action.c_str(), "dso:", 4) == 0) {
+		if (strncasecmp(action.c_str(), "dso:", 4) == 0 && action.size() > 4) {
 			jumpType = JUMP_DSO;
 			jumpName = action.substr(4);
+			return true;
 		}
 	}
-	return true;
+	return false;
 }
 void KAccess::buildChainAction(kgl_jump_type jumpType, const KSafeJump& jump, KWStream& s) {
 	bool jname = false;
@@ -1006,18 +1021,28 @@ void KAccess::htmlRadioAction(KWStream& s, kgl_jump_type* jump_value, int jump_t
 	}
 }
 
-void KAccess::parse_config(const KXmlAttribute& attr) {
+bool KAccess::parse_config(const KXmlAttribute& attr) {
 	auto locker = write_lock();
 	KString jump_name;
-	parseChainAction(attr["action"], default_jump_type, jump_name);
-	setChainAction(this->default_jump_type, default_jump, jump_name);
+	kgl_jump_type jump_type;
+	if (!parseChainAction(attr["action"], jump_type, jump_name)) {
+		klog(KLOG_ERR, "cann't parse access action=[%s]\n", attr("action"));
+		return false;
+	}
+	KSafeJump jump;
+	setChainAction(jump_type, jump, jump_name);
+	default_jump_type = jump_type;
+	default_jump = jump;
+	return true;
 }
 bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) {
 	switch (ev->type) {
 	case kconfig::EvUpdate:
 	case kconfig::EvNew:
 	{
-		parse_config(ev->get_xml()->attributes());
+		if (!parse_config(ev->get_xml()->attributes())) {
+			return false;
+		}
 		break;
 	}
 	case kconfig::EvRemove:
@@ -1173,6 +1198,9 @@ bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent*
 }
 bool KAccess::named_module_can_remove(const KString& name, int type) {
 	static constexpr int module_used_refs = 2;
+	if (name.empty()) {
+		return false;
+	}
 	if (this != kaccess[this->type] && name[0] == '~') {
 		return kaccess[this->type]->named_module_can_remove(name, type);
 	}

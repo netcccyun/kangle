@@ -45,14 +45,21 @@ public:
 		stLock.Unlock();
 	}
 	bool killProcess(int pid) override {
+		bool killed = false;
 		stLock.Lock();
-		if (st) {
+		if (st && (pid == 0 || st->process.getProcessId() == pid)) {
 			delete st;
 			st = NULL;
+			killed = true;
 		}
-		status = VProcess_Close;
+		if (pid == 0) {
+			killed = true;
+		}
+		if (killed) {
+			status = VProcess_Close;
+		}
 		stLock.Unlock();
-		return true;
+		return killed;
 	}
 	//{{ent
 #ifdef ENABLE_ADPP

@@ -445,10 +445,10 @@ int WhmCore::call_edit_named_module(const char* call_name, const char* event_typ
 		return WHM_CALL_FAILED;
 	}
 	khttpd::KSafeXmlNode xml;
-	if (strncmp((*it).first.c_str(), _KS("acl")) == 0) {
+	if (strncmp((*it).first.c_str(), _KS("acl_")) == 0) {
 		xml = (*it).second->to_xml(_KS("named_acl"),name.c_str(),name.size());
 		xml->attributes().emplace("module"_CS, (*it).first.substr(4));
-	} else if (strncmp((*it).first.c_str(), _KS("mark")) == 0) {
+	} else if (strncmp((*it).first.c_str(), _KS("mark_")) == 0) {
 		xml = (*it).second->to_xml(_KS("named_mark"), name.c_str(), name.size());
 		xml->attributes().emplace("module"_CS, (*it).first.substr(5));
 	} else {
@@ -504,7 +504,7 @@ int WhmCore::call_config(const char* call_name, const char* event_type, WhmConte
 	} else if (item == 3) {
 		sl->add("max", conf.max);
 
-		sl->add("max_per_ip value", conf.max_per_ip);
+		sl->add("max_per_ip", conf.max_per_ip);
 		sl->add("max_keep_alive", conf.keep_alive_count);
 #ifdef ENABLE_BLACK_LIST
 		sl->add("per_ip_deny", conf.per_ip_deny);
@@ -522,7 +522,7 @@ int WhmCore::call_config(const char* call_name, const char* event_type, WhmConte
 		sl->add("max_post_size", get_size(conf.max_post_size));
 #endif
 		sl->add("worker_io", conf.worker_io);
-		sl->add("max_io' value='" , conf.max_io);
+		sl->add("max_io", conf.max_io);
 		sl->add("io_buffer",get_size(conf.io_buffer));
 		sl->add("upstream_sign", conf.upstream_sign);
 	} else if (item == 5) {
@@ -531,10 +531,10 @@ int WhmCore::call_config(const char* call_name, const char* event_type, WhmConte
 		sl->add("min_compress_length", conf.min_compress_length);
 		sl->add("gzip_level", conf.gzip_level);
 #ifdef ENABLE_BROTLI
-		sl->add("br_level size", conf.br_level);
+		sl->add("br_level", conf.br_level);
 #endif
 #ifdef ENABLE_ZSTD
-		sl->add("zstd_level size", conf.zstd_level);
+		sl->add("zstd_level", conf.zstd_level);
 #endif
 #ifdef KANGLE_ENT
 		sl->add("server_software", conf.server_software);

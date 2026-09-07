@@ -12,14 +12,17 @@ static KGL_RESULT zstd_compress(zstd_context* ctx, const uint8_t* str, size_t le
 	in.src = str;
 	in.size = len;
 	in.pos = 0;
-	do {
+			do {
 		size_t result;
-		do {
+	do {
 			ZSTD_outBuffer out;
 			out.dst = (void*)buffer;
 			out.pos = 0;
 			out.size = sizeof(buffer);
 			result = ZSTD_compressStream2(ctx->ctx, &out, &in, op);
+			if (ZSTD_isError(result)) {
+				return KGL_EDATA_FORMAT;
+			}
 			if (out.pos > 0) {
 				KGL_RESULT ret = ctx->down_body.f->write(ctx->down_body.ctx, buffer, (int)out.pos);
 				if (ret != KGL_OK) {
@@ -31,14 +34,17 @@ static KGL_RESULT zstd_compress(zstd_context* ctx, const uint8_t* str, size_t le
 	return KGL_OK;
 }
 static KGL_RESULT zstd_write(kgl_response_body_ctx* rq, const char* str, int len) {
+	if (len < 0 || (len > 0 && str == NULL)) {
+		return KGL_EINVALID_PARAMETER;
+	}
 	return zstd_compress((zstd_context*)rq, (const uint8_t*)str, (size_t)len, ZSTD_e_continue);
 }
 static KGL_RESULT zstd_flush(kgl_response_body_ctx* rq) {
 	KGL_RESULT result2 = zstd_compress((zstd_context*)rq, NULL, 0, ZSTD_e_flush);
 	if (result2 != KGL_OK) {
-		return forward_flush((kgl_response_body_ctx*)rq);
+		return result2;
 	}
-	return KGL_OK;
+	return forward_flush(rq);
 }
 static KGL_RESULT zstd_close(kgl_response_body_ctx* rq, KGL_RESULT result) {
 	zstd_context* ctx = (zstd_context*)rq;
@@ -65,7 +71,10 @@ bool pipe_zstd_compress(int level, kgl_response_body* body) {
 	if (ctx == NULL) {
 		return false;
 	}
-	ZSTD_CCtx_setParameter(ctx, ZSTD_c_compressionLevel, level);
+	if (ZSTD_isError(ZSTD_CCtx_setParameter(ctx, ZSTD_c_compressionLevel, level))) {
+		ZSTD_freeCCtx(ctx);
+		return false;
+	}
 	zstd_context* zstd = new zstd_context;
 	zstd->ctx = ctx;
 	pipe_response_body(zstd, &zstd_function, body);

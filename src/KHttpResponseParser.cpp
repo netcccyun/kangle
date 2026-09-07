@@ -4,9 +4,9 @@
 #include "KHttpFieldValue.h"
 #include "time_utils.h"
 #include "kmalloc.h"
+#include <limits.h>
 bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, const char* val, int val_len) {
 	//printf("parse header attr=[%d] val=[%s]\n",attr,val);
-	assert(val_len != 0);
 	const char* end = val + val_len;
 	KHttpObject* obj = rq->ctx.obj;
 	assert(!rq->ctx.obj->in_cache);
@@ -73,10 +73,13 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 			if (!KBIT_TEST(obj->index.flags, OBJ_IS_STATIC2)) {
 #endif
 				if (field.is(_KS("no-store"))) {
+					cache_control_no_cache = true;
 					obj->index.flags |= ANSW_NO_CACHE;
 				} else if (field.is(_KS("no-cache"))) {
+					cache_control_no_cache = true;
 					obj->index.flags |= ANSW_NO_CACHE;
 				} else if (field.is(_KS("private"))) {
+					cache_control_no_cache = true;
 					obj->index.flags |= ANSW_NO_CACHE;
 				}
 #ifdef ENABLE_STATIC_ENGINE
@@ -89,13 +92,23 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 			} else
 #endif
 				if (field.is(_KS("public"))) {
-					KBIT_CLR(obj->index.flags, ANSW_NO_CACHE);
-				} else if (field.is(_KS("max-age="), (int*)&obj->data->i.max_age)) {
-					obj->index.flags |= ANSW_HAS_MAX_AGE;
-				} else if (field.is(_KS("s-maxage="), (int*)&obj->data->i.max_age)) {
-					obj->index.flags |= ANSW_HAS_MAX_AGE;
-				} else if (field.is(_KS("must-revalidate"))) {
-					obj->index.flags |= OBJ_MUST_REVALIDATE;
+					if (!cache_control_no_cache) {
+						KBIT_CLR(obj->index.flags, ANSW_NO_CACHE);
+					}
+				} else {
+					int parsed_max_age;
+					if (field.is(_KS("max-age="), &parsed_max_age)) {
+						if (!has_s_maxage) {
+							obj->data->i.max_age = parsed_max_age > 0 ? (uint32_t)parsed_max_age : 0;
+							obj->index.flags |= ANSW_HAS_MAX_AGE;
+						}
+					} else if (field.is(_KS("s-maxage="), &parsed_max_age)) {
+						has_s_maxage = true;
+						obj->data->i.max_age = parsed_max_age > 0 ? (uint32_t)parsed_max_age : 0;
+						obj->index.flags |= ANSW_HAS_MAX_AGE;
+					} else if (field.is(_KS("must-revalidate"))) {
+						obj->index.flags |= OBJ_MUST_REVALIDATE;
+					}
 				}
 		} while (field.next());
 #ifdef ENABLE_FORCE_CACHE
@@ -209,13 +222,18 @@ void KHttpResponseParser::end_parse(KHttpRequest* rq, int64_t body_size) {
 		}
 		unsigned corrected_received_age = KGL_MAX(apparent_age, age);
 
-		unsigned response_delay = (unsigned)(responseTime - rq->sink->data.begin_time_msec / 1000);
-		unsigned corrected_initial_age = corrected_received_age + response_delay;
-		unsigned resident_time = (unsigned)(kgl_current_sec - responseTime);
-		age = corrected_initial_age + resident_time;
+		time_t request_time = (time_t)(rq->sink->data.begin_time_msec / 1000);
+		uint64_t response_delay = responseTime > request_time ? (uint64_t)(responseTime - request_time) : 0;
+		uint64_t resident_time = kgl_current_sec > responseTime ? (uint64_t)(kgl_current_sec - responseTime) : 0;
+		uint64_t calculated_age = (uint64_t)corrected_received_age + response_delay + resident_time;
+		age = calculated_age > UINT_MAX ? UINT_MAX : (unsigned)calculated_age;
 		if (!KBIT_TEST(obj->index.flags, ANSW_HAS_MAX_AGE)
 			&& KBIT_TEST(obj->index.flags, ANSW_HAS_EXPIRES)) {
-			obj->data->i.max_age = (unsigned)(expireDate - serverDate) - age;
+			uint64_t freshness = expireDate > serverDate ? (uint64_t)(expireDate - serverDate) : 0;
+			obj->data->i.max_age = freshness > UINT_MAX ? UINT_MAX : (uint32_t)freshness;
+		}
+		if (age > 0) {
+			obj->index.last_verified = age >= (uint64_t)responseTime ? 0 : responseTime - age;
 		}
 	}
 	commit_headers(obj);

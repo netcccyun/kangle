@@ -223,7 +223,7 @@ KGL_RESULT KFastcgiFetchObject::ParseBody(KHttpRequest* rq, char** pos, char* en
 }
 void KFastcgiFetchObject::appendPostEnd()
 {
-	//最后的post数据
+	//鏈�鍚庣殑post鏁版嵁
 	kbuf* fcgibuff = (kbuf*)malloc(sizeof(kbuf));
 	fcgibuff->data = (char*)malloc(sizeof(FCGI_Header));
 	fcgibuff->used = sizeof(FCGI_Header);
@@ -271,6 +271,16 @@ char* KFastcgiFetchObject::parse_fcgi_header(char** str, char* end, bool full)
 		}
 		packet_length -= sizeof(FCGI_Header);
 		FCGI_Header* header = (FCGI_Header*)(*str);
+		if (!is_extend() && (header->version != FCGI_VERSION_1 ||
+			header->requestIdB1 != 0 || header->requestIdB0 != 1)) {
+			klog(KLOG_ERR, "recv invalid fastcgi header version=[%u] request_id=[%u].\n",
+				header->version, ((unsigned)header->requestIdB1 << 8) | header->requestIdB0);
+			fcgi_header_type = FCGI_ABORT_REQUEST;
+			fcgi_pad_length = 0;
+			body_len = 0;
+			(*str) += sizeof(FCGI_Header);
+			return *str;
+		}
 		uint16_t content_length = ntohs(header->contentLength);
 		if (header->type == FCGI_END_REQUEST) {
 			full = true;
@@ -295,4 +305,3 @@ char* KFastcgiFetchObject::parse_fcgi_header(char** str, char* end, bool full)
 	(*str) += packet_length;
 	return body;
 }
-

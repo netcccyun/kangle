@@ -46,11 +46,11 @@ public:
 		return true;
 	}
 	void start(int header_len) override;
-	//·µ»ØÍ·³¤¶È,-1±íÊ¾³ö´í
+	//è¿”å›å¤´é•¿åº¦,-1è¡¨ç¤ºå‡ºé”™
 	int internal_start_response_body(int64_t body_size, bool is_100_continue) override
 	{
 		if (header_finish) {
-			header_finish(arg, status_code, body_size);
+			return header_finish(arg, status_code, body_size);
 		}
 		return 0;
 	}
@@ -85,6 +85,9 @@ public:
 	}
 	int write_all(const kbuf* buf, int length) override {
 		while (length > 0) {
+			if (buf == NULL) {
+				break;
+			}
 			int send_size = KGL_MIN(length, buf->used);
 			if (write_all(buf->data, send_size)!=0) {
 				break;

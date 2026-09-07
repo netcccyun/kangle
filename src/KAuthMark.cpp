@@ -178,6 +178,9 @@ bool KAuthMark::checkLogin(KHttpRequest *rq) {
 	if (rq->auth->getType() != auth_type) {
 		return false;
 	}
+	if (!rq->auth->verifySession(rq)) {
+		return false;
+	}
 	bool result = false;
 	lock.Lock();
 	auto it = users.find(rq->auth->getUser());
@@ -228,7 +231,7 @@ bool KAuthMark::loadAuthFile(KString&path) {
 		char *p = strchr(hot,':');
 		if (p==NULL) {
 			fprintf(stderr, "user passwd format error[%s]\n", hot);
-			break;
+			continue;
 		}
 		*p = '\0';
 		char *user = hot;
@@ -239,9 +242,9 @@ bool KAuthMark::loadAuthFile(KString&path) {
 					users.insert(pair<string, string> (user, passwd));
 				}
 			} else {
-				auto it = users.find(user);
-				if(it!=users.end()){
-					(*it).second = passwd;
+				auto it = required_users.find(user);
+				if(it!=required_users.end()){
+					users.insert(std::make_pair(KString(user), KString(passwd)));
 				}
 			}
 		}else{
@@ -303,11 +306,11 @@ KString KAuthMark::getRequireUsers()
 			s << reg_user->getModel();
 		} else {
 			lock.Lock();
-			for(auto it=users.begin();it!=users.end();it++){
-				if(it!=users.begin()){
+			for(auto it=required_users.begin();it!=required_users.end();it++){
+				if(it!=required_users.begin()){
 					s << ",";
 				}
-				s << (*it).first;
+				s << *it;
 			}
 			lock.Unlock();
 		}
@@ -349,6 +352,7 @@ void KAuthMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 	}
 	auto  require = attribute["require"];
 	users.clear();
+	required_users.clear();
 	if (reg_user) {
 		delete reg_user;
 		reg_user = NULL;
@@ -375,7 +379,9 @@ void KAuthMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 				if(hot!=NULL){
 					*hot = '\0';
 				}
-				users.insert(pair<std::string,std::string>(buf,""));
+				if (*buf != '\0') {
+					required_users.insert(buf);
+				}
 				if(hot==NULL){
 					break;
 				}

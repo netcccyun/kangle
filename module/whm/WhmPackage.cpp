@@ -159,6 +159,7 @@ bool WhmPackage::startElement(KXmlContext *context) {
 	if (context->qName == "event") {
 		if (curCallable == NULL) {
 			WhmError("cann't add event,it must under tag call\n");
+			return false;
 		}
 		WhmExtend *extend = findExtend(context->attribute["extend"]);
 		if (extend == NULL) {

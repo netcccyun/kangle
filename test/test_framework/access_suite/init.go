@@ -17,6 +17,7 @@ func (a *access) Init() error {
 	server.Handle("/footer", handleFooter)
 	server.Handle("/access/header", handle_header)
 	server.Handle("/access/auth", handle_auth)
+	server.Handle("/access/digest", handle_auth)
 
 	config := `<!--#start 300-->\r\n
 <config>
@@ -44,7 +45,11 @@ func (a *access) Init() error {
 			</chain>
 			<chain  action='continue' >
 				<acl_path path='/access/auth'/>
-				<mark_auth   file='auth.txt' crypt_type='plain' auth_type='Basic' realm='kangle' require='*' failed_deny='1'></mark_auth>
+				<mark_auth   file='auth.txt' crypt_type='plain' auth_type='Basic' realm='kangle' require='user' failed_deny='1'></mark_auth>
+			</chain>
+			<chain  action='continue' >
+				<acl_path path='/access/digest'/>
+				<mark_auth   file='auth.txt' crypt_type='plain' auth_type='Digest' realm='kangle' require='user' failed_deny='1'></mark_auth>
 			</chain>
 		</table>
 	</request>

@@ -175,5 +175,7 @@ func init() {
 	s.AddCase("flush", "upstream flush", check_flush)
 	s.AddCase("big_request_header", "big http11 request header", check_big_request_header)
 	s.AddCase("config_server", "config server changed", check_config_server)
+	s.AddCase("http2_ping_ack", "HTTP/2 PING ACK 回显载荷", check_http2_ping_ack)
+	s.AddCase("http2_ping_flood", "HTTP/2 PING 只发不读应断开且服务仍存活", check_http2_ping_flood)
 	s.AddCase("bug", "bug", check_bug)
 }

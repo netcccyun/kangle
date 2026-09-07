@@ -109,7 +109,7 @@ bool KApiDso::init() {
 
 bool KApiDso::load() {
 	if (STATE_LOAD_SUCCESS == state) {
-		//已经成功，不可再加载
+		//宸茬粡鎴愬姛锛屼笉鍙啀鍔犺浇
 		return true;
 	}
 	state = STATE_LOAD_FAILED;
@@ -122,13 +122,13 @@ bool KApiDso::load() {
 	KDynamicString ds;
 	auto filename = ds.parseString(path.c_str());
 	handle = LoadLibrary(filename.get());
+#ifdef _WIN32
+	SetDllDirectory(NULL);
+#endif
 	if (handle == NULL) {
 		klog(KLOG_ERR, "cann't LoadLibrary [%s] %s\n", filename.get(), getError());
 		return false;
 	}
-#ifdef _WIN32
-	SetDllDirectory(NULL);
-#endif
 	GetExtensionVersion = (GetExtensionVersionf)GetProcAddress(handle,
 		"GetExtensionVersion");
 	if (GetExtensionVersion == NULL) {

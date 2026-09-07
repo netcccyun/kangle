@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2010, NanChang BangTeng Inc
  * All Rights Reserved.
  *
@@ -49,16 +49,8 @@ KChain::~KChain() {
 }
 void KChain::clear() {
 	jump = nullptr;
-	/*
-	for (auto it = acls.begin(); it != acls.end(); ++it) {
-		(*it)->release();
-	}
 	acls.clear();
-	for (auto it = marks.begin(); it != marks.end(); ++it) {
-		(*it)->release();
-	}
 	marks.clear();
-	*/
 }
 void KChain::get_edit_html(kgl::serializable* s) {
 	for (auto it = acls.begin(); it != acls.end(); ++it) {
@@ -91,7 +83,7 @@ void KChain::get_edit_html(KWStream& s, u_short accessType) {
 		getModelHtml((*it), s, 1, index);
 		index++;
 	}
-	//ʾmark
+	//?mark
 	s << "<tr><td>" << klang["available_marks"] << "</td><td>";
 	s << "<select onChange='";
 	s << "addmodel(this.options[this.options.selectedIndex].value,1)'>";

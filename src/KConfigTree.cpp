@@ -54,11 +54,13 @@ namespace kconfig {
 				return nullptr;
 			}
 			defer(kfiber_file_close(fp));
-			auto size = (int)kfiber_file_size(fp);
-			if (size > max_file_size) {
-				klog(KLOG_ERR, "config file [%s %s] is too big. size=[%d]\n", file->get_name()->data, file->get_filename()->data, size);
+			int64_t file_size = kfiber_file_size(fp);
+			if (file_size < 0 || file_size > max_file_size) {
+				klog(KLOG_ERR, "config file [%s %s] has invalid size=[" INT64_FORMAT "]\n",
+					file->get_name()->data, file->get_filename()->data, file_size);
 				return nullptr;
 			}
+			int size = (int)file_size;
 			kgl_auto_cstr buf((char*)malloc(size + 1));
 			if (!buf) {
 				return nullptr;
@@ -894,7 +896,8 @@ namespace kconfig {
 	public:
 		void new_file(const kgl_ref_str_t* name, const kgl_ref_str_t* filename, const KFileModified& last_modified, bool is_default) {
 			int new_flag;
-			if (filename->len < 5 || kgl_memcmp(filename->data + filename->len - 4, _KS(".xml")) != 0) {
+			if ((current_source == KConfigFileSource::System || current_source == KConfigFileSource::Vh) &&
+				(filename->len < 5 || kgl_memcmp(filename->data + filename->len - 4, _KS(".xml")) != 0)) {
 				klog(KLOG_ERR, "config file [%s %s] ext must be .xml\n", name->data, filename->data);
 				return;
 			}
@@ -965,6 +968,7 @@ namespace kconfig {
 		auto locker = lock();
 		kgl_ext_config_context ctx;
 		KConfigScanInfoProvider provider;
+		bool scanned[static_cast<int>(KConfigFileSource::Size)] = { false };
 		config_files.iterator([](void* data, void* arg) {
 			KConfigFile* file = (KConfigFile*)data;
 			//printf("set file [%s] remove_flag\n", file->filename->data);
@@ -978,13 +982,28 @@ namespace kconfig {
 				if (sources[i]->enable_scan()) {
 					provider.current_source = static_cast<KConfigFileSource>(i);
 					sources[i]->scan(&provider);
+					scanned[i] = true;
 				}
 			}
 		}
-		for (auto&& info : provider.prepare_files) {
-			klog(KLOG_ERR, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
-			info.second.cfg->update(info.second.body);
+		auto apply_prepare_files = [&provider]() {
+			for (auto&& info : provider.prepare_files) {
+				klog(KLOG_ERR, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
+				info.second.cfg->update(info.second.body);
+			}
+			provider.prepare_files.clear();
+		};
+		apply_prepare_files();
+		// A source driver can become available after the main configuration
+		// has been applied (for example, the virtual-host database driver).
+		for (int i = 0; i < static_cast<int>(KConfigFileSource::Size); ++i) {
+			if (!scanned[i] && sources[i] != nullptr && sources[i]->enable_scan()) {
+				provider.current_source = static_cast<KConfigFileSource>(i);
+				sources[i]->scan(&provider);
+				scanned[i] = true;
+			}
 		}
+		apply_prepare_files();
 		config_files.iterator([](void* data, void* arg) {
 			KConfigFile* file = (KConfigFile*)data;
 			if (file->is_removed()) {

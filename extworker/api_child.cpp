@@ -1,6 +1,6 @@
 /*
  * api_child.cpp
- * kangle ÒÔ×Ó½ø³ÌÔËÐÐÊ±ºÍÖ÷½ø³ÌÍ¨ÐÅµÄ´úÂë
+ * kangle ä»¥å­è¿›ç¨‹è¿è¡Œæ—¶å’Œä¸»è¿›ç¨‹é€šä¿¡çš„ä»£ç 
  *
  *  Created on: 2010-7-9
  *      Author: keengo
@@ -148,7 +148,8 @@ static bool api_child_load(KStream* st, char* msg, u_short id, u_short content_l
 
 	FCGI_Header header;
 	memset(&header, 0, sizeof(header));
-	if (loadApiRedirect(msg, id)) {
+	if (msg != NULL && content_len > 0 && msg[content_len - 1] == '\0' &&
+		loadApiRedirect(msg, id)) {
 		header.id = 0;
 	} else {
 		header.id = 1;
@@ -183,7 +184,7 @@ static bool api_child_chroot(KStream* st, char* msg,
 	u_short content_len) {
 	FCGI_Header header;
 	memset(&header, 0, sizeof(header));
-	header.id = chroot(msg);
+	header.id = (msg != NULL && content_len > 0 && msg[content_len - 1] == '\0') ? chroot(msg) : -1;
 	header.type = API_CHILD_CHROOT_RESULT;
 	return st->write_all((char*)&header, sizeof(header))
 		== STREAM_WRITE_SUCCESS;
@@ -192,23 +193,24 @@ static bool api_child_chroot(KStream* st, char* msg,
 #else
 static char* get_string(char** msg, u_short& content_len)
 {
+	if (msg == NULL || *msg == NULL) {
+		return NULL;
+	}
 	int len = 0;
-	int string_len = sizeof(len);
+	const u_short string_len = sizeof(len);
 	//char *hot = msg;
-	if (content_len <= string_len) {
+	if (content_len < string_len) {
 		//printf("content_len < string_len\n");
 		return NULL;
 	}
 	content_len -= string_len;
 	kgl_memcpy((char*)&len, *msg, string_len);
-	//printf("len=%d,content_len =%d\n",len,content_len);
-
-	content_len -= len;
 	*msg += string_len;
-
-	if (content_len < 0) {
+	//printf("len=%d,content_len =%d\n",len,content_len);
+	if (len < 0 || (unsigned)len > content_len) {
 		return NULL;
 	}
+	content_len -= (u_short)len;
 	char* buf = (char*)xmalloc(len + 1);
 	kgl_memcpy(buf, *msg, len);
 	*msg += len;
