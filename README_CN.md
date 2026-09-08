@@ -20,22 +20,6 @@ kangle 是一款轻量、高性能的 Web 服务器和反向代理软件，内�
 
 ## 编译要求
 
-完整项目实际要求 **CMake 3.12 或更高版本**，因为 `khttpd` 子模块最低要求
-CMake 3.12。虽然根目录当前仍声明了更早的最低版本，但 CMake 2.x 无法配置完整源码树。
-
-必须安装以下工具和开发库：
-
-- Git，并支持拉取 Git 子模块
-- CMake 3.12 或更高版本（CentOS/RHEL 7 使用 `cmake3`）
-- GNU Make 或 Ninja
-- 支持 C++17 的编译器，建议使用较新的 GCC 或 Clang
-- OpenSSL 开发库
-- zlib 开发库
-- PCRE2 开发库，也可以使用 PCRE 8.x
-- Unix 类系统需要 POSIX Threads
-
-SQLite 已包含在源码中。系统不存在 SQLite 开发库时，会自动编译并使用内置版本。
-
 ### Debian、Ubuntu
 
 ```bash
@@ -55,8 +39,7 @@ sudo dnf install -y \
 
 ### CentOS/RHEL 7
 
-系统自带的 `cmake` 版本过低，需要安装 EPEL 提供的 `cmake3`，配置项目时也必须使用
-`cmake3` 命令：
+系统自带的 `cmake` 版本过低，需要安装 EPEL 提供的 `cmake3`，配置项目时也必须使用 `cmake3` 命令：
 
 ```bash
 sudo yum install -y epel-release
@@ -67,7 +50,7 @@ sudo yum install -y \
 
 ## 从源码编译
 
-请递归克隆仓库，`kasync` 和 `khttpd` 是必需的子模块。
+递归克隆仓库，`kasync` 和 `khttpd` 是必需的子模块。
 
 ```bash
 git clone --recursive https://github.com/cccyun/kangle.git
@@ -75,14 +58,14 @@ cd kangle
 
 mkdir cmake-build
 cd cmake-build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_INSTALL_PREFIX=/vhs/kangle -DCMAKE_BUILD_TYPE=Release
 make -j"$(nproc)"
 ```
 
 CentOS/RHEL 7 需要将 `cmake` 替换为 `cmake3`：
 
 ```bash
-cmake3 .. -DCMAKE_BUILD_TYPE=Release
+cmake3 .. -DCMAKE_INSTALL_PREFIX=/vhs/kangle -DCMAKE_BUILD_TYPE=Release
 make -j"$(nproc)"
 ```
 
@@ -92,7 +75,7 @@ make -j"$(nproc)"
 git submodule update --init --recursive
 ```
 
-即使使用单独的 CMake 构建目录，最终程序仍会输出到仓库的 `build/` 目录。可以用下面的命令检查已启用的功能：
+最终程序仍会输出到仓库的 `build/` 目录。可以用下面的命令检查已启用的功能：
 
 ```bash
 ../build/kangle -v
@@ -100,30 +83,30 @@ git submodule update --init --recursive
 
 ## 安装和运行
 
-以下命令会将 kangle 安装到 `/usr/local`。如需修改安装位置，在执行 CMake 时添加
-`-DCMAKE_INSTALL_PREFIX=/目标目录`。
+将 kangle 安装到 `/vhs/kangle`。如需修改安装位置，在执行 CMake 时添加
+`-DCMAKE_INSTALL_PREFIX=/another/path`。
 
 ```bash
 sudo make install
-sudo install -d /usr/local/var /usr/local/ext /usr/local/www
-sudo cp -n /usr/local/etc/config-default.xml /usr/local/etc/config.xml
+sudo install -d /vhs/kangle/var /vhs/kangle/ext /vhs/kangle/www
+sudo cp -n /vhs/kangle/etc/config-default.xml /vhs/kangle/etc/config.xml
 ```
 
-对外提供服务前，请检查 `/usr/local/etc/config.xml` 中的监听地址和管理密码。默认配置监听
+对外提供服务前，请检查 `/vhs/kangle/etc/config.xml` 中的监听地址和管理密码。默认配置监听
 80 端口，管理接口仅监听 `127.0.0.1:3311`。
 
 ```bash
 # 以守护进程方式启动
-sudo /usr/local/bin/kangle
+sudo /vhs/kangle/bin/kangle
 
 # 平滑加载配置
-sudo /usr/local/bin/kangle -r
+sudo /vhs/kangle/bin/kangle -r
 
 # 停止服务
-sudo /usr/local/bin/kangle -q
+sudo /vhs/kangle/bin/kangle -q
 
 # 前台运行，适合容器或故障排查
-sudo /usr/local/bin/kangle -n -g
+sudo /vhs/kangle/bin/kangle -n -g
 ```
 
 项目目前不会自动安装 systemd 服务单元。发行版安装包或自定义服务单元可以调用上面的命令。
@@ -151,6 +134,7 @@ sudo /usr/local/bin/kangle -n -g
 
 ```bash
 cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/vhs/kangle \
   -DCMAKE_BUILD_TYPE=Release \
   -DENABLE_BROTLI=ON \
   -DENABLE_ZSTD=ON
@@ -171,6 +155,7 @@ git clone --recursive https://github.com/cccyun/kangle.git
 cd kangle
 mkdir cmake-build && cd cmake-build
 cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/vhs/kangle \
   -DCMAKE_BUILD_TYPE=Release \
   -DBORINGSSL_DIR=../../boringssl \
   -DLSQUIC_DIR=../../lsquic
@@ -190,7 +175,7 @@ cd test
 ./test.sh
 ```
 
-测试程序会启动多个本地监听端口和辅助进程，请确认测试端口没有被其他程序占用。未编译的功能（例如 Brotli 或 HTTP/3）会在测试输出中提示并自动跳过。
+测试程序会启动多个本地监听端口和辅助进程，请确认测试端口没有被其他程序占用。
 
 ## 文档
 

@@ -22,24 +22,6 @@ upstream support.
 
 ## Requirements
 
-The effective minimum CMake version is **3.12** because the `khttpd`
-submodule requires it. Although the top-level project still declares an older
-minimum, CMake 2.x cannot configure the complete source tree.
-
-Required tools and libraries:
-
-- Git, including submodule support
-- CMake 3.12 or newer (`cmake3` on CentOS/RHEL 7)
-- GNU Make or Ninja
-- A compiler with C++17 support; a current GCC or Clang release is recommended
-- OpenSSL development files
-- zlib development files
-- PCRE2 development files, or PCRE 8.x as a fallback
-- POSIX threads on Unix-like systems
-
-SQLite is bundled and is used automatically when a system SQLite development
-package is not available.
-
 ### Debian and Ubuntu
 
 ```bash
@@ -59,8 +41,7 @@ sudo dnf install -y \
 
 ### CentOS/RHEL 7
 
-The distribution's `cmake` package is too old. Install EPEL's `cmake3`
-package and use the `cmake3` command when configuring the project:
+The distribution's `cmake` package is too old. Install EPEL's `cmake3` package and use the `cmake3` command when configuring the project:
 
 ```bash
 sudo yum install -y epel-release
@@ -80,14 +61,14 @@ cd kangle
 
 mkdir cmake-build
 cd cmake-build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_INSTALL_PREFIX=/vhs/kangle -DCMAKE_BUILD_TYPE=Release
 make -j"$(nproc)"
 ```
 
 On CentOS/RHEL 7, replace `cmake` with `cmake3`:
 
 ```bash
-cmake3 .. -DCMAKE_BUILD_TYPE=Release
+cmake3 .. -DCMAKE_INSTALL_PREFIX=/vhs/kangle -DCMAKE_BUILD_TYPE=Release
 make -j"$(nproc)"
 ```
 
@@ -98,8 +79,7 @@ before configuring:
 git submodule update --init --recursive
 ```
 
-Build products are placed in the repository's `build/` directory even when a
-separate CMake build directory is used. Check the enabled features with:
+Build products are placed in the repository's `build/` directory. Check the enabled features with:
 
 ```bash
 ../build/kangle -v
@@ -107,32 +87,32 @@ separate CMake build directory is used. Check the enabled features with:
 
 ## Install and run
 
-The following installs kangle under `/usr/local`. Set
+Install kangle under `/vhs/kangle`. Set
 `-DCMAKE_INSTALL_PREFIX=/another/path` during configuration to choose a
 different prefix.
 
 ```bash
 sudo make install
-sudo install -d /usr/local/var /usr/local/ext /usr/local/www
-sudo cp -n /usr/local/etc/config-default.xml /usr/local/etc/config.xml
+sudo install -d /vhs/kangle/var /vhs/kangle/ext /vhs/kangle/www
+sudo cp -n /vhs/kangle/etc/config-default.xml /vhs/kangle/etc/config.xml
 ```
 
-Review `/usr/local/etc/config.xml` before exposing the server, especially its
+Review `/vhs/kangle/etc/config.xml` before exposing the server, especially its
 listeners and administration credentials. The sample configuration listens on
 port 80 and exposes the management interface only on `127.0.0.1:3311`.
 
 ```bash
 # Start as a daemon
-sudo /usr/local/bin/kangle
+sudo /vhs/kangle/bin/kangle
 
 # Reload configuration gracefully
-sudo /usr/local/bin/kangle -r
+sudo /vhs/kangle/bin/kangle -r
 
 # Stop the server
-sudo /usr/local/bin/kangle -q
+sudo /vhs/kangle/bin/kangle -q
 
 # Run in the foreground (useful for containers and diagnostics)
-sudo /usr/local/bin/kangle -n -g
+sudo /vhs/kangle/bin/kangle -n -g
 ```
 
 The project does not currently install a systemd unit. A distribution package
@@ -163,6 +143,7 @@ libraries:
 
 ```bash
 cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/vhs/kangle \
   -DCMAKE_BUILD_TYPE=Release \
   -DENABLE_BROTLI=ON \
   -DENABLE_ZSTD=ON
@@ -185,6 +166,7 @@ git clone --recursive https://github.com/cccyun/kangle.git
 cd kangle
 mkdir cmake-build && cd cmake-build
 cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/vhs/kangle \
   -DCMAKE_BUILD_TYPE=Release \
   -DBORINGSSL_DIR=../../boringssl \
   -DLSQUIC_DIR=../../lsquic
@@ -206,8 +188,7 @@ cd test
 ```
 
 The test runner starts local listeners and helper processes, so make sure its
-test ports are not already in use. Features that were not compiled, such as
-Brotli or HTTP/3, are reported and skipped automatically.
+test ports are not already in use.
 
 ## Documentation
 
