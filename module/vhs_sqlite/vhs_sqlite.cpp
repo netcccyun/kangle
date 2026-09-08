@@ -1,4 +1,4 @@
-// vhs_sqlite.cpp : 定义 DLL 应用程序的导出函数。
+// SQLite-backed virtual host storage module.
 //
 #include <string>
 #include <stdlib.h>
@@ -34,7 +34,7 @@ static int sqliteBusyHandle(void *db,int count)
 static void * createConnection()
 {
 	KVirtualHostSqliteConnection *cn = new KVirtualHostSqliteConnection;
-	int ret = sqlite3_open_v2(dbname.c_str(), &cn->db, SQLITE_OPEN_READONLY, NULL);
+	int ret = sqlite3_open_v2(dbname.c_str(), &cn->db, SQLITE_OPEN_READWRITE, NULL);
 	if(ret != SQLITE_OK){
 		fprintf(stderr,"open db [%s] failed %d\n",dbname.c_str(),ret);
 		delete cn;
@@ -44,7 +44,7 @@ static void * createConnection()
 	sqlite3_busy_handler(cn->db,sqliteBusyHandle,NULL);
 	return cn;
 }
-//查询操作,data作为输出参数
+// Copy one result row into the caller-provided data object.
 static int query(void *stmt,vh_data *data)
 {
 	KVirtualHostData *rs_data = (KVirtualHostData *)stmt;
@@ -71,7 +71,7 @@ static void freeConnection(void *param)
 	KVirtualHostSqliteConnection *cn = (KVirtualHostSqliteConnection *)param;
 	delete cn;
 }
-//读取操作，返回stmt
+// Return a statement used to enumerate virtual hosts.
 static void * loadVirtualHost(void *cn)
 {
 	return ((KVirtualHostSqliteConnection *)cn)->loadVirtualHost();
@@ -85,7 +85,7 @@ static void * loadInfo(void *cn,const char *name)
 	return ((KVirtualHostSqliteConnection *)cn)->loadInfo(name);
 }
 
-//更新操作，成功返回1,错误返回0
+// Return 1 on a successful update/insert, otherwise 0.
 static int  addVirtualHost(void *cn,vh_data *data)
 {
 	KVirtualHostStmt *st = ((KVirtualHostSqliteConnection *)cn)->addVirtualHost();

@@ -386,6 +386,7 @@ bool KWebDavService::doLock() {
 	if (rs == nullptr) {
 		rs = rsMaker->makeFile(provider->getFileName(), "/");
 		if (rs == nullptr) {
+			lockManager.unlock(token);
 			return send(STATUS_FORBIDEN);
 		}
 		send(STATUS_CREATED);

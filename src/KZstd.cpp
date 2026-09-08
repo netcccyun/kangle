@@ -12,25 +12,29 @@ static KGL_RESULT zstd_compress(zstd_context* ctx, const uint8_t* str, size_t le
 	in.src = str;
 	in.size = len;
 	in.pos = 0;
-			do {
-		size_t result;
-	do {
-			ZSTD_outBuffer out;
-			out.dst = (void*)buffer;
-			out.pos = 0;
-			out.size = sizeof(buffer);
-			result = ZSTD_compressStream2(ctx->ctx, &out, &in, op);
-			if (ZSTD_isError(result)) {
-				return KGL_EDATA_FORMAT;
+	for (;;) {
+		ZSTD_outBuffer out;
+		out.dst = (void*)buffer;
+		out.pos = 0;
+		out.size = sizeof(buffer);
+		size_t result = ZSTD_compressStream2(ctx->ctx, &out, &in, op);
+		if (ZSTD_isError(result)) {
+			return KGL_EDATA_FORMAT;
+		}
+		if (out.pos > 0) {
+			KGL_RESULT ret = ctx->down_body.f->write(ctx->down_body.ctx, buffer, (int)out.pos);
+			if (ret != KGL_OK) {
+				return ret;
 			}
-			if (out.pos > 0) {
-				KGL_RESULT ret = ctx->down_body.f->write(ctx->down_body.ctx, buffer, (int)out.pos);
-				if (ret != KGL_OK) {
-					return ret;
-				}
+		}
+		if (op == ZSTD_e_continue) {
+			if (in.pos == in.size) {
+				break;
 			}
-		} while (result > 0);
-	} while (in.pos!=in.size);
+		} else if (result == 0) {
+			break;
+		}
+	}
 	return KGL_OK;
 }
 static KGL_RESULT zstd_write(kgl_response_body_ctx* rq, const char* str, int len) {

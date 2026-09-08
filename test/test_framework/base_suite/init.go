@@ -134,6 +134,7 @@ func init() {
 	s.AddCase("bigobj_upstream_error", "大文件缓存,源异常不可用", check_bigobj_upstream_error)
 	s.AddCase("if_range_forward", "if-range转发", check_if_range_forward)
 	s.AddCase("if_range_local", "if-range本地", check_if_range_local)
+	s.AddCase("static_precondition", "静态文件条件请求", check_static_precondition)
 	s.AddCase("not_get_cache", "not GET cache", check_not_get_cache)
 	s.AddCase("not_200_cache", "not 200 cache", check_not_200_cache)
 	s.AddCase("last_range", "大物件尾部缓存命中", check_last_range)

@@ -43,6 +43,7 @@ void parse_module_child_config(KModel* m, const KMap<khttpd::KXmlKey, khttpd::KX
 KChain::KChain() {
 	hit_count = 0;
 	jump_type = JUMP_CONTINUE;
+	skip_to = -1;
 }
 KChain::~KChain() {
 	clear();
@@ -126,6 +127,9 @@ void KChain::dump(kgl::serializable* s,bool is_short) {
 	case JUMP_DROP:
 		s->add("action", "drop");
 		break;
+	case JUMP_SKIP:
+		s->add("action", "skip");
+		break;
 	}
 	if (jump) {
 		s->add("jump", jump->name);
@@ -180,6 +184,9 @@ void KChain::parse_config(KAccess* access, const khttpd::KXmlNodeBody* xml) {
 		throw KXmlException("chain action error");
 	}
 	access->setChainAction(jump_type, jump, jumpName);
+	if (jump_type == JUMP_SKIP) {
+		skip_to = atoi(jumpName.c_str());
+	}
 	for (auto node : xml->childs) {
 		if (node->is_tag(_KS("acl"))) {
 			for (auto&& body : node->body) {

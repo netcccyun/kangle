@@ -17,6 +17,7 @@
  */
 #include <string.h>
 #include <stdlib.h>
+#include <climits>
 #include "KAccess.h"
 #include <map>
 #include "KChain.h"
@@ -661,6 +662,20 @@ bool KAccess::parseChainAction(const KString& action, kgl_jump_type& jumpType, K
 	if (strncasecmp(action.c_str(), "table:", 6) == 0 && action.size() > 6) {
 		jumpType = JUMP_TABLE;
 		jumpName = action.substr(6);
+		return true;
+	}
+	if (strncasecmp(action.c_str(), "tablechain:", 11) == 0) {
+		const char* p = strrchr(action.c_str(), ':');
+		if (!p || p <= action.c_str() + 10 || !*(p + 1)) {
+			return false;
+		}
+		char* end = nullptr;
+		unsigned long target = strtoul(p + 1, &end, 10);
+		if (*end || target > INT_MAX) {
+			return false;
+		}
+		jumpType = JUMP_SKIP;
+		jumpName = p + 1;
 		return true;
 	}
 	if (strncasecmp(action.c_str(), "wback:", 6) == 0 && action.size() > 6) {

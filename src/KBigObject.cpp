@@ -33,7 +33,7 @@ KGL_RESULT turn_on_bigobject(KHttpRequest* rq, KHttpObject* obj, kgl_response_bo
 	KBigObjectContext* bo_ctx = new KBigObjectContext(rq, obj);
 	auto result = bo_ctx->create();
 	if (result != KGL_OK) {
-		return result;
+		return bo_ctx->close(result);
 	}
 	
 	assert(!rq->ctx.body.ctx);

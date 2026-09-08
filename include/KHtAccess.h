@@ -95,14 +95,16 @@ struct _KApacheHtaccessContext
 	KAccess *access[2];
 	kconfig::KConfigFile *file;
 	kconfig::KConfigTree ev;
-	_KApacheHtaccessContext(const char* filename) : file{ 0 },access { 0 }, ev(nullptr, _KS("")) {
+	_KApacheHtaccessContext(const char* filename, const char* prefix) : file{ 0 },access { 0 }, ev(nullptr, _KS("")) {
 		for (int i = 0; i < 2; ++i) {
 			access[i] = new KAccess(false, i);
 		}
 		ev.add(_KS("request"), access[REQUEST]);
 		ev.add(_KS("response"), access[RESPONSE]);
 		KString str(filename);
-		file = new kconfig::KConfigFile(&ev, nullptr, str.data(), kconfig::KConfigFileSource::Htaccess);
+		kgl_ref_str_t* prefix_str = kstring_from(prefix);
+		file = new kconfig::KConfigFile(&ev, prefix_str, str.data(), kconfig::KConfigFileSource::Htaccess);
+		kstring_release(prefix_str);
 	}
 	~_KApacheHtaccessContext() noexcept {
 		if (file) {

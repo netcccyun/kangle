@@ -78,7 +78,9 @@ bool KTable::parse_config(KAccess* access, const khttpd::KXmlNodeBody* xml) {
 kgl_jump_type KTable::match(KHttpRequest* rq, KHttpObject* obj, unsigned& checked_table, KSafeJump& jump, KSafeSource& fo) {
 	KTable* m_table = NULL;
 	for (auto&& chain_file : chains) {
-		for (auto&& chain : chain_file.second) {
+		auto& vec = chain_file.second;
+		for (size_t i = 0; i < vec.size(); ++i) {
+			auto&& chain = vec[i];
 			uint32_t result = chain->match(rq, obj, fo);
 			if (fo) {
 				return chain->jump_type;
@@ -91,6 +93,11 @@ kgl_jump_type KTable::match(KHttpRequest* rq, KHttpObject* obj, unsigned& checke
 			}
 			switch (chain->jump_type) {
 			case JUMP_CONTINUE:
+				break;
+			case JUMP_SKIP:
+				if (chain->skip_to > (int)i) {
+					i = (size_t)chain->skip_to;
+				}
 				break;
 			case JUMP_TABLE:
 			{
@@ -204,6 +211,9 @@ void KTable::htmlTable(KWStream& s, const char* vh, u_short accessType) {
 				break;
 			case JUMP_RETURN:
 				s << klang["return"];
+				break;
+			case JUMP_SKIP:
+				s << "skip";
 				break;
 			}
 			if (chain->jump) {

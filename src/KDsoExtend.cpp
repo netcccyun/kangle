@@ -234,6 +234,7 @@ bool KDsoExtend::load(const char* filename, const KXmlAttribute& attribute) {
 	}
 	if (!IS_KSAPI_VERSION_COMPATIBLE(version.api_version)) {
 		klog(KLOG_ERR, "cann't load dso extend [%s] module api version=[%d.%d] not compatible\n", name, HIWORD(version.api_version), LOWORD(version.api_version));
+		shutdown();
 		return false;
 	}
 	return true;

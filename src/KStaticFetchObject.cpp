@@ -28,12 +28,13 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 		out->f->write_unknow_header(out->ctx, _KS("Allow"), _KS("GET, HEAD"));
 		return out->f->write_header_finish(out->ctx,0, nullptr);
 	}
-	if (condition && condition->time>0) {
-		if (KBIT_TEST(flag, kgl_precondition_mask) != kgl_precondition_if_modified_since) {
+	if (condition && KBIT_TEST(flag, kgl_precondition_if_time) && condition->time > 0) {
+		kgl_precondition_flag type = (kgl_precondition_flag)KBIT_TEST(flag, kgl_precondition_mask);
+		if (type == kgl_precondition_if_unmodified_since && last_modified > condition->time) {
 			out->f->write_status(out->ctx, STATUS_PRECONDITION);
 			return out->f->write_header_finish(out->ctx,0, nullptr);
 		}
-		if (condition->time >= last_modified) {
+		if (type == kgl_precondition_if_modified_since && condition->time >= last_modified) {
 			out->f->write_status(out->ctx, STATUS_NOT_MODIFIED);
 			return out->f->write_header_finish(out->ctx,0, nullptr);
 		}

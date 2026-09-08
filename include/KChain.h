@@ -125,6 +125,7 @@ private:
 private:
 	uint32_t hit_count;
 	kgl_jump_type jump_type;
+	int skip_to;
 	KSafeJump jump;
 	std::vector<KModelPtr<KAcl>> acls;
 	std::vector<KModelPtr<KMark>> marks;

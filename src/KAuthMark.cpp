@@ -66,6 +66,7 @@ bool checkPassword(const char *toCheck, const char *password, int cryptType) {
 #ifdef ENABLE_HTPASSWD_CRYPT
 	case CRYPT_TYPE_HTPASSWD:
 		//return apr_password_validate(toCheck,password) == 0;
+		return false;
 #endif
 	case CRYPT_TYPE_SALT_MD5:	
 		return checkSaltMd5(toCheck,password);

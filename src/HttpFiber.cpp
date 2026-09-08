@@ -447,7 +447,7 @@ KGL_RESULT handle_error(KHttpRequest* rq, int code, const char* msg) {
 		} else {
 			errorUrl << errorPage;
 		}
-		result = rq->file->setName(svh->doc_root, errorPage, rq->getFollowLink());
+		result = rq->file->setName(svh->doc_root, errorUrl.c_str(), rq->getFollowLink());
 		if (result) {
 			result = rq->rewrite_url(errorUrl.c_str(), code);
 		}

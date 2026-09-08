@@ -24,6 +24,9 @@
 #define MODEL_ACL 	1
 #define MODEL_MARK	2
 typedef uint32_t kgl_jump_type;
+#ifndef JUMP_SKIP
+#define JUMP_SKIP 18
+#endif
 class KAccess;
 class KFetchObject;
 class KHttpObject;

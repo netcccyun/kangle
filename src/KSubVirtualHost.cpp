@@ -473,7 +473,7 @@ bool KSubVirtualHost::bindFile(KHttpRequest* rq, bool& exsit, bool searchDefault
 	return true;
 }
 KApacheHtaccessContext KSubVirtualHost::make_htaccess(const char* prefix, KFileName* file) {
-	KApacheHtaccessContext ctx(new _KApacheHtaccessContext(file->getName()));
+	KApacheHtaccessContext ctx(new _KApacheHtaccessContext(file->getName(), prefix));
 	try {
 		ctx->file->reload(true);
 	} catch (std::exception& e) {

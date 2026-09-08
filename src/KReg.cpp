@@ -119,6 +119,12 @@ bool KReg::setModel(const char* model_str, int flag) {
 #endif
 		c_model = NULL;
 	}
+#ifndef ENABLE_PCRE2
+	if (pe) {
+		freeStudy(pe);
+		pe = NULL;
+	}
+#endif
 	model = xstrdup(model_str);	
 	const char* error = NULL;
 #ifdef ENABLE_PCRE2
