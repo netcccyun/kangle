@@ -48,22 +48,22 @@ public:
 	int getCount();
 public:
 	/*
-	 * ¸üĞÂĞéÄâÖ÷»ú
+	 * æ›´æ–°è™šæ‹Ÿä¸»æœº
 	 */
 	bool updateVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh);
 	bool updateVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh, KVirtualHost* ov);
 	//void updateVirtualHost(KVirtualHost* vh, std::list<KSubVirtualHost*>& hosts);
 	//void updateVirtualHost(KVirtualHost* vh, std::list<KString>& binds);
 	/*
-	 * Ôö¼ÓĞéÄâÖ÷»ú
+	 * å¢åŠ è™šæ‹Ÿä¸»æœº
 	 */
 	bool addVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh);
 	/*
-	 * É¾³ıĞéÄâÖ÷»ú
+	 * åˆ é™¤è™šæ‹Ÿä¸»æœº
 	 */
 	bool removeVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh);
 	/*
-	* ²éÕÒĞéÄâÖ÷»ú²¢°ó¶¨ÔÚrqÉÏ¡£
+	* æŸ¥æ‰¾è™šæ‹Ÿä¸»æœºå¹¶ç»‘å®šåœ¨rqä¸Šã€‚
 	*/
 	static query_vh_result queryVirtualHost(KVirtualHostContainer* vhc, KSubVirtualHost** rq_svh, const char* site, int site_len) {
 		query_vh_result result = query_vh_host_not_found;
@@ -82,7 +82,7 @@ public:
 		if (svh) {
 			result = query_vh_success;
 			if ((*rq_svh) != svh) {
-				//ĞéÄâÖ÷»ú±ä»¯ÁË?°ÑÀÏµÄÊÍ·Å£¬ÒıÓÃĞÂµÄ
+				//è™šæ‹Ÿä¸»æœºå˜åŒ–äº†?æŠŠè€çš„é‡Šæ”¾ï¼Œå¼•ç”¨æ–°çš„
 				if (*rq_svh) {
 					(*rq_svh)->release();
 					(*rq_svh) = NULL;
@@ -99,7 +99,7 @@ public:
 	kserver* RefsServer(u_short port);
 #ifdef ENABLE_VH_FLOW
 	void dumpLoad(KVirtualHostEvent* ctx, bool revers, const char* prefix, int prefix_len);
-	//µ¼³öËùÓĞĞéÄâÖ÷»úÁ÷Á¿
+	//å¯¼å‡ºæ‰€æœ‰è™šæ‹Ÿä¸»æœºæµé‡
 	void dumpFlow();
 	void dumpFlow(KVirtualHostEvent* ctx, bool revers, const char* prefix, int prefix_len, int extend);
 #endif
@@ -122,16 +122,16 @@ private:
 	void getAllVhHtml(KWStream& s);
 	void getVhDetail(KWStream& s, KVirtualHost* vh, bool edit);
 	/*
-	 * ËùÓĞĞéÄâÖ÷»úÁĞ±í
+	 * æ‰€æœ‰è™šæ‹Ÿä¸»æœºåˆ—è¡¨
 	 */
 	std::map<KString, KVirtualHost*> avh;
 	/*
-	* °ó¶¨µ½ÕìÌıÉÏ
+	* ç»‘å®šåˆ°ä¾¦å¬ä¸Š
 	*/
 	void InternalBindVirtualHost(KVirtualHost* vh);
 	void InternalUnBindVirtualHost(KVirtualHost* vh);
 	/*
-	* ²éÕÒÈ«¾ÖĞéÄâÖ÷»ú²¢°ó¶¨ÉÏ¡£
+	* æŸ¥æ‰¾å…¨å±€è™šæ‹Ÿä¸»æœºå¹¶ç»‘å®šä¸Šã€‚
 	*/
 	void BindGlobalVirtualHost(kserver* server);
 	void UnBindGlobalVirtualHost(kserver* server);

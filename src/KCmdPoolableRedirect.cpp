@@ -107,9 +107,9 @@ bool KCmdPoolableRedirect::Exec(KVirtualHost* vh, KListenPipeStream* st,bool isS
 	}
 	arg[i] = NULL;
 	/**
-	* ����ͬһ��Ӧ�ó���أ���һ����������(isSameRunning),��ʱ�������޷�ȷ��֪���ý��̵�״̬
-	* �п��ܸý��̻�����������ǰ����õ�preLoad(д�����ļ�ģ��),��δ�������á�
-	* ��ʱ����ٵ���preLoad, ��������̬����(race condition)
+	* 对于同一个应用程序池，有一个正在运行(isSameRunning),这时我们是无法确切知道该进程的状态
+	* 有可能该进程还正在启动，前面调用的preLoad(写配置文件模板),还未发生作用。
+	* 此时如果再调用preLoad, 即发生竞态条件(race condition)
 	*/
 	if (isSameRunning || preLoad(&ds)) {
 		KCmdEnv* env = makeEnv(&ds);

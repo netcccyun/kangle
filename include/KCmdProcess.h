@@ -153,7 +153,7 @@ public:
 	}
 	void gcSocket(KUpstream* st, int life_time) override
 	{
-		//Ê¹ÓÃÁËKTsUpstreamºó£¬windowsÏÂ¶àiocp£¬Ò²¿ÉÒÔÊ¹ÓÃ³¤Á¬½Ó.
+		//ä½¿ç”¨äº†KTsUpstreamåŽï¼Œwindowsä¸‹å¤šiocpï¼Œä¹Ÿå¯ä»¥ä½¿ç”¨é•¿è¿žæŽ¥.
 		KPoolableSocketContainer::gcSocket(st, life_time);
 		kassert(vprocess!=NULL);
 		vprocess->gcProcess(this);

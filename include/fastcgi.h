@@ -87,15 +87,15 @@ typedef struct {
 
 
 /*
-map Ò»¸öurlµ½ÎïÀíµØÖ·
+map ä¸€ä¸ªurlåˆ°ç‰©ç†åœ°å€
 */
 #define API_CHILD_MAP_PATH        FCGI_EXTEND_CMD+8
 /*
-¶ÁÒ»´ÎÊı¾İ
+è¯»ä¸€æ¬¡æ•°æ®
 */
 #define API_CHILD_READ_ONE        FCGI_EXTEND_CMD+9
 /*
-¶ÁÈ«²¿Êı¾İ
+è¯»å…¨éƒ¨æ•°æ®
 */
 #define API_CHILD_READ_ALL        FCGI_EXTEND_CMD+10
 #define API_CHILD_LOGON           FCGI_EXTEND_CMD+11
@@ -124,7 +124,7 @@ typedef struct {
 			unsigned char roleB0;
 		};
 		/*
-		 * idÖ»ÊÇÄÚ²¿Í¨ĞÅÓÃ
+		 * idåªæ˜¯å†…éƒ¨é€šä¿¡ç”¨
 		 */
 		u_short id;
 	};
@@ -201,7 +201,7 @@ struct sp_info {
 	int port;
 };
 /*
- * ÔÚÁ¬½ÓÉÏ·¢ËÍ
+ * åœ¨è¿æ¥ä¸Šå‘é€
  */
 struct sp_connect {
 	int key;

@@ -224,7 +224,7 @@ void log_access(KHttpRequest* rq) {
 	//printf("log_access=[%p]\n", rq);
 	int log_radio = conf.log_radio;
 	if (log_radio > 1) {
-		//ÈÕÖ¾³éÑù
+		//æ—¥å¿—æŠ½æ ·
 		uint32_t log_count = katom_inc((void*)&kgl_log_count);
 		if (log_count % log_radio != 0) {
 			return;

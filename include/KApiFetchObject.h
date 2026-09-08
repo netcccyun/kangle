@@ -1,8 +1,8 @@
 /*
  * KApiFetchObject.h
- * isapi�ӿڷ����࣬�����ַ����ṩ��ʽ������isapiģ������з�ʽ��
- * һ���Ǳ��صģ���isapiģ�����kangle�������ϣ��Զ��̵߳ķ�ʽ����(�����ṩ����KLocalApiService *sa)
- * ��һ����Զ�̵ģ���isapiģ�����kangle�ӽ����ϣ���fastcgi(��չ��)�ķ�ʽ��������ͨ��(�����ṩ����KFastcgiStream *st)
+ * isapi接口服务类，有两种服务提供方式，看该isapi模块的运行方式。
+ * 一种是本地的，即isapi模块挂在kangle主进程上，以多线程的方式运行(服务提供者是KLocalApiService *sa)
+ * 另一种是远程的，即isapi模块挂在kangle子进程上，以fastcgi(扩展了)的方式和主进程通信(服务提供者是KFastcgiStream *st)
 
  *  Created on: 2010-6-13
  *      Author: keengo

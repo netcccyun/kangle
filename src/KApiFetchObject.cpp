@@ -28,7 +28,7 @@ Token_t KApiFetchObject::getVhToken(const char* vh_name) {
 #ifndef HTTP_PROXY
 	if (rq && rq->sink->data.opaque) {
 		if (kangle::get_virtual_host(rq)->vh->user.empty()) {
-			//Ö»ÓÐ³¬¼¶ÕËºÅÔËÐÐµÄÐéÄâÖ÷»ú²ÅÓÐÈ¨ÏÞ¡£
+			//åªæœ‰è¶…çº§è´¦å·è¿è¡Œçš„è™šæ‹Ÿä¸»æœºæ‰æœ‰æƒé™ã€‚
 			KVirtualHost* vh = conf.gvm->refsVirtualHostByName(vh_name);
 			if (vh) {
 				if (token) {

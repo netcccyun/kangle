@@ -12,11 +12,11 @@ public:
 	virtual ~KUrlValue();
 	const KString &get(const KString&name) const;
 	/*
-	�õ�һ��ֵ�����᷵��NULL,�������򷵻�""
+	得到一个值，不会返回NULL,不存在则返回""
 	*/
 	const KString& get(const char *name) const;
 	/*
-	�õ�һ��ֵ�������ڷ���NULL
+	得到一个值，不存在返回NULL
 	*/
 	const char *getx(const char *name) const;
 	KString remove(const KString& name) {

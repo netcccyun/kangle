@@ -78,7 +78,7 @@ public:
 		}
 		KIpListItem *wl = (*it).second;
 		if (!wl->IsStatic()) {
-			//¶¯Ì¬×ª¾²Ì¬
+			//åŠ¨æ€è½¬é™æ€
 			wl->ConvertToStatic();
 		}
 		wls.erase(it);
@@ -92,12 +92,12 @@ public:
 		if (it != wls.end()) {
 			KIpListItem *wl = (*it).second;
 			if (wl->IsStatic()) {
-				//±¾ÉíÊÇ¾²Ì¬µÄ£¬Ö»ÐÞ¸ÄºÚ°×Ãûµ¥
+				//æœ¬èº«æ˜¯é™æ€çš„ï¼Œåªä¿®æ”¹é»‘ç™½åå•
 				wl->SetWhite(white);
 				lock.Unlock();
 				return;
 			}			
-			//¶¯Ì¬×ª¾²Ì¬
+			//åŠ¨æ€è½¬é™æ€
 			wl->ConvertToStatic();
 			wls.erase(it);
 		}
@@ -138,7 +138,7 @@ public:
 		while (head && kgl_current_sec - head->last_time>time_out) {
 			assert(!head->IsStatic());
 			if (!head->IsConvertToStatic()) {
-				//¶¯Ì¬µÄ£¬ÒÑ¾­×ª¾²Ì¬ÁË¡£
+				//åŠ¨æ€çš„ï¼Œå·²ç»è½¬é™æ€äº†ã€‚
 				wls.erase((char *)head->ip);
 			}
 			next = head->next;

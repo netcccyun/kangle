@@ -94,18 +94,18 @@ int WhmExtendCall::whmCall(const char* eventType, WhmContext* context) {
 	KStringStream* rd = context->getRedirectCalls();
 	if (ret == WHM_OK) {
 		if (rd && rd->size() > 0) {
-			//¼ì²éÊÇ·ñÖØ¶¨Ïò
+			//æ£€æŸ¥æ˜¯å¦é‡å®šå‘
 			ret = WHM_REDIRECT;
 		}
 	}
 	if (ret != WHM_REDIRECT) {
-		//Èç¹û²»ÊÇÖØ¶¨Ïò£¬¾Í·µ»Ø½á¹û
+		//å¦‚æžœä¸æ˜¯é‡å®šå‘ï¼Œå°±è¿”å›žç»“æžœ
 		if (rd) {
 			rd->clear();
 		}
 		return ret;
 	}
-	//ÖØ¶¨Ïòµ÷ÓÃ
+	//é‡å®šå‘è°ƒç”¨
 	KServiceProvider* sp = context->getProvider();
 	stringstream s;
 	auto path = getPath(sp->getFileName());

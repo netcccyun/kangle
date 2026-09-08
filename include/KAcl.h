@@ -30,7 +30,7 @@
 #define 	ACL_CONTEXT		"acl"
 
 /*
- * ·ÃÎÊ¿ØÖÆ
+ * è®¿é—®æŽ§åˆ¶
  */
 class KAcl : public KModel {
 public:

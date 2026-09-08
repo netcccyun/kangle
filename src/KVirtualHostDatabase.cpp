@@ -279,8 +279,8 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 		}
 		case VH_INFO_MAP:
 		{
-			//name¸ñÊ½       ÊÇ·ñÎÄ¼şÀ©Õ¹Ãû1|0,Öµ
-			//value¸ñÊ½      ÊÇ·ñÑéÖ¤ÎÄ¼ş´æÔÚ1|0,target,allowMethod
+			//nameæ ¼å¼       æ˜¯å¦æ–‡ä»¶æ‰©å±•å1|0,å€¼
+			//valueæ ¼å¼      æ˜¯å¦éªŒè¯æ–‡ä»¶å­˜åœ¨1|0,target,allowMethod
 			const char* map_val = strchr(name.c_str(), ',');
 			if (map_val) {
 				map_val++;

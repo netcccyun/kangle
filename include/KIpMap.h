@@ -9,7 +9,7 @@ struct dns_range_addr
 {
 	ip_addr min_addr;
 	ip_addr max_addr;
-	//ÏßÂ·
+	//çº¿è·¯
 	void *bind_data;
 };
 class KIpMap {

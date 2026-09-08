@@ -303,7 +303,7 @@ bool KVirtualHostManage::updateVirtualHost(kconfig::KConfigTree* ct, KVirtualHos
 	return updateVirtualHost(ct, vh, ov.get());
 }
 /*
- * Ôö¼ÓĞéÄâÖ÷»ú
+ * å¢åŠ è™šæ‹Ÿä¸»æœº
  */
 bool KVirtualHostManage::addVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh) {
 	if (vh->name.size() == 0) {
@@ -313,7 +313,7 @@ bool KVirtualHostManage::addVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* 
 	return internalAddVirtualHost(ct, vh, nullptr);
 }
 /*
- * É¾³ıĞéÄâÖ÷»ú
+ * åˆ é™¤è™šæ‹Ÿä¸»æœº
  */
 bool KVirtualHostManage::removeVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh) {
 	auto lock = locker();
@@ -736,7 +736,7 @@ void KVirtualHostManage::dumpLoad(KVirtualHostEvent* ctx, bool revers, const cha
 	}
 	ctx->data()->add("load", s2.str());
 }
-//extend=4,µ¼³öÉÏÏÂĞĞ£¬¼°»º´æÁ÷Á¿
+//extend=4,å¯¼å‡ºä¸Šä¸‹è¡Œï¼ŒåŠç¼“å­˜æµé‡
 void KVirtualHostManage::dumpFlow(KVirtualHostEvent* ctx, bool revers, const char* prefix, int prefix_len, int extend) {
 	char buf[64];
 	KStringBuf s;
@@ -1008,7 +1008,7 @@ void KVirtualHostManage::UnBindGlobalListens(std::vector<KListenHost*>& services
 void KVirtualHostManage::BindGlobalListens(std::vector<KListenHost*>& services) {
 	auto lock = locker();
 	for (size_t i = 0; i < services.size(); i++) {
-		//·ÀÖ¹¼ÓÔØÊ±¼äÌ«³¤£¬¶ø°²È«½ø³ÌÎóÈÏÎª¹Òµô¡£
+		//é˜²æ­¢åŠ è½½æ—¶é—´å¤ªé•¿ï¼Œè€Œå®‰å…¨è¿›ç¨‹è¯¯è®¤ä¸ºæŒ‚æ‰ã€‚
 		setActive();
 		dlisten.AddGlobal(services[i]);
 	}

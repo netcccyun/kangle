@@ -342,7 +342,7 @@ void change_admin_password_crypt_type() {
 	}
 }
 /*
-´´½¨Ò»¸ö½ø³ÌÍâ¹¤×÷£¬²¢µÈ´ýÍê³É
+åˆ›å»ºä¸€ä¸ªè¿›ç¨‹å¤–å·¥ä½œï¼Œå¹¶ç­‰å¾…å®Œæˆ
 */
 bool startProcessWork(Token_t token, char * args[], KCmdEnv *envs)
 {	
@@ -354,7 +354,7 @@ bool startProcessWork(Token_t token, char * args[], KCmdEnv *envs)
 #endif
 		);
 	if (st) {
-		//µÈ´ý×Ó½ø³Ì½áÊø
+		//ç­‰å¾…å­è¿›ç¨‹ç»“æŸ
 		st->waitClose();
 		delete st;
 		return true;

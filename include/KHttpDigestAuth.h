@@ -27,7 +27,7 @@ public:
 	 */
 	char *realm;
 	/*
-	 * ×îºó»îÔ¾Ê±¼ä
+	 * æœ€åæ´»è·ƒæ—¶é—´
 	 */
 	time_t lastActive;
 	sockaddr_i addr;

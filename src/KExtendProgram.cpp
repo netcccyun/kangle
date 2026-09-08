@@ -10,7 +10,7 @@
 extern char** environ;
 #endif
 void addCurrentEnv(KCmdEnv* env) {
-	//°ÑÏÖÓÐµÄ»·¾³±äÁ¿¼ÓÈë
+	//æŠŠçŽ°æœ‰çš„çŽ¯å¢ƒå˜é‡åŠ å…¥
 	for (int i = 0;; i++) {
 		char* e = environ[i];
 		if (e == NULL) {
@@ -258,7 +258,7 @@ done:
 		}
 		if (!result) {
 			klog(KLOG_NOTICE, "now remove tmp file [%s]\n", dst_tmp.c_str());
-			//Èç¹ûÃ»ÓÐ³É¹¦£¬ÔòÉ¾³ýÁÙÊ±ÎÄ¼þ			
+			//å¦‚æžœæ²¡æœ‰æˆåŠŸï¼Œåˆ™åˆ é™¤ä¸´æ—¶æ–‡ä»¶
 			unlink(dst_tmp.c_str());
 		}
 	}
@@ -304,7 +304,7 @@ bool KExtendProgramCmd::handle(KExtendProgramString* ds) {
 	}
 	result = false;
 	if (st) {
-		//µÈ´ý×Ó½ø³Ì½áÊø
+		//ç­‰å¾…å­è¿›ç¨‹ç»“æŸ
 		st->waitClose();
 		delete st;
 		result = true;

@@ -42,7 +42,7 @@ void WhmShell::flush() {
 	lock.Unlock();
 }
 void WhmShell::readStdin(WhmShellContext* sc, WhmContext* context) {
-	//²éÕÒ±ê×¼ÊäÈëÊı¾İ
+	//æŸ¥æ‰¾æ ‡å‡†è¾“å…¥æ•°æ®
 	kgl::string stdin_str;
 	if (context->getUrlValue()->get("-", stdin_str)) {
 		sc->in_buffer.write_all(stdin_str.c_str(), stdin_str.size());
@@ -63,7 +63,7 @@ int WhmShell::call(const char *callName,const char *eventType,WhmContext *contex
 {
 	WhmShellContext *sc = NULL;
 	if (merge) {
-		//ºÏ²¢Ä£Ê½
+		//åˆå¹¶æ¨¡å¼
 		int ret = WHM_PROGRESS;
 		lock.Lock();
 		bool need_start_thread = false;
@@ -74,10 +74,10 @@ int WhmShell::call(const char *callName,const char *eventType,WhmContext *contex
 			this->context.insert(std::pair<KString,WhmShellContext *>(sc->session,sc));
 			context->add("session",sc->session);
 			if (merge_context_running) {
-				//ÒÑ¾­ÔÚÔËĞĞ
+				//å·²ç»åœ¨è¿è¡Œ
 				merge_context = sc;
 			} else {
-				//Æô¶¯Ïß³Ì
+				//å¯åŠ¨çº¿ç¨‹
 				need_start_thread = true;
 				merge_context_running = true;
 				
@@ -87,7 +87,7 @@ int WhmShell::call(const char *callName,const char *eventType,WhmContext *contex
 			readStdin(merge_context,context);
 			context->add("session",merge_context->session);
 			if (!merge_context_running) {
-				//Æô¶¯Ïß³Ì
+				//å¯åŠ¨çº¿ç¨‹
 				need_start_thread = true;
 				merge_context_running = true;
 				merge_context = NULL;
@@ -108,7 +108,7 @@ int WhmShell::call(const char *callName,const char *eventType,WhmContext *contex
 		}
 		return ret;
 	}
-	//ÆÕÍ¨Ä£Ê½
+	//æ™®é€šæ¨¡å¼
 	sc = new WhmShellContext;
 	initContext(sc,context);
 	if (!async) {

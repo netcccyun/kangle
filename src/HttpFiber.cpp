@@ -91,7 +91,7 @@ KGL_RESULT process_request_stream(KHttpRequest* rq, kgl_input_stream* in, kgl_ou
 #ifdef ENABLE_REQUEST_QUEUE
 	KRequestQueue* queue = rq->queue;
 	if (KBIT_TEST(rq->GetWorkModel(), WORK_MODEL_MANAGE) || rq->ctx.internal || !rq->NeedQueue()) {
-		//ºóÌ¨¹ÜÀí¼°ÄÚ²¿µ÷ÓÃ£¬²»ÓÃÅÅ¶Ó
+		//åŽå°ç®¡ç†åŠå†…éƒ¨è°ƒç”¨ï¼Œä¸ç”¨æŽ’é˜Ÿ
 		goto skip_queue;
 	}
 #ifdef ENABLE_VH_QUEUE
@@ -320,7 +320,7 @@ void start_request_fiber(KSink* sink, int header_length) {
 				if (new_svh) {
 					auto svh = kangle::get_virtual_host(&rq);
 					if (new_svh->vh == svh->vh) {
-						//Ö»ÓÐÐéÄâÖ÷»úÏàÍ¬£¬²ÅÔÊÐíÖØÐ´host
+						//åªæœ‰è™šæ‹Ÿä¸»æœºç›¸åŒï¼Œæ‰å…è®¸é‡å†™host
 						rq.sink->data.bind_opaque(new_svh);
 					} else {
 						new_svh->release();
@@ -393,12 +393,12 @@ KGL_RESULT handle_error(KHttpRequest* rq, int code, const char* msg) {
 		obj->data->i.status_code = code;
 	}
 	if (KBIT_TEST(rq->sink->data.flags, RQ_IS_ERROR_PAGE)) {
-		//Èç¹û±¾ÉíÊÇ´íÎóÒ³Ãæ£¬ÓÖ²úÉú´íÎó
+		//å¦‚æžœæœ¬èº«æ˜¯é”™è¯¯é¡µé¢ï¼Œåˆäº§ç”Ÿé”™è¯¯
 		return send_error2(rq, code, msg);
 	}
-	//ÉèÖÃÎª´íÎóÒ³Ãæ
+	//è®¾ç½®ä¸ºé”™è¯¯é¡µé¢
 	KBIT_SET(rq->sink->data.flags, RQ_IS_ERROR_PAGE);
-	//Çå³ýrangeÇëÇó
+	//æ¸…é™¤rangeè¯·æ±‚
 	rq->sink->data.range = nullptr;
 	//KBIT_CLR(rq->sink->data.flags, RQ_HAVE_RANGE);
 	assert(svh);
@@ -422,7 +422,7 @@ KGL_RESULT handle_error(KHttpRequest* rq, int code, const char* msg) {
 	}
 	rq->file = new KFileName;
 	/*
-	skip_redirect Èç¹ûÊÇ±¾µØÎÄ¼þfile:// Ôò²»ÓÃ²éÕÒÀ©Õ¹Ó³Éä£¬µ±ÆÕÍ¨ÎÄ¼þ¼´¿É.
+	skip_redirect å¦‚æžœæ˜¯æœ¬åœ°æ–‡ä»¶file:// åˆ™ä¸ç”¨æŸ¥æ‰¾æ‰©å±•æ˜ å°„ï¼Œå½“æ™®é€šæ–‡ä»¶å³å¯.
 	*/
 	//bool skip_redirect = true;
 	if (strncasecmp(errorPage, "file://", 7) == 0) {
@@ -548,7 +548,7 @@ bool process_check_final_source(KHttpRequest* rq, kgl_input_stream* in, kgl_outp
 	return false;
 }
 /*
-×¼±¸¶ÁÎÄ¼þ£¬·Ö¼ñÇëÇó
+å‡†å¤‡è¯»æ–‡ä»¶ï¼Œåˆ†æ¡è¯·æ±‚
 */
 KGL_RESULT prepare_request_fetchobj(KHttpRequest* rq, kgl_input_stream* in, kgl_output_stream* out) {
 	assert(rq->ctx.obj);
@@ -640,7 +640,7 @@ static inline KGL_RESULT process_check_cache_expire(KHttpRequest* rq, KHttpObjec
 #ifdef ENABLE_BIG_OBJECT_206
 	if (obj->data->i.type == BIG_OBJECT_PROGRESS) {
 		/**
-		* Î´ÍêÎï¼þ£¬ÌØÊâ´¦Àí¡£»ò²úÉúif-rangeÇëÇóÍ·»áÑéÖ¤ÊÇ·ñÐÞ¸Ä¡£
+		* æœªå®Œç‰©ä»¶ï¼Œç‰¹æ®Šå¤„ç†ã€‚æˆ–äº§ç”Ÿif-rangeè¯·æ±‚å¤´ä¼šéªŒè¯æ˜¯å¦ä¿®æ”¹ã€‚
 		*
 		*/
 		KBigObjectContext* bo_ctx = new KBigObjectContext(rq, obj);
@@ -790,7 +790,7 @@ static inline swap_in_result swap_in_object(KHttpRequest* rq, KHttpObject* obj) 
 #endif
 #ifdef ENABLE_DISK_CACHE
 		} else if (obj->data->i.type == SWAPING_OBJECT) {
-			//ÒÑ¾­ÓÐÆäËüÏß³ÌÔÚswap
+			//å·²ç»æœ‰å…¶å®ƒçº¿ç¨‹åœ¨swap
 			KHttpObjectSwaping* os = obj->data->os;
 			assert(os);
 			return os->wait(lock);
@@ -823,7 +823,7 @@ static inline KGL_RESULT process_cache_request(KHttpRequest* rq) {
 	{
 		//swap in failed.
 #ifdef ENABLE_DISK_CACHE
-	//²»ÄÜswap in¾Í´ÓÔ´ÉÏÈ¥È¡
+	//ä¸èƒ½swap inå°±ä»Žæºä¸ŠåŽ»å–
 		{
 			auto filename = obj->get_filename();
 			klog(KLOG_ERR, "obj swap in failed cache file [%s] error=[%d].\n", filename.get(), result);

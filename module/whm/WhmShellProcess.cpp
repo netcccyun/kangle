@@ -39,7 +39,7 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 	Token_t token = NULL;
 #ifndef HTTP_PROXY
 	if (runAsUser) {
-		//´´½¨ÔËĞĞÉí·İÁîÅÆ
+		//åˆ›å»ºè¿è¡Œèº«ä»½ä»¤ç‰Œ
 		if (sc->vh==NULL) {
 			sc->last_error = 128;
 			return false;
@@ -65,9 +65,9 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 	//init the std file
 	PIPE_T hstdin = get_stdin(sc);
 	if (hstdin==INVALIDE_PIPE && sc->in_buffer.getLen()>0) {
-		//Èç¹ûÃ»ÓĞÊäÈëÎÄ¼ş²¢ÇÒÊäÈëÓĞÊı¾İ¡£¾ÍÒª´´½¨ÊäÈë¹ÜµÀ
+		//å¦‚æœæ²¡æœ‰è¾“å…¥æ–‡ä»¶å¹¶ä¸”è¾“å…¥æœ‰æ•°æ®ã€‚å°±è¦åˆ›å»ºè¾“å…¥ç®¡é“
 		if (!KPipeStream::create(big_stdin_pipe)) {
-			//¹Ø±Õ´ò¿ªµÄbig_stdout_pipe
+			//å…³é—­æ‰“å¼€çš„big_stdout_pipe
 			ClosePipe(big_stdout_pipe[0]);
 			ClosePipe(big_stdout_pipe[1]);
 			if (token) {
@@ -151,15 +151,15 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 		}	
 		c = c->next;
 	}
-	//¹Ø±ÕÊäÈë£¬Êä³ö¸¸½ø³ÌÎŞÓÃµÄ¹ÜµÀ¶Ë
+	//å…³é—­è¾“å…¥ï¼Œè¾“å‡ºçˆ¶è¿›ç¨‹æ— ç”¨çš„ç®¡é“ç«¯
 	if (kflike(hstdin)) {
 		ClosePipe(hstdin);
 	}
 	ClosePipe(big_stdout_pipe[WRITE_PIPE]);
-	//´¦ÀíÊäÈë
+	//å¤„ç†è¾“å…¥
 	if (big_stdin_pipe_created) {
 		if (result) {
-			//´´½¨³É¹¦²ÅĞ´ÈëÊı¾İ
+			//åˆ›å»ºæˆåŠŸæ‰å†™å…¥æ•°æ®
 			kbuf *buf = sc->in_buffer.getHead();
 			while (buf && buf->data) {
 				if (write_pipe(big_stdin_pipe[WRITE_PIPE],buf->data,buf->used)!=buf->used) {
@@ -168,11 +168,11 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 				buf = buf->next;
 			}
 		}
-		//ÇåÀíÊäÈëÊı¾İºÍ¹ÜµÀ×ÊÔ´
+		//æ¸…ç†è¾“å…¥æ•°æ®å’Œç®¡é“èµ„æº
 		sc->in_buffer.destroy();
 		ClosePipe(big_stdin_pipe[WRITE_PIPE]);
 	}
-	//´¦ÀíÊä³ö
+	//å¤„ç†è¾“å‡º
 	if (result && (hstdout==INVALIDE_PIPE || hstderr==INVALIDE_PIPE)) {
 		for (;;) {
 			char buf[512];

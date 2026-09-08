@@ -71,7 +71,7 @@ BOOL whmCreateProcess(WhmContext* ctx, WHM_CMD_DATA* cmd) {
 			pthread_t id;
 			pthread_attr_t attr;
 			pthread_attr_init(&attr);
-			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);//ÉèÖÃÏß³ÌÎª·ÖÀë
+			pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);//è®¾ç½®çº¿ç¨‹ä¸ºåˆ†ç¦»
 #endif
 			if (!PTHREAD_CREATE_SUCCESSED(pthread_create(&id, &attr, createProcessThread, (void*)param))) {
 				delete st;

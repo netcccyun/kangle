@@ -175,7 +175,7 @@ void on_cache_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) {
 			kconfig::set_need_reboot();
 		}
 	} else {
-		//Éú³Édisk_cache_dir
+		//ç”Ÿæˆdisk_cache_dir
 		if (*conf.disk_cache_dir2) {
 			string disk_cache_dir = conf.disk_cache_dir2;
 			pathEnd(disk_cache_dir);

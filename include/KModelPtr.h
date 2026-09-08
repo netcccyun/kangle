@@ -67,7 +67,7 @@ public:
 	}
 	bool revers;
 	bool is_or;
-	/* ÃüÃûÄ£¿éµÄÃû×Ö */
+	/* å‘½åæ¨¡å—çš„åå­— */
 	KString named;
 	T* m;
 };

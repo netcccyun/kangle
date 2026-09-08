@@ -21,7 +21,7 @@ public:
 			KHttpObjectBody* data = NULL;
 			if (obj) {
 				if (obj->in_cache) {
-					//Èç¹ûÒÑ¾­ÔÚ»º´æÖĞ£¬Ôò²»ÖØ¸´²Ù×÷
+					//å¦‚æœå·²ç»åœ¨ç¼“å­˜ä¸­ï¼Œåˆ™ä¸é‡å¤æ“ä½œ
 					return KF_STATUS_REQ_FALSE;
 				}
 				data = obj->data;

@@ -1,7 +1,7 @@
 #ifndef KURLRANGEMARK_H
 #define KURLRANGEMARK_H
 /*
-* url´ørangeÇëÇó
+* urlå¸¦rangeè¯·æ±‚
 */
 #if 0
 class KUrlRangeMark : public KMark

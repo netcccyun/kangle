@@ -263,8 +263,8 @@ bool KHttpManage::runCommand() {
 	} else if (cmd == "test_crash") {
 		memcpy(0, "t", 1);
 	} else if (cmd == "test_leak") {
-		//警告: 这里只是测试使用，存在明显的内存泄漏
-		//测试一个内存泄漏，以此测试内存泄漏工具是否正常工作
+		//璀﹀憡: 杩欓噷鍙槸娴嬭瘯浣跨敤锛屽瓨鍦ㄦ槑鏄剧殑鍐呭瓨娉勬紡
+		//娴嬭瘯涓�涓唴瀛樻硠婕忥紝浠ユ娴嬭瘯鍐呭瓨娉勬紡宸ュ叿鏄惁姝ｅ父宸ヤ綔
 		int* a = new int;
 		char* scode = strdup("200");
 		return sendHttp(scode);

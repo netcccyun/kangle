@@ -36,7 +36,7 @@
 #include "KConfigTree.h"
 
 /*
- * ×ª»»apache¸ñÊ½µÄ.htaccessµ½kangleµÄKAccess
+ * è½¬æ¢apacheæ ¼å¼çš„.htaccessåˆ°kangleçš„KAccess
  */
 class KApacheConfig {
 public:
@@ -47,7 +47,7 @@ public:
 #endif
 	bool load(const char *file);
 	/*
-	 * µÃµ½Î¨Ò»tableÃû
+	 * å¾—åˆ°å”¯ä¸€tableå
 	 */
 	std::string getTableName()
 	{

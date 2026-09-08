@@ -53,7 +53,7 @@ extern "C" {
 struct WHM_CMD_DATA
 {
 	void *ctx;
-	BOOL async;//Î´ÊµÏÖÒì²½¹¦ÄÜ
+	BOOL async;//æœªå®ç°å¼‚æ­¥åŠŸèƒ½
 	BOOL runasuser;
 	char **args;
 	char **envs;
@@ -69,36 +69,36 @@ struct WHM_VERSION_INFO {
 struct WHM_CONTEXT 
 {
 	/*
-	context,µ÷ÓÃÊ±Ğè»Ø´«¸økangle
+	context,è°ƒç”¨æ—¶éœ€å›ä¼ ç»™kangle
 	*/
 	void *ctx;
 	/*
-	µÃµ½url±äÁ¿
+	å¾—åˆ°urlå˜é‡
 	*/
 	const char *(* getUrl)(void *ctx,const char *name);
 	/*
-	µÃµ½ĞéÄâÖ÷»ú±äÁ¿
+	å¾—åˆ°è™šæ‹Ÿä¸»æœºå˜é‡
 	*/
 	const char *(* getVh)(void *ctx,const char *name);
 	/*
-	µÃµ½Ò»Ğ©È«¾Ö±äÁ¿
+	å¾—åˆ°ä¸€äº›å…¨å±€å˜é‡
 	*/
 	const char *(* getEnv)(void *ctx,const char *name);
 	/*
-	ÉèÖÃ´íÎóĞÅÏ¢
+	è®¾ç½®é”™è¯¯ä¿¡æ¯
 	*/
 	void (* setError)(void *ctx,const char *errMsg);
 	/*
-	ÉèÖÃ·µ»ØÖµ
+	è®¾ç½®è¿”å›å€¼
 	*/
 	void (* setValue)(void *ctx,const char *name,const char *value);
 	/*
-	¼ì²âÊÇ·ñÓĞĞéÄâÖ÷»ú
+	æ£€æµ‹æ˜¯å¦æœ‰è™šæ‹Ÿä¸»æœº
 	*/
 	BOOL (* hasVh)(void *ctx);
 	void (* redirect)(void *ctx,const char *package,const char *call);
 	BOOL (* ServerSupportFunction)(void *ctx, int request,void *buffer, int *size, int *dataType);
-	//Í¨¹ıServerSupportFunction·ÖÅäµÄÄÚ´æ£¬Òªµ÷ÓÃÏÂÃæµÄº¯ÊıÀ´ÊÍ·Å
+	//é€šè¿‡ServerSupportFunctionåˆ†é…çš„å†…å­˜ï¼Œè¦è°ƒç”¨ä¸‹é¢çš„å‡½æ•°æ¥é‡Šæ”¾
 	void (* free)(void *ctx,void *param);
 };
 DLL_PUBLIC BOOL WINAPI GetWhmVersion(WHM_VERSION_INFO *pVer);

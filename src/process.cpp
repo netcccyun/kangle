@@ -1437,7 +1437,7 @@ void coredump(DWORD pid,HANDLE hProcess,PEXCEPTION_POINTERS pExInfo)
 LONG WINAPI CustomUnhandledExceptionFilter(PEXCEPTION_POINTERS pExInfo)
 {
 	if (quit_program_flag==PROGRAM_NO_QUIT) {
-		//只有在正常运行出现异常才coredump
+		//鍙湁鍦ㄦ甯歌繍琛屽嚭鐜板紓甯告墠coredump
 		coredump(GetCurrentProcessId(),GetCurrentProcess(),pExInfo);
 	}
 	TerminateProcess(GetCurrentProcess(),1);

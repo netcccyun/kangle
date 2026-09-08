@@ -11,7 +11,7 @@
 #include "KCmdPoolableRedirect.h"
 #include "lang.h"
 using namespace std;
-//启动进程工作线程
+//鍚姩杩涚▼宸ヤ綔绾跨▼
 KTHREAD_FUNCTION VProcessPowerWorker(void *param)
 {
 	VProcessPowerParam *vpp = (VProcessPowerParam *)param;

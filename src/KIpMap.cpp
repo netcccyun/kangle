@@ -36,7 +36,7 @@ static int ip_addr_cmp(const ip_addr *a1,const ip_addr *a2)
 	return -1;	
 #endif
 }
-/* ipv4µÄ²åÈë±È½Ïº¯Êı */
+/* ipv4çš„æ’å…¥æ¯”è¾ƒå‡½æ•° */
 static int range_addr_find_cmp(const void *k1,const void *k2)
 {
 	ip_addr *addr = (ip_addr *)k1;
@@ -51,7 +51,7 @@ static int range_addr_find_cmp(const void *k1,const void *k2)
 	}
 	return 0;
 }
-/* ipv4µÄ²åÈë±È½Ïº¯Êı */
+/* ipv4çš„æ’å…¥æ¯”è¾ƒå‡½æ•° */
 static int range_addr_insert_cmp(const void *k1,const void *k2)
 {
 	struct dns_range_addr *a1 = (struct dns_range_addr *)k1;
@@ -269,20 +269,20 @@ bool KIpMap::add_range_addr(struct dns_range_addr *range_addr,void *bind_data)
 	kgl_memcpy(addr,range_addr,sizeof(struct dns_range_addr));
 	node->data = addr;
 	addr->bind_data = bind_data;
-	//´¦ÀíÇ°ÃæµÄip¸²¸Ç
+	//å¤„ç†å‰é¢çš„ipè¦†ç›–
 	struct krb_node *pre_node = rb_prev(node);
 	if (pre_node) {
 		struct dns_range_addr *pre_addr = (struct dns_range_addr *)pre_node->data;
 		if (ip_addr_cmp(&pre_addr->max_addr,&range_addr->max_addr)>0) {
 			make_local_ip(&range_addr->min_addr, ips, MAXIPLEN);
 			//klog(KLOG_WARNING,"IP [%s] is pre-covered max,view = [%d]\n",ips,view->id);
-			//²úÉúĞÂµÄrange ip²åÈë
+			//äº§ç”Ÿæ–°çš„range ipæ’å…¥
 			struct dns_range_addr new_addr;
 			memset(&new_addr,0,sizeof(new_addr));
 			kgl_memcpy(&new_addr.min_addr,&range_addr->max_addr,sizeof(new_addr.min_addr));
 			kgl_memcpy(&new_addr.max_addr,&pre_addr->max_addr,sizeof(new_addr.max_addr));
 			addr_add(&new_addr.min_addr,1);
-			//ÖØĞÂµ÷ÕûÖ®Ç°µÄrange ip
+			//é‡æ–°è°ƒæ•´ä¹‹å‰çš„range ip
 			kgl_memcpy(&pre_addr->max_addr,&range_addr->min_addr,sizeof(ip_addr));
 			addr_sub(&pre_addr->max_addr,1);
 			add_range_addr(&new_addr,pre_addr->bind_data);
@@ -290,12 +290,12 @@ bool KIpMap::add_range_addr(struct dns_range_addr *range_addr,void *bind_data)
 		} else if (ip_addr_cmp(&pre_addr->max_addr,&range_addr->min_addr)>=0) {
 			make_local_ip(&range_addr->min_addr, ips, MAXIPLEN);
 			//klog(KLOG_WARNING,"IP [%s] is pre-covered min,view = [%d]\n",ips,view->id);
-			//ÖØĞÂµ÷ÕûÖ®Ç°µÄrange ip
+			//é‡æ–°è°ƒæ•´ä¹‹å‰çš„range ip
 			kgl_memcpy(&pre_addr->max_addr,&range_addr->min_addr,sizeof(ip_addr));
 			addr_sub(&pre_addr->max_addr,1);
 		}
 	}
-	//´¦ÀíºóÃæµÄip¸²¸Ç
+	//å¤„ç†åé¢çš„ipè¦†ç›–
 	struct krb_node *next_node = rb_next(node);
 	if (next_node) {
 		struct dns_range_addr *next_addr = (struct dns_range_addr *)next_node->data;

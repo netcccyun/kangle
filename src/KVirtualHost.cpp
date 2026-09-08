@@ -583,7 +583,7 @@ KString KVirtualHost::getApp(KHttpRequest* rq) {
 		return getUser();
 	}
 	kassert((int)apps.size() == (int)app);
-	//todo:以后根据ip做hash
+	//todo:浠ュ悗鏍规嵁ip鍋歨ash
 	int index = (ip_hash ? ksocket_addr_hash(rq->sink->get_peer_addr()) : rand()) % app;
 	//printf("get vh=[%p] app=[%s]\n",this,apps[index].c_str());
 	return apps[index];

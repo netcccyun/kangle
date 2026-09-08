@@ -15,7 +15,7 @@ public:
 	virtual void handle() = 0;
 };
 
-//ÈÕÖ¾´¦Àí
+//æ—¥å¿—å¤„ç†
 class KLogDealTask : public KLogTask
 {
 public:
@@ -26,7 +26,7 @@ private:
 	const char * logFile;
 	char **arg;
 };
-//ÈÕÖ¾Î¬»¤
+//æ—¥å¿—ç»´æŠ¤
 class KLogZeroManageTask : public KLogTask
 {
 public:
@@ -48,7 +48,7 @@ private:
 	INT64 log_size;
 	std::list<KFileName *> files;
 };
-//ÈÕÖ¾Î¬»¤ºÍ´¦Àí
+//æ—¥å¿—ç»´æŠ¤å’Œå¤„ç†
 class KLogHandle
 {
 public:

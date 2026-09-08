@@ -32,7 +32,7 @@ bool check_path_info(const char *file,struct _stat64 *buf)
 	}
 	free(str);
 	if (result) {
-		//排除目录
+		//鎺掗櫎鐩綍
 		result = (S_ISDIR(buf->st_mode) == 0);
 	}
 	return result;
@@ -98,7 +98,7 @@ bool KRewriteRule::parse(const KXmlAttribute& attribute)
 	}
 	const char *path = attribute["path"].c_str();
 	if (*path=='!') {
-		//反转
+		//鍙嶈浆
 		revert = true;
 		path ++;
 	} else {
@@ -117,7 +117,7 @@ uint32_t KRewriteRule::mark(KHttpRequest *rq, KHttpObject *obj,
 	if (len < prefix.size()) {
 		return KF_STATUS_REQ_FALSE;
 	}
-	//测试path
+	//娴嬭瘯path
 	KRegSubString *subString = reg.matchSubString(rq->sink->data.url->path + prefix.size(), (int)(len - prefix.size()), 0);
 	bool match_result = (subString!=NULL);
 	if (revert==match_result) {
@@ -129,7 +129,7 @@ uint32_t KRewriteRule::mark(KHttpRequest *rq, KHttpObject *obj,
 	KRegSubString *lastCond = NULL;
 	bool result = true;
 	if (conds) {
-		//测试条件
+		//娴嬭瘯鏉′欢
 		std::list<KRewriteCond *>::iterator it;
 		for (it = conds->begin(); it != conds->end(); it++) {
 			if (result && (*it)->is_or) {
@@ -229,7 +229,7 @@ bool KFileAttributeTestor::test(const char *str, KRegSubString **lastSubString) 
 	struct _stat64 buf;
 	bool exsit = (_stati64(str, &buf) == 0);
 	if (!exsit && conf.path_info && type!='d') {
-		//检查path_info情况
+		//妫�鏌ath_info鎯呭喌
 		exsit = check_path_info(str,&buf);
 	}
 	if (!exsit) {

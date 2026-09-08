@@ -238,7 +238,7 @@ bool KApiRedirect::load()
 	return true;
 }
 KRedirectSource*KApiRedirect::makeFetchObject(KHttpRequest *rq, KFileName *file) {
-	//ÉèÖÃapi·ÃÎÊÊ±Ê¹ÓÃfull path_info
+	//è®¾ç½®apiè®¿é—®æ—¶ä½¿ç”¨full path_info
 	KBIT_SET(rq->ctx.filter_flags,RQ_FULL_PATH_INFO);
 	if (type == WORK_TYPE_MP || type == WORK_TYPE_SP) {
 		return new KApiFastcgiFetchObject();

@@ -29,7 +29,7 @@ public:
 				return KF_STATUS_REQ_TRUE;
 			}
 			if (obj) {
-				//如果是缓存物件，则不再重复增加header
+				//濡傛灉鏄紦瀛樼墿浠讹紝鍒欎笉鍐嶉噸澶嶅鍔爃eader
 				if (!obj->in_cache && (this->force || obj->find_header(attr,attr_len)==NULL)) {
 					obj->insert_http_header((const char *)attr,attr_len,s->c_str(),s->size());
 				}

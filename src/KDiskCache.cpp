@@ -26,7 +26,7 @@
 static std::list<std::string> partfiles;
 static std::map<std::string, bool> partobjs;
 #endif
-//扫描进程是否存在
+//鎵弿杩涚▼鏄惁瀛樺湪
 volatile bool index_progress = false;
 index_scan_state_t index_scan_state;
 static int load_count = 0;

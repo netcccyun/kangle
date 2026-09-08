@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
 	}
 	if (argc > 4) {
 		if (strcmp(argv[1], "-b") == 0) {
-			//独立运行模式
+			//鐙珛杩愯妯″紡
 			seperate_work_model();
 			return 0;
 		}

@@ -33,7 +33,7 @@ class KHttpObject;
 class KHttpRequest;
 using KSafeSource = std::unique_ptr<KFetchObject>;
 /*
- * 控制模块基类
+ * 鎺у埗妯″潡鍩虹被
  */
 class KModel {
 public:

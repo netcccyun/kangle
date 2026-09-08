@@ -54,7 +54,7 @@ public:
 	KFileName();
 	~KFileName();
 	/*
-	 µ÷ÓÃÕâ¸öº¯ÊıÖ®Ç°Çë¶ÔÓÚpath,ÇëÏÈµ÷ÓÃ tripDir2º¯Êı
+	 è°ƒç”¨è¿™ä¸ªå‡½æ•°ä¹‹å‰è¯·å¯¹äºpath,è¯·å…ˆè°ƒç”¨ tripDir2å‡½æ•°
 	 */
 	bool setName(const char *docRoot, const char *triped_path, int follow_link);
 	bool setName(const char *path);
@@ -80,7 +80,7 @@ public:
 			if (*hot == '/' || *hot == '\\') {
 				*src = split_char;
 				src++;
-				//Ìøµ½²»ÊÇ·Ö¸ñ·ûµÄÎ»ÖÃ
+				//è·³åˆ°ä¸æ˜¯åˆ†æ ¼ç¬¦çš„ä½ç½®
 				for (;;) {
 					if (!*hot) {
 						*src = '\0';
@@ -93,16 +93,16 @@ public:
 					}
 				}
 			}
-			//²»ÊÇ·Ö¸ñ·û
+			//ä¸æ˜¯åˆ†æ ¼ç¬¦
 			char* p = hot;
-			//ÕÒÏÂÃæµÄ·Ö¸ñ·û
+			//æ‰¾ä¸‹é¢çš„åˆ†æ ¼ç¬¦
 			while (*p && *p != '/' && *p != '\\')
 				p++;
-			//ÕÒµ½ÁË
+			//æ‰¾åˆ°äº†
 			int copy_len = (int)(p - hot);
 			if (*hot == '.') {
 				if (copy_len == 1) {
-					//Èç¹ûÊÇ±¾Ä¿Â¼£¬ÔòÂÔ¹ı
+					//å¦‚æœæ˜¯æœ¬ç›®å½•ï¼Œåˆ™ç•¥è¿‡
 					if (src > path) {
 						src--;
 						assert(*src == split_char);
@@ -111,7 +111,7 @@ public:
 					continue;
 				}
 				if (copy_len == 2 && *(hot + 1) == '.') {
-					//Èç¹ûÊÇÉÏ¼¶Ä¿Â¼
+					//å¦‚æœæ˜¯ä¸Šçº§ç›®å½•
 
 					if (src > path) {
 						src--;
@@ -135,7 +135,7 @@ public:
 			}
 			hot = p;
 		}
-		//²»¿ÉÄÜµ½ÕâÀïÀ´µÄ¡£
+		//ä¸å¯èƒ½åˆ°è¿™é‡Œæ¥çš„ã€‚
 		assert(false);
 		
 	}
@@ -190,7 +190,7 @@ private:
 	char *index;
 	struct _stat64 buf;
 	//int name_len;	
-	//path_infoÊ±£¬urlµÄ³¤¶È
+	//path_infoæ—¶ï¼Œurlçš„é•¿åº¦
 	unsigned pathInfoLength;
 	bool prev_dir;
 	bool linkChecked;	

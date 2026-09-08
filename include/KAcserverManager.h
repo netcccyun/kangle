@@ -51,7 +51,7 @@ public:
 #endif	
 	void killAllProcess(KVirtualHost* vh);
 	void shutdown();
-	/* х╚╡©в╪╠╦╨цакё╛©ирт╪стькЫсп╣дapiак║ё*/
+	/* Е┘╗И┐╗Е┤├Е╓┤Е╔╫Д╨├О╪▄Е▐╞Д╩╔Е┼═Х╫╫Ф┴─Ф°┴Г └apiД╨├Ц─┌*/
 	void loadAllApi();
 	void unloadAllApi();
 	bool remove_server(const KString &name, KString& err_msg);

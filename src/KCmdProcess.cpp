@@ -10,7 +10,7 @@
 #include "KCmdPoolableRedirect.h"
 #include "KAsyncFetchObject.h"
 #ifdef ENABLE_VH_RUN_AS
-//Æô¶¯½ø³Ì¹¤×÷Ïß³Ì
+//å¯åŠ¨è¿›ç¨‹å·¥ä½œçº¿ç¨‹
 KSPCmdProcess::KSPCmdProcess() {
 	st = NULL;
 }
@@ -26,7 +26,7 @@ KUpstream *KSPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 		delete st;
 	}
 	st = static_cast<KListenPipeStream *>(st2);
-	//ÕâÀï°Ñ¶Ë¿ÚºÅ±£´æ£¬ÏÂ´ÎÁ¬½ÓÊ±¾Í²»ÓÃ¶ÔstLock¼ÓËøÁË¡£
+	//è¿™é‡ŒæŠŠç«¯å£å·ä¿å­˜ï¼Œä¸‹æ¬¡è¿æ¥æ—¶å°±ä¸ç”¨å¯¹stLockåŠ é”äº†ã€‚
 #ifdef KSOCKET_UNIX
 	if (unix_path.empty()) {
 #endif
@@ -114,7 +114,7 @@ KUpstream *KMPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 	st->set_tcp(tcp);
 	klist_append(busyProcessList, st);
 	stLock.Unlock();
-	//ÕâÀï°Ñ¶Ë¿ÚºÅ±£´æ£¬ÏÂ´ÎÁ¬½ÓÊ±¾Í²»ÓÃ¶ÔstLock¼ÓËøÁË¡£
+	//è¿™é‡ŒæŠŠç«¯å£å·ä¿å­˜ï¼Œä¸‹æ¬¡è¿æ¥æ—¶å°±ä¸ç”¨å¯¹stLockåŠ é”äº†ã€‚
 #ifdef KSOCKET_UNIX
 	if (!st->unix_path.empty()) {
 		ksocket_unix_addr(st->unix_path.c_str(),&st->un_addr);

@@ -36,7 +36,7 @@ public:
 	bool createProcess(KVirtualHost *vh, KPipeStream *st);
 	bool isChanged(KExtendProgram *rd)
 	{
-		//todo:µ±Ç°api²»Ö§³ÖÖØĞÂ¼ÓÔØ¡£
+		//todo:å½“å‰apiä¸æ”¯æŒé‡æ–°åŠ è½½ã€‚
 		return false;
 	}
 	bool load();

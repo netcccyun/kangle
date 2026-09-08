@@ -85,21 +85,21 @@ void split(char *buf, std::vector<char *> &item);
 KString endTag();
 void addCurrentEnv(KCmdEnv *env);
 /*
-´´½¨Ò»¸ö½ø³ÌÍâ¹¤×÷£¬²¢µÈ´ıÍê³É
+åˆ›å»ºä¸€ä¸ªè¿›ç¨‹å¤–å·¥ä½œï¼Œå¹¶ç­‰å¾…å®Œæˆ
 */
 bool startProcessWork(Token_t token, char * args[], KCmdEnv *envs);
 /*
-´´½¨Ò»¸ö½ø³Ì.
-rdstd = 0 Ê¹ÓÃnamedPipe
-rdstd = 1 ÖØ¶¨Ïòstd
-rdstd = 2 ²»Á¬½Ó
+åˆ›å»ºä¸€ä¸ªè¿›ç¨‹.
+rdstd = 0 ä½¿ç”¨namedPipe
+rdstd = 1 é‡å®šå‘std
+rdstd = 2 ä¸è¿æ¥
 */
 KPipeStream * createProcess(Token_t token,char * args[],KCmdEnv *envs, int rdstd);
 /*
-´´½¨Ò»¸ö½ø³Ì.
-rdstd = 0 Ê¹ÓÃnamedPipe
-rdstd = 1 ÖØ¶¨Ïòstd
-rdstd = 2 ²»Á¬½Ó
+åˆ›å»ºä¸€ä¸ªè¿›ç¨‹.
+rdstd = 0 ä½¿ç”¨namedPipe
+rdstd = 1 é‡å®šå‘std
+rdstd = 2 ä¸è¿æ¥
 */
 bool createProcess(KPipeStream *st,Token_t token, char * args[], KCmdEnv *envs, int rdstd);
 bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *cur_dir,PIPE_T in,PIPE_T out,PIPE_T err,pid_t &pid);

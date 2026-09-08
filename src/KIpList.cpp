@@ -92,7 +92,7 @@ void KIpList::clearBlackList()
 	}
 	lock.Unlock();
 }
-//µÃµ½ºÚÃûµ¥
+//å¾—åˆ°é»‘åå•
 void KIpList::getBlackList(WhmContext *ctx)
 {
 	lock.Lock();

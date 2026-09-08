@@ -45,7 +45,7 @@ private:
 
 bool new_tempfile_input_stream(kgl_input_stream* in);
 bool tee_tempfile_body(kgl_response_body * body);
-//¶ÁpostÊı¾İµ½ÁÙÊ±ÎÄ¼ş
+//è¯»postæ•°æ®åˆ°ä¸´æ—¶æ–‡ä»¶
 KTHREAD_FUNCTION clean_tempfile_thread(void *param);
 #endif
 #endif

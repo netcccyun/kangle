@@ -120,7 +120,7 @@ private:
 	KMutex lock;
 	KWhiteListItem queue;
 };
-//°×Ãûµ¥
+//ç™½åå•
 extern KWhiteListManager wlm;
 #endif
 #endif

@@ -32,7 +32,7 @@ KUpstream* KApiProcess::PowerResult(KHttpRequest* rq, KPipeStream* st2)
 		delete st;
 	}
 	st = static_cast<KApiPipeStream*>(st2);
-	//ÕâÀï°Ñ¶Ë¿ÚºÅ±£´æ£¬ÏÂ´ÎÁ¬½ÓÊ±¾Í²»ÓÃ¶ÔstLock¼ÓËøÁË¡£
+	//è¿™é‡ŒæŠŠç«¯å£å·ä¿å­˜ï¼Œä¸‹æ¬¡è¿žæŽ¥æ—¶å°±ä¸ç”¨å¯¹stLockåŠ é”äº†ã€‚
 #ifdef KSOCKET_UNIX	
 	if (st->is_unix_socket()) {
 		KStringBuf s;

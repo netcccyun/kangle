@@ -200,7 +200,7 @@ KTHREAD_FUNCTION time_thread(void* arg) {
 #endif
 		flush_mem_cache(last_msec);
 #ifdef ENABLE_VH_FLOW
-		//自动刷新流量
+		//鑷姩鍒锋柊娴侀噺
 		if (conf.flush_flow_time > 0 && nowTime - lastFlushFlowTime > conf.flush_flow_time) {
 			lastFlushFlowTime = nowTime;
 			flushFlowFlag = true;

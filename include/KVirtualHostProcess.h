@@ -28,7 +28,7 @@ enum VProcess_Status
 };
 class KListenPipeStream;
 /*
- * Ò»¸öĞéÄâÖ÷»ú½ø³ÌÄ£ĞÍ
+ * ä¸€ä¸ªè™šæ‹Ÿä¸»æœºè¿›ç¨‹æ¨¡å‹
  */
 class KVirtualHostProcess : public KPoolableSocketContainer
 {
@@ -135,15 +135,15 @@ public:
 		return false;
 	}
 	/*
-	É±µôÖ¸¶¨½ø³Ì£¬pid=0£¬É±µôÈ«²¿½ø³Ì¡£
-	·µ»Øtrue,Ôò±íÊ¾È«²¿½ø³ÌÒÑÉ±µô£¬
-	·µ»Øfalse,Ôò±íÊ¾»¹ÓĞ½ø³Ì(Õë¶Ô¶à½ø³Ì)
+	æ€æ‰æŒ‡å®šè¿›ç¨‹ï¼Œpid=0ï¼Œæ€æ‰å…¨éƒ¨è¿›ç¨‹ã€‚
+	è¿”å›true,åˆ™è¡¨ç¤ºå…¨éƒ¨è¿›ç¨‹å·²æ€æ‰ï¼Œ
+	è¿”å›false,åˆ™è¡¨ç¤ºè¿˜æœ‰è¿›ç¨‹(é’ˆå¯¹å¤šè¿›ç¨‹)
 	*/
 	virtual bool killProcess(int pid) {
 		return false;
 	}
 	/*
-	 ±êÊ¶ÊÇ·ñÒÑ¾­½áÊø
+	 æ ‡è¯†æ˜¯å¦å·²ç»ç»“æŸ
 	 */
 	int idleTime;
 	VProcess_Status status;

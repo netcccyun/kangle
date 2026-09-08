@@ -175,7 +175,7 @@ void KDynamicListen::add(KListenKey *key, KSslConfig *ssl_config, KVirtualHost *
 		listen->key->SetFlag(key);
 		if (key->ssl > 0) {
 			if (!KBIT_TEST(listen->server->flags, WORK_MODEL_SSL) || key->global>0) {
-				//无ssl或者是全局侦听，要更新ssl
+				//鏃爏sl鎴栬�呮槸鍏ㄥ眬渚﹀惉锛岃鏇存柊ssl
 				need_load_ssl = true;
 			}
 		}

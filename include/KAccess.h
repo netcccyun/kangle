@@ -103,7 +103,7 @@ public:
 	kgl_jump_type check(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo);
 	int get_chain(WhmContext *ctx, const KString& table_name);
 	void add_chain_form(KWStream& s, const char* vh, const KString& table_name, const KString& file, uint16_t index, size_t id, bool add);
-	//POSTMAP Ö»ÔÚRESPONSEÀïÓĞĞ§£¬ÔÚÓ³ÉäÍêÎïÀíÎÄ¼şºóµ÷ÓÃ
+	//POSTMAP åªåœ¨RESPONSEé‡Œæœ‰æ•ˆï¼Œåœ¨æ˜ å°„å®Œç‰©ç†æ–‡ä»¶åè°ƒç”¨
 	kgl_jump_type check_post_map(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo);
 	static void loadModel();
 

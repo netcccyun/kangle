@@ -28,7 +28,7 @@ void KCloudIpAcl::http_body_hook(const char *data, int len)
 		}
 		int flush_time = this->flush_time;
 		if (!this->parse_data()) {
-			//如果失败，则30秒后重试
+			//濡傛灉澶辫触锛屽垯30绉掑悗閲嶈瘯
 			flush_time = 30;
 		}
 		timer_run(cloud_ip_timer, this, flush_time * 1000);

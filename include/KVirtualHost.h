@@ -45,7 +45,7 @@
 #include "KFlowInfo.h"
 #include "KConnectionLimit.h"
 #include "KXmlAttribute.h"
-//ÓÉvhµÄÒıÓÃ£¬¼ÆËãÁ¬½ÓÊıµÄ²îÒì
+//ç”±vhçš„å¼•ç”¨ï¼Œè®¡ç®—è¿æ¥æ•°çš„å·®å¼‚
 #define VH_REFS_CONNECT_DELTA 2
 inline KString get_vh_full_doc_root(const KString &doc_root) {
 	KString full_path;
@@ -63,7 +63,7 @@ inline KString get_vh_full_doc_root(const KString &doc_root) {
 	return full_path;
 }
 /**
-* ĞéÄâÖ÷»úÀà
+* è™šæ‹Ÿä¸»æœºç±»
 */
 class KVirtualHost final : public KBaseVirtualHost, public KSslConfig
 {
@@ -94,7 +94,7 @@ public:
 		{
 			uint16_t closed : 1;
 			uint16_t browse : 1;
-			//Í³¼ÆÁ÷Á¿
+			//ç»Ÿè®¡æµé‡
 			uint16_t fflow : 1;
 			uint16_t ip_hash : 1;
 			uint16_t inherit : 1;
@@ -109,7 +109,7 @@ public:
 			uint16_t chroot : 1;
 #endif
 			uint16_t app_share : 1;
-			/* Ó¦ÓÃ³ÌĞò³ØÊıÁ¿ */
+			/* åº”ç”¨ç¨‹åºæ± æ•°é‡ */
 			uint8_t app;
 		};
 		uint32_t flags;
@@ -163,7 +163,7 @@ public:
 #endif
 #ifdef ENABLE_VH_RUN_AS
 	/*
-	 * ¼ÆËãÊÇ·ñĞèÒªÉ±µô¶ÔÓ¦µÄ½ø³Ì,·µ»ØtrueÔòÒªÉ±µô½ø³Ì£¬·ñÔò²»É±µô½ø³Ì
+	 * è®¡ç®—æ˜¯å¦éœ€è¦æ€æ‰å¯¹åº”çš„è¿›ç¨‹,è¿”å›trueåˆ™è¦æ€æ‰è¿›ç¨‹ï¼Œå¦åˆ™ä¸æ€æ‰è¿›ç¨‹
 	 */
 	bool caculateNeedKillProcess(KVirtualHost* ov);
 	void KillAllProcess();
@@ -227,11 +227,11 @@ public:
 			}
 		}
 	}
-	//µ±Ç°Á¬½ÓÊıĞÅÏ¢
+	//å½“å‰è¿æ¥æ•°ä¿¡æ¯
 	KConnectionLimit* cur_connect;
-	//Á¬½ÓÊıÏŞÖÆ
+	//è¿æ¥æ•°é™åˆ¶
 	int max_connect;
-	//´ø¿íÏŞÖÆ
+	//å¸¦å®½é™åˆ¶
 	int speed_limit;
 #endif
 #ifdef ENABLE_VH_FLOW
@@ -274,7 +274,7 @@ public:
 #endif
 	bool alias(bool internal, const char* path, KFileName* file, bool& exsit, int flag);
 	kgl_auto_cstr alias(bool internal, const char* path);
-	//ÓÃÓÚwebdavµÈÓ¦ÓÃĞ£Ñé
+	//ç”¨äºwebdavç­‰åº”ç”¨æ ¡éªŒ
 	KBaseRedirect* refsPathRedirect(const char* path, int path_len);
 	KFetchObject* findPathRedirect(KHttpRequest* rq, KFileName* file, const char* path,
 		bool fileExsit, bool& result);
@@ -328,7 +328,7 @@ public:
 	static void createToken(Token_t token);
 #else
 	/*
-	¶ÔÓÚ²»Ö§³ÖĞéÄâÖ÷»úÔËĞĞÓÃ»§Ê±·µ»ØÒ»¸öÈ«¾ÖÓÃ»§Ãû
+	å¯¹äºä¸æ”¯æŒè™šæ‹Ÿä¸»æœºè¿è¡Œç”¨æˆ·æ—¶è¿”å›ä¸€ä¸ªå…¨å±€ç”¨æˆ·å
 	*/
 	KString getUser() {
 		return "-";
@@ -371,11 +371,11 @@ public:
 private:
 	~KVirtualHost();
 #ifdef ENABLE_VH_RS_LIMIT
-	//µ±Ç°´ø¿íĞÅÏ¢
+	//å½“å‰å¸¦å®½ä¿¡æ¯
 	KSpeedLimit* sl;
 #endif
 #ifdef ENABLE_VH_FLOW
-	//Á÷Á¿±í
+	//æµé‡è¡¨
 	KFlowInfo* flow;
 #endif
 	bool loadApiRedirect(KRedirect* rd, KApiPipeStream* st, int workType);

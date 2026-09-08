@@ -115,7 +115,7 @@ void KHttpObject::UpdateCache(KHttpObject* obj)
 	if (cmp_vary_key(uk.vary, obj->uk.vary) != 0) {
 		cache.UpdateVary(this, obj->uk.vary);
 	}
-	//TODO:¸üÐÂvary,»òmax_ageµÈ»º´æ¿ØÖÆ	
+	//TODO:æ›´æ–°vary,æˆ–max_ageç­‰ç¼“å­˜æŽ§åˆ¶
 	return;
 }
 bool KHttpObject::is_same_precondition(KHttpObject* obj) 	{
@@ -261,7 +261,7 @@ bool KHttpObjectBody::restore_header(KHttpObject* obj, char* buffer, int len)
 		return false;
 	}
 	if (len != (int)fileHeader->dbi.index.head_size) {
-		//head_size²»¶Ô
+		//head_sizeä¸å¯¹
 		return false;
 	}
 	int hotlen = len - sizeof(KHttpObjectFileHeader);
@@ -474,7 +474,7 @@ bool KHttpObject::swapout(KBufferFile* file, bool fast_model)
 	}
 #endif
 	if (KBIT_TEST(index.flags, FLAG_IN_DISK)) {
-		//ÄÚÈÝÒÑ¾­ÓÐ£¬ÎÞÐè
+		//å†…å®¹å·²ç»æœ‰ï¼Œæ— éœ€
 		goto swap_out_success;
 	}
 	if (data->i.type != MEMORY_OBJECT) {

@@ -28,7 +28,7 @@ public:
 	KVirtualHostDatabase();
 	~KVirtualHostDatabase();
 	bool parse_config(khttpd::KXmlNodeBody *xml);
-	//检查数据库连接是否正常
+	//妫�鏌ユ暟鎹簱杩炴帴鏄惁姝ｅ父
 	bool check();
 	bool isSuccss()
 	{

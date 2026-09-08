@@ -37,7 +37,7 @@ int apache_config_include_handle(const char* file, void* param)
 }
 using namespace std;
 /*
- * 最大htaccess文件大小,1M
+ * 鏈�澶taccess鏂囦欢澶у皬,1M
  */
 static const int max_htaccess_file_size = 1024 * 1024;
 void split(char* buf, std::vector<char*>& item) {
@@ -186,7 +186,7 @@ bool KApacheConfig::process(const char* cmd, std::vector<char*>& item)
 			return true;
 		}
 		if (strchr(path, '*') != NULL) {
-			//目录
+			//鐩綍
 			KApacheConfigFileInclude include;
 			char* e = path + strlen(path) - 1;
 			bool efinded = false;

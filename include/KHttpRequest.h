@@ -111,19 +111,19 @@ public:
 		uint32_t cache_hit_part : 1;
 		uint32_t have_stored : 1;
 		uint32_t upstream_connection_keep_alive : 1;
-		//connect´úÀí
+		//connectä»£ç†
 		//uint32_t connection_connect_proxy : 1;
 		uint32_t no_http_header : 1;
 		uint32_t always_on_model : 1;
 		uint32_t response_checked : 1;
 		uint32_t upstream_sign : 1;
 		uint32_t parent_signed : 1;
-		//clientÖ÷¶¯¹Ø±Õ
+		//clientä¸»åŠ¨å…³é—­
 		uint32_t read_huped : 1;
 		uint32_t upstream_expected_done : 1;
-		//preconditionÀàÐÍ
+		//preconditionç±»åž‹
 		uint32_t precondition_flag : 3;
-		int64_t left_read;	//final fetchobj Ê¹ÓÃ
+		int64_t left_read;	//final fetchobj ä½¿ç”¨
 		KHttpObject* obj;
 		KHttpObject* old_obj;
 		kgl_sub_request* sub_request;
@@ -132,17 +132,17 @@ public:
 	} ctx;
 	KFetchObject* fo_head;
 	KFetchObject* fo_last;
-	//ÎïÀíÎÄ¼þÓ³Éä
+	//ç‰©ç†æ–‡ä»¶æ˜ å°„
 	KFileName* file;
-	//httpÈÏÖ¤
+	//httpè®¤è¯
 	KHttpAuth* auth;
 #ifdef ENABLE_REQUEST_QUEUE
 	KRequestQueue* queue;
 #endif
-	//ÏÞËÙ(µþ¼Ó)
+	//é™é€Ÿ(å åŠ )
 	KSpeedLimitHelper* slh;
 	/****************
-* Êä³ö¹ýÂË
+* è¾“å‡ºè¿‡æ»¤
 *****************/
 	KOutputFilterContext* of_ctx;
 	KOutputFilterContext* getOutputFilterContext();
@@ -354,7 +354,7 @@ public:
 		return sink->response_content_length(content_length);
 	}
 #endif
-	//·µ»Øtrue£¬Ò»¶¨ÐèÒª»ØÓ¦content-length»òchunk
+	//è¿”å›žtrueï¼Œä¸€å®šéœ€è¦å›žåº”content-lengthæˆ–chunk
 	//inline bool response_connection() {
 	//	return sink->response_connection();
 	//}
@@ -373,7 +373,7 @@ public:
 	bool response_header(const char* name, hlen_t name_len, const char* val, hlen_t val_len) {
 		return sink->response_header(name, name_len, val, val_len);
 	}
-	//·¢ËÍÍêheader¿ªÊ¼·¢ËÍbodyÊ±µ÷ÓÃ
+	//å‘é€å®Œheaderå¼€å§‹å‘é€bodyæ—¶è°ƒç”¨
 	bool start_response_body(INT64 body_len) {
 		return sink->start_response_body(body_len);
 	}
@@ -423,7 +423,7 @@ public:
 	KGL_RESULT write_end(KGL_RESULT result) {
 		assert(ctx.body.ctx);
 		if (result == KGL_OK && sink->get_response_left() > 0) {
-			//ÓÐcontent-length£¬ÓÖÎ´¶ÁÍê
+			//æœ‰content-lengthï¼Œåˆæœªè¯»å®Œ
 			result = KGL_ESOCKET_BROKEN;
 		}
 		ctx.body = { 0 };
@@ -464,7 +464,7 @@ public:
 	void SetSelfPort(uint16_t port, bool ssl) {
 		sink->set_self_port(port, ssl);
 	}
-	//¿Í»§ÕæÊµip(ÓÐ¿ÉÄÜ±»Ìæ»»)
+	//å®¢æˆ·çœŸå®žip(æœ‰å¯èƒ½è¢«æ›¿æ¢)
 	const char* getClientIp() {
 		return sink->get_client_ip();
 	}
@@ -481,7 +481,7 @@ public:
 	uint32_t GetWorkModel() {
 		return sink->get_server_model();
 	}
-	/* Êý¾ÝÔ´ */
+	/* æ•°æ®æº */
 	bool is_source_empty() {
 		return fo_head == nullptr;
 	}
@@ -503,9 +503,9 @@ public:
 		}
 		return !KBIT_TEST(fo_last->flags, KGL_UPSTREAM_FILTER);
 	}
-	/* Êý¾ÝÔ´½áÊø */
+	/* æ•°æ®æºç»“æŸ */
 
-	//´Ó¶ÑÉÏ·ÖÅäÄÚ´æ£¬ÔÚrqÉ¾³ýÊ±£¬×Ô¶¯ÊÍ·Å¡£
+	//ä»Žå †ä¸Šåˆ†é…å†…å­˜ï¼Œåœ¨rqåˆ é™¤æ—¶ï¼Œè‡ªåŠ¨é‡Šæ”¾ã€‚
 	void* alloc_connect_memory(int size) {
 		return kgl_pnalloc(sink->get_connection_pool(), size);
 	}

@@ -82,7 +82,7 @@ public:
 		ref = 1;
 	}
 	/**
-	* µ÷ÓÃ´Ë´¦rd±ØĞëÏÈĞĞaddRef¡£
+	* è°ƒç”¨æ­¤å¤„rdå¿…é¡»å…ˆè¡ŒaddRefã€‚
 	*/
 	KBaseRedirect(KRedirect *rd, KConfirmFile confirmFile) {
 		this->rd = rd;

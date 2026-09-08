@@ -1,6 +1,6 @@
 /*
  * HttpExt.cpp
- * Îªisapi½Ó¿ÚÌá¹©·şÎñ£¬½öÌá¹©¹µÍ¨×÷ÓÃ£¬Êµ¼Ê·şÎñÌá¹©ÓÉKApiFetchObjectÀàÌá¹©¡£
+ * ä¸ºisapiæ¥å£æä¾›æœåŠ¡ï¼Œä»…æä¾›æ²Ÿé€šä½œç”¨ï¼Œå®é™…æœåŠ¡æä¾›ç”±KApiFetchObjectç±»æä¾›ã€‚
  *
  *  Created on: 2010-6-13
  *      Author: keengo
@@ -14,7 +14,7 @@
 #include "kmalloc.h"
 #include "KApiService.h"
 #ifndef _WIN32
-//Ê¹ÓÃgccÖĞµÄlibiconv
+//ä½¿ç”¨gccä¸­çš„libiconv
 #define LIBICONV_PLUG 1
 #endif
 #include "iconv.h"

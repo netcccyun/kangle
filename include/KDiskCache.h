@@ -15,8 +15,8 @@
 #pragma pack(push,4)
 struct KHttpObjectKey
 {
-	unsigned filename1;//从kgl_current_sec得到
-	unsigned filename2;//每次累加
+	unsigned filename1;//浠巏gl_current_sec寰楀埌
+	unsigned filename2;//姣忔绱姞
 };
 struct HttpObjectIndex
 {
