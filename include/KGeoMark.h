@@ -44,7 +44,9 @@ public:
 		}
 		while (lable) {
 			auto header = rq->sink->data.add_header(this->name.c_str(), (int)this->name.size(), lable->data, lable->len);
-			header->name_is_internal = 1;
+			if (header) {
+				header->name_is_internal = 1;
+			}
 			lable = lable->next;
 		}
 		kfiber_rwlock_runlock(lock);

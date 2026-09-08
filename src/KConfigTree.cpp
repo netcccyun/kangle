@@ -78,15 +78,18 @@ namespace kconfig {
 			if (strncmp(hot, "<!--#", 5) == 0) {
 				hot += 5;
 				if (strncmp(hot, "stop", 4) == 0) {
-					/*
-					 * 扩展没有启动
-					 */
+					/* This extension has no configuration. */
 					id = 0;
 					file->set_index(0);
 					return nullptr;
 				} else if (strncmp(hot, "start", 5) == 0) {
-					hot += 6;
-					id = atoi(hot);
+					hot += 5;
+					while (*hot && isspace((unsigned char)*hot)) {
+						hot++;
+					}
+					if (*hot) {
+						id = atoi(hot);
+					}
 				}
 			}
 			if (file->get_index() == 0) {
@@ -699,7 +702,7 @@ namespace kconfig {
 		if (diff.new_to != diff.old_to) {
 			is_diff = true;
 		}
-		for (; (diff.new_to > diff.from + 1 || diff.old_to > diff.from + 1); --diff.old_to, --diff.new_to) {
+		for (; (diff.new_to > diff.from + 1 && diff.old_to > diff.from + 1); --diff.old_to, --diff.new_to) {
 			if (diff.old_to == 0 || diff.new_to == 0) {
 				break;
 			}
@@ -759,14 +762,12 @@ namespace kconfig {
 		while (*hot && isspace((unsigned char)*hot)) {
 			hot++;
 		}
-		//默认启动顺序为50
+		// The default configuration order is 50.
 		uint32_t id = default_file_index;
 		if (strncmp(hot, "<!--#", 5) == 0) {
 			hot += 5;
 			if (strncmp(hot, "stop", 4) == 0) {
-				/*
-				 * 扩展没有启动
-				 */
+				/* This extension has no configuration. */
 				return 0;
 			} else if (strncmp(hot, "start", 5) == 0) {
 				hot += 6;

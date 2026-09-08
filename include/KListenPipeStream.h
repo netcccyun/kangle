@@ -57,7 +57,12 @@ public:
 	bool listen(int port=0,const char *host="127.0.0.1")
 	{
 		sockaddr_i addr;
-		ksocket_getaddr(host, port, AF_UNSPEC, AI_NUMERICHOST,&addr);
+		if (host == NULL || *host == '\0') {
+			host = "0.0.0.0";
+		}
+		if (!ksocket_getaddr(host, port, AF_UNSPEC, AI_NUMERICHOST,&addr)) {
+			return false;
+		}
 		SOCKET sockfd = ksocket_listen(&addr, KSOCKET_BLOCK);
 		if (!ksocket_opened(sockfd)) {
 			return false;

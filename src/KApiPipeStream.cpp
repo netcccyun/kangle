@@ -200,7 +200,7 @@ bool KApiPipeStream::listen(u_short port, bool unix_socket) {
 	if (!read_all((char*)&info, sizeof(sp_info))) {
 		return false;
 	}
-	return true;
+	return info.result == 0;
 }
 bool KApiPipeStream::init(KVirtualHost* vh, int workType) {
 	if (!loadAllApi(vh, workType)) {

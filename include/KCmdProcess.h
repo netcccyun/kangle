@@ -14,9 +14,7 @@
 #include "kselector_manager.h"
 #include "KTcpUpstream.h"
 #include "kfiber.h"
-/*
-多线程命令进程
-*/
+/* Single-process command worker. */
 class KSPCmdProcess: public KVirtualHostProcess {
 public:
 	KSPCmdProcess();
@@ -87,7 +85,7 @@ protected:
 	KListenPipeStream *st;
 };
 class KSingleListenPipeStream;
-//多进程命令扩展
+// Multi-process command worker.
 class KMPCmdProcess: public KVirtualHostProcess {
 public:
 	KMPCmdProcess();
@@ -140,6 +138,9 @@ public:
 			return st;
 		}
 		kconnection* cn = kfiber_net_open(&addr);
+		if (cn == NULL) {
+			return NULL;
+		}
 		if (kfiber_net_connect(cn, NULL, 0) != 0) {
 			kfiber_net_close(cn);
 			return NULL;

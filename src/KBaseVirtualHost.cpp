@@ -180,6 +180,7 @@ bool KBaseVirtualHost::getIndexFile(KHttpRequest* rq, KFileName* file, KFileName
 				return true;
 			} else {
 				delete (*newFile);
+				*newFile = NULL;
 			}
 		}
 	}

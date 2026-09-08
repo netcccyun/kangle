@@ -1050,8 +1050,13 @@ bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent*
 		if (!isGlobal()) {
 			auto type = this->get_type();
 			auto acc = static_cast<KAccess*>(tree->unbind());
-			assert(acc && this == acc);
+			if (!acc) {
+				return false;
+			}
 			defer(acc->release(););
+			if (acc != this) {
+				return false;
+			}
 			auto vh = static_cast<KVirtualHost*>(tree->parent->ls);
 			if (vh) {
 				auto locker = vh->get_locker();
@@ -1091,7 +1096,11 @@ bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent*
 			if (!named_model) {
 				return false;
 			}
-			named_model->get_module()->parse_config(xml->get_first());
+			auto body = xml->get_first();
+			if (!body) {
+				return false;
+			}
+			named_model->get_module()->parse_config(body);
 			return true;
 		}
 		return true;
@@ -1153,12 +1162,14 @@ bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent*
 		auto xml = ev->get_xml();
 		if (xml->is_tag(_KS("table"))) {
 			auto body = xml->get_first();
-			assert(body);
 			if (!body) {
 				return false;
 			}
 			auto locker = write_lock();
 			KSafeTable table(static_cast<KTable*>(tree->unbind()));
+			if (!table) {
+				return false;
+			}
 			//printf("remove table name=[%s]\n", table->name.c_str());
 			if (table.get() == begin.get()) {
 				begin.reset();

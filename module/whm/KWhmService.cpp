@@ -24,8 +24,13 @@ bool KWhmService::service(KServiceProvider *provider) {
 	uv->parse(provider->getQueryString());
 	INT64 contentLength = provider->getContentLength();
 	if(contentLength > 0){
+		if (contentLength > MAX_POST_SIZE) {
+			return false;
+		}
 		KHttpPost httpPost;
-		httpPost.init((int)contentLength);		
+		if(!httpPost.init((int)contentLength)){
+			return false;
+		}
 		if(!httpPost.readData(provider->getInputStream())){
 			return false;
 		}

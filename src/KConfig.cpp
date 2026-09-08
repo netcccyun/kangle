@@ -121,8 +121,8 @@ void KSslCertificate::attach_modified_event(kconfig::KConfigFile* file, KXmlAttr
 	if (key_file) {
 		KStringBuf name;
 		name << khttpd::internal_xml_attribute << "key_file";
-		KFileModified last_modified(get_cert_file(doc_root).c_str());
-		file->merge_last_modified(get_cert_file(doc_root).c_str());
+		KFileModified last_modified(get_key_file(doc_root).c_str());
+		file->merge_last_modified(get_key_file(doc_root).c_str());
 		attributes.emplace(name.str(), last_modified.to_string());
 	}
 }
@@ -639,7 +639,7 @@ void do_config(bool first_time) {
 }
 
 void parse_server_software() {
-	//Éú³ÉserverName
+	// Generate serverName.
 	timeLock.Lock();
 	if (*conf.server_software) {
 		SAFE_STRCPY(conf.serverName, conf.server_software);

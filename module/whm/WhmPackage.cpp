@@ -63,11 +63,13 @@ int WhmPackage::query(WhmContext *context)
 	KVirtualHost *vh = context->getVh();
 	if (sc->vh==NULL && vh) {
 		context->setStatus("access denied");
+		sc->release();
 		return WHM_FORBIDEN;
 	}
 	if (sc->vh) {
 		if (vh==NULL || vh->name!=sc->vh->name) {
 			context->setStatus("access denied");
+			sc->release();
 			return WHM_FORBIDEN;
 		}
 	}

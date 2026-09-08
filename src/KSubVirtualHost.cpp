@@ -172,7 +172,7 @@ bool KSubVirtualHost::setHost(const char* host) {
 	}
 	return result;
 }
-/* 如果setHost里面设置了dir信息(|分隔),以setHost的为准 */
+/* A directory embedded in setHost (after '|') takes precedence. */
 void KSubVirtualHost::set_doc_root(const char* doc_root, const char* dir) {
 	free_subtype_data();
 	if (this->dir == nullptr) {
@@ -291,6 +291,10 @@ void KSubVirtualHost::set_doc_root(const char* doc_root, const char* dir) {
 	type = subdir_type::subdir_local;
 	KFileName::tripDir3(this->dir, '/');
 	char* sub_doc_root = KFileName::concatDir(doc_root, this->dir);
+	if (sub_doc_root == NULL) {
+		this->doc_root = NULL;
+		return;
+	}
 	this->doc_root = sub_doc_root;
 	size_t doc_len = strlen(this->doc_root);
 	if (this->doc_root[doc_len - 1] != '/'
@@ -309,10 +313,12 @@ void KSubVirtualHost::set_doc_root(const char* doc_root, const char* dir) {
 }
 kgl_jump_type KSubVirtualHost::bindFile(KHttpRequest* rq, KHttpObject* obj, bool& exsit, KApacheHtaccessContext& htctx, KSafeSource& fo) {
 #ifdef _WIN32
-	int path_len = (int)strlen(rq->sink->data.url->path);
-	char* c = rq->sink->data.url->path + path_len - 1;
-	if (*c == '.' || *c == ' ') {
-		return JUMP_DENY;
+	const char* url_path = rq->sink->data.url->path;
+	if (url_path && *url_path) {
+		char* c = (char*)url_path + strlen(url_path) - 1;
+		if (*c == '.' || *c == ' ') {
+			return JUMP_DENY;
+		}
 	}
 #endif
 	if (doc_root == NULL) {
@@ -358,7 +364,7 @@ kgl_jump_type KSubVirtualHost::bindFile(KHttpRequest* rq, KHttpObject* obj, bool
 			}
 		}
 		if (rq->file) {
-			//重新绑定过,因为有可能重写了
+			// Rebind the file because a rewrite may have changed the path.
 			delete rq->file;
 			rq->file = NULL;
 		}
@@ -482,4 +488,3 @@ kgl_auto_cstr KSubVirtualHost::map_file(const char* path) {
 	}
 	return kgl_auto_cstr(KFileName::concatDir(doc_root, path));
 }
-

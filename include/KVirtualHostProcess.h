@@ -92,11 +92,18 @@ public:
 				return NULL;
 			}
 			kconnection* cn = kconnection_new(&addr);
+			if (cn == NULL) {
+				ksocket_close(fd);
+				return NULL;
+			}
 			cn->st.fd = fd;
 			return new_upstream(cn);
 		}
 #endif
 		kconnection* cn = kfiber_net_open(&addr);
+		if (cn == NULL) {
+			return NULL;
+		}
 		if (kfiber_net_connect(cn, NULL, 0) == 0) {
 			return new_upstream(cn);
 		}

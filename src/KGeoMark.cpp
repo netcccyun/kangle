@@ -123,7 +123,7 @@ void KGeoMark::flush_timer_callback()
 	char *url = strdup(this->url);
 	kfiber_rwlock_runlock(lock);
 #ifdef ENABLE_SIMULATE_HTTP
-	async_download(this->url, file.c_str(), geo_mark_download, this);
+	async_download(url, file.c_str(), geo_mark_download, this);
 #else
 	geo_mark_download(this, 302);
 #endif

@@ -69,6 +69,7 @@ public:
 							rq->sink->data.raw_url.port = 80;
 						}
 					}
+					delete sub;
 					return KF_STATUS_REQ_TRUE;
 				}
 			}
