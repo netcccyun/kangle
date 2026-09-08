@@ -170,6 +170,7 @@ func Mkdir() {
 	os.Mkdir(config.Cfg.BasePath+"/var", 0755)
 	os.Mkdir(config.Cfg.BasePath+"/ext", 0755)
 	os.Mkdir(config.Cfg.BasePath+"/bin", 0755)
+	os.Mkdir(config.Cfg.BasePath+"/log", 0755)
 	os.Mkdir(config.Cfg.BasePath+"/www/dav", 0755)
 }
 func Prepare(kangle_path string, only_prepare bool) {
@@ -188,8 +189,13 @@ func Prepare(kangle_path string, only_prepare bool) {
 	time.Sleep(time.Second)
 }
 func Close() {
+	cmd := kangle_cmd
+	if cmd == nil {
+		return
+	}
+	kangle_cmd = nil
 	go Stop()
-	kangle_cmd.Wait()
+	_ = cmd.Wait()
 }
 func Stop() {
 	exec.Command(kangleCommand, "-q").Run()

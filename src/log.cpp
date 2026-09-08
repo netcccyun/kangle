@@ -99,6 +99,9 @@ int klog_start() {
 			errorLogger.place = LOG_PRINT;
 		}
 		accessLogger.place = LOG_FILE;
+		if (*conf.access_log == '\0') {
+			SAFE_STRCPY(conf.access_log, "access.log");
+		}
 		KString logpath;
 		if(conf.access_log[0]!='|' && !isAbsolutePath(conf.access_log)){
 #ifdef KANGLE_VAR_DIR
@@ -119,4 +122,3 @@ int klog_start() {
 	klog_init(my_vklog);
 	return 1;
 }
-

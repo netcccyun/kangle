@@ -356,10 +356,12 @@ void KSharedBigObject::close_write(KHttpObject* obj, int64_t write_from) {
 	}
 	close(obj);
 	kfiber_mutex_unlock(lock);
-	// Wake remaining readers so they can retry or fail cleanly.
+	// Wake remaining readers so they can re-check the merged cache block.  A
+	// normal "no data" result makes the background sender stop at this writer's
+	// boundary even when an adjacent cached block is already available.
 	std::list<BigObjectReadQueue*>::iterator it;
 	for (it = notice_queues.begin(); it != notice_queues.end(); it++) {
-		kfiber_wakeup_ts((*it)->rq, (*it)->buf, -2);
+		kfiber_wakeup_ts((*it)->rq, (*it)->buf, KGL_BIG_OBJECT_READ_RETRY);
 		delete (*it);
 	}
 }
@@ -471,13 +473,15 @@ KGL_RESULT KSharedBigObject::write(KHttpObject* obj, int64_t offset, const char*
 		int64_t buf_start = (*it)->from - offset;
 		int64_t block_length = (int64_t)length - buf_start;
 		if (buf_start < 0 || buf_start >= (int64_t)length || block_length <= 0) {
-			kfiber_wakeup_ts((*it)->rq, (*it)->buf, -2);
+			// The merged block contains the requested offset, but this input
+			// buffer does not. Let the reader retry from the cache file.
+			kfiber_wakeup_ts((*it)->rq, (*it)->buf, KGL_BIG_OBJECT_READ_RETRY);
 			delete (*it);
 			continue;
 		}
 		block_length = KGL_MIN((int64_t)(*it)->length, block_length);
 		if (block_length <= 0) {
-			kfiber_wakeup_ts((*it)->rq, (*it)->buf, -2);
+			kfiber_wakeup_ts((*it)->rq, (*it)->buf, KGL_BIG_OBJECT_READ_RETRY);
 			delete (*it);
 			continue;
 		}

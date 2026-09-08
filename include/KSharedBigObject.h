@@ -22,6 +22,9 @@ struct KFileBlock {
 	int64_t from;
 	int64_t to;
 };
+
+constexpr int KGL_BIG_OBJECT_READ_RETRY = -3;
+
 //大物件数据块
 class KBigObjectBlock
 {

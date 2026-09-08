@@ -148,7 +148,7 @@ func check_post_chunk_trailer_with_path(path string) {
 	h := &headerReader{
 		reader: strings.NewReader("body"),
 		md5:    md5.New(),
-		header: http.Header{"md5": nil, "size": []string{strconv.Itoa(len("body"))}},
+		header: http.Header{"Md5": nil, "Size": []string{strconv.Itoa(len("body"))}},
 	}
 	url := config.GetUrl("localhost", path)
 

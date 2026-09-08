@@ -174,7 +174,7 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 			kgl_is_attr(av, _KS("Proxy-Connection")) ||
 			kgl_is_attr(av, _KS("Connection")) ||
 			kgl_is_attr(av, _KS("TE")) ||
-			kgl_is_attr(av, _KS("Trailer")) ||
+			(!client->IsMultiStream() && kgl_is_attr(av, _KS("Trailer"))) ||
 			kgl_is_attr(av, _KS("Transfer-Encoding")) ||
 			(!KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && kgl_is_attr(av, _KS("Upgrade"))) ||
 			(is_connection_option(rq, attr) &&

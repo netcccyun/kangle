@@ -87,7 +87,7 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 #endif
 #ifdef ENABLE_FORCE_CACHE
 			if (field.is(_KS("static"))) {
-				//Í¨¹ıhttp headerÇ¿ÖÆ»º´æ
+				//é€šè¿‡http headerå¼ºåˆ¶ç¼“å­˜
 				obj->force_cache(true);
 			} else
 #endif
@@ -148,7 +148,7 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 		} else if (kgl_mem_case_same(val, val_len, _KS("identity"))) {
 			obj->uk.url->accept_encoding = (u_char)~0;
 		} else if (val_len > 0) {
-			//²»Ã÷content-encoding²»ÄÜ»º´æ
+			//ä¸æ˜content-encodingä¸èƒ½ç¼“å­˜
 			KBIT_SET(obj->index.flags, FLAG_DEAD);
 			obj->uk.url->set_content_encoding(KGL_ENCODING_UNKNOW);
 		}
@@ -200,8 +200,8 @@ void KHttpResponseParser::end_parse(KHttpRequest* rq, int64_t body_size) {
 	}
 	/*
  * see rfc2616
- * Ã»ÓĞ Last-Modified ÎÒÃÇ²»»º´æ.
- * µ«Èç¹ûÓĞ expires or max-age  ³ıÍâ
+ * æ²¡æœ‰ Last-Modified æˆ‘ä»¬ä¸ç¼“å­˜.
+ * ä½†å¦‚æœæœ‰ expires or max-age  é™¤å¤–
  */
 	if (!obj->data->etag) {
 		if (!KBIT_TEST(obj->index.flags, ANSW_HAS_MAX_AGE | ANSW_HAS_EXPIRES)) {
@@ -232,7 +232,11 @@ void KHttpResponseParser::end_parse(KHttpRequest* rq, int64_t body_size) {
 			uint64_t freshness = expireDate > serverDate ? (uint64_t)(expireDate - serverDate) : 0;
 			obj->data->i.max_age = freshness > UINT_MAX ? UINT_MAX : (uint32_t)freshness;
 		}
-		if (age > 0) {
+		// content_range_length shares storage with last_verified. Preserve the
+		// parsed total length until a partial response has been converted to a
+		// progressive big object; KSharedBigObject::create() sets last_verified
+		// after consuming it.
+		if (age > 0 && !KBIT_TEST(obj->index.flags, ANSW_HAS_CONTENT_RANGE)) {
 			obj->index.last_verified = age >= (uint64_t)responseTime ? 0 : responseTime - age;
 		}
 	}

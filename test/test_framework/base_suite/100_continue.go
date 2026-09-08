@@ -22,10 +22,10 @@ func handle_100_continue(w http.ResponseWriter, r *http.Request) {
 func check_100_continue_port(port int) {
 	var str, body string
 	var h map[string]string
+	addr := fmt.Sprintf("127.0.0.1:%v", port)
 
-	cn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%v", port))
+	cn, err := net.Dial("tcp", addr)
 	common.Assert("err", err == nil)
-	defer cn.Close()
 	reader := bufio.NewReader(cn)
 
 	//not read body
@@ -37,6 +37,15 @@ func check_100_continue_port(port int) {
 	common.AssertSame(strings.ToLower(h["http/1.1"]), "200 ok")
 	common.AssertSame(body, "ok")
 	common.AssertSame(err, nil)
+	cn.Close()
+
+	// The previous request intentionally did not send its declared body.  A
+	// compliant server closes that connection, so use a fresh one for the
+	// request that exercises the 100 Continue handshake.
+	cn, err = net.Dial("tcp", addr)
+	common.Assert("err", err == nil)
+	defer cn.Close()
+	reader = bufio.NewReader(cn)
 
 	//read body
 	str = "POST /upstream/http/100_continue HTTP/1.1\r\nContent-Length: 4\r\nHost: localhost\r\nExpect: 100-continue\r\nx-read-body: 1\r\n\r\n"
