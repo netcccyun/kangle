@@ -235,6 +235,15 @@ void KFastcgiFetchObject::appendPostEnd()
 	fcgiheader->requestIdB0 = 1;
 	buffer->Append(fcgibuff);
 }
+KGL_RESULT KFastcgiFetchObject::on_post_end()
+{
+	FCGI_Header header;
+	memset(&header, 0, sizeof(header));
+	header.version = 1;
+	header.type = FCGI_STDIN;
+	header.requestIdB0 = 1;
+	return client->write_all((const char*)&header, (int)sizeof(header)) == 0 ? KGL_OK : KGL_ECAN_RETRY_SOCKET_BROKEN;
+}
 void KFastcgiFetchObject::buildPost(KHttpRequest* rq)
 {
 	unsigned postLen = buffer->getLen();

@@ -1,6 +1,8 @@
 #ifndef KHTTPOBJECT_H_
 #define KHTTPOBJECT_H_
 
+#include <climits>
+
 #include "KMutex.h"
 #include "kforwin32.h"
 #include "KBuffer.h"

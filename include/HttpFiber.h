@@ -75,11 +75,18 @@ inline bool kgl_match_if_range(kgl_precondition_flag flag, kgl_request_range* ra
 	}
 	return range->if_range_date == last_modified;
 }
+inline bool kgl_is_weak_etag(const char* data, size_t len) {
+	return len >= 2 && (data[0] == 'W' || data[0] == 'w') && data[1] == '/';
+}
 inline bool kgl_match_if_range(kgl_precondition_flag flag, kgl_request_range* range, kgl_len_str_t* etag) {
 	if (!range->if_range_entity) {
 		return true;
 	}
 	if (KBIT_TEST(flag, kgl_precondition_if_range_date)) {
+		return false;
+	}
+	if (kgl_is_weak_etag(etag->data, etag->len) ||
+		kgl_is_weak_etag(range->if_range_entity->data, range->if_range_entity->len)) {
 		return false;
 	}
 	return kgl_mem_same(etag->data, etag->len, range->if_range_entity->data, range->if_range_entity->len);
@@ -102,7 +109,7 @@ inline bool kgl_request_match_if_range(KHttpRequest* rq, KHttpObject* obj) {
 bool process_check_final_source(KHttpRequest* rq, kgl_input_stream* in, kgl_output_stream* out, KGL_RESULT* result);
 typedef KGL_RESULT(*kgl_request_handler)(kgl_str_t *path, void *data, KHttpRequest* rq, kgl_input_stream* in, kgl_output_stream* out);
 /**
-* 发送在内存中的object.
+* 鍙戦�佸湪鍐呭瓨涓殑object.
 */
 inline KGL_RESULT send_memory_object(KHttpRequest* rq) {
 	KHttpObject* obj = rq->ctx.obj;

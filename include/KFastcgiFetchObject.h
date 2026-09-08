@@ -15,6 +15,7 @@ public:
 protected:
 	KGL_RESULT buildHead(KHttpRequest* rq) override;
 	void buildPost(KHttpRequest* rq) override;
+	KGL_RESULT on_post_end() override;
 	virtual bool is_extend() {
 		return false;
 	}
@@ -29,7 +30,7 @@ private:
 	void appendPostEnd();
 	//return NULL for need more data
 	char *parse_fcgi_header(char** str, char* end, bool full);
-	//body_len = 0Ê±±íÊ¾¶Áhead
+	//body_len = 0æ—¶è¡¨ç¤ºè¯»head
 	union
 	{
 		struct

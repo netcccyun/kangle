@@ -57,16 +57,18 @@ public:
 				hot++;
 			}
 			if (*hot=='"') {
-				//ÊÇ×Ö·û´®Öµ
+				//æ˜¯å­—ç¬¦ä¸²å€¼
 				hot++;
 				val = hot;
-				char *p = strchr(hot,'"');				
-				if(p){
-					*p = '\0';
+				char *p = strchr(hot,'"');
+				if (!p) {
+					val = NULL;
+					return NULL;
 				}
+				*p = '\0';
 				hot = p+1;
 			} else {
-				//Êý×Ö
+				//æ•°å­—
 				val = hot;
 			}
 			while (*hot) {

@@ -202,7 +202,7 @@ KGL_RESULT KAsyncFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_o
 		client->health(HealthStatus::Success);
 	}
 	if (post_fiber == NULL) {
-		//ÌáÇ°¹Ø±ÕÉÏÁ÷Á¬½Ó£¬¼°Ê±ÊÍ·Å×ÊÔ´
+		//æå‰å…³é—­ä¸Šæµè¿žæŽ¥ï¼ŒåŠæ—¶é‡Šæ”¾èµ„æº
 		Close(rq);
 	}
 	rq->ReleaseQueue();
@@ -310,7 +310,7 @@ KGL_RESULT KAsyncFetchObject::ReadHeader(KHttpRequest* rq, kfiber** post_fiber) 
 			ks_save_point(&us_buffer, data);
 			break;
 		case kgl_parse_want_read:
-			//ajpÐ­Òé»á·¢ËÍÒ»¸öJK_AJP13_GET_BODY_CHUNK¹ýÀ´£¬´ËÊ±Òª·¢ËÍÒ»¸ö¿ÕµÄÊý¾Ý°ü¹ýÈ¥
+			//ajpåè®®ä¼šå‘é€ä¸€ä¸ªJK_AJP13_GET_BODY_CHUNKè¿‡æ¥ï¼Œæ­¤æ—¶è¦å‘é€ä¸€ä¸ªç©ºçš„æ•°æ®åŒ…è¿‡åŽ»
 			if (*post_fiber) {
 				break;
 			}
@@ -383,10 +383,14 @@ KGL_RESULT KAsyncFetchObject::PostResult(KHttpRequest* rq, int got) {
 			}
 			trailer = trailer->next;
 		}
-		//Èç¹û»¹ÓÐÊý¾ÝÒª¶Á£¬¶ø¶Áµ½0µÄ»°£¬¾Í±íÊ¾¶ÁÈ¡Ê§°Ü£¬¶ø²»ÊÇ¶ÁÈ¡½áÊø¡£
+		//å¦‚æžœè¿˜æœ‰æ•°æ®è¦è¯»ï¼Œè€Œè¯»åˆ°0çš„è¯ï¼Œå°±è¡¨ç¤ºè¯»å–å¤±è´¥ï¼Œè€Œä¸æ˜¯è¯»å–ç»“æŸã€‚
 		if (pop_header.post_is_chunk) {
 			buffer->WSTR("\r\n");
 			return KGL_OK;
+		}
+		KGL_RESULT end_result = on_post_end();
+		if (end_result != KGL_OK) {
+			return end_result;
 		}
 		client->write_end();
 		return KGL_END;
@@ -473,7 +477,7 @@ KGL_RESULT KAsyncFetchObject::PushHeaderFinished(KHttpRequest* rq) {
 		expectDone(rq);
 	}
 	if (KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE)) {
-		//Èç¹ûÊÇwebsocket£¬Ôò³¤¶ÈÎ´Öª
+		//å¦‚æžœæ˜¯websocketï¼Œåˆ™é•¿åº¦æœªçŸ¥
 		rq->ctx.left_read = -1;
 	}
 	assert(body.ctx == nullptr);
@@ -577,7 +581,7 @@ KGL_RESULT KAsyncFetchObject::PushHeader(KHttpRequest* rq, const char* attr, int
 		const char* data = kgl_memstr(val, val_len, _KS("timeout="));
 		if (data) {
 			data += 8;
-			//È·±£ÓÐÐ§£¬¼õµô2ÃëÉú´æÊ±¼ä
+			//ç¡®ä¿æœ‰æ•ˆï¼Œå‡æŽ‰2ç§’ç”Ÿå­˜æ—¶é—´
 			pop_header.keep_alive_time_out = kgl_atoi((u_char*)data, end - data) - 2;
 		}
 		return KGL_OK;
@@ -646,7 +650,7 @@ KGL_RESULT KAsyncFetchObject::upstream_is_error(KHttpRequest* rq, int error, con
 		KBIT_SET(rq->sink->data.flags, RQ_UPSTREAM_ERROR);
 		if (client) {
 			if (client->IsNew()) {
-				//newµÄ²Å¼ÆËã´íÎó.
+				//newçš„æ‰è®¡ç®—é”™è¯¯.
 				client->health(HealthStatus::Err);
 			}
 			auto url = rq->sink->data.url->getUrl();

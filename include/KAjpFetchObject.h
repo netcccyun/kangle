@@ -19,13 +19,14 @@ public:
 	KAjpFetchObject();
 	virtual ~KAjpFetchObject();
 protected:
-	//´´½¨·¢ËÍÍ·µ½bufferÖĞ¡£
+	//åˆ›å»ºå‘é€å¤´åˆ°bufferä¸­ã€‚
 	KGL_RESULT buildHead(KHttpRequest* rq) override;
-	//½âÎöhead
+	//è§£æhead
 	kgl_parse_result parse_unknow_header(KHttpRequest* rq, char** data, char* end) override;
-	//´´½¨postÊı¾İµ½bufferÖĞ¡£
+	//åˆ›å»ºpostæ•°æ®åˆ°bufferä¸­ã€‚
 	void buildPost(KHttpRequest* rq) override;
-	//½âÎöbody
+	KGL_RESULT on_post_end() override;
+	//è§£æbody
 	KGL_RESULT ParseBody(KHttpRequest* rq, char** data, char* end) override;
 	void BuildPostEnd();
 	bool checkContinueReadBody(KHttpRequest* rq) override

@@ -70,7 +70,7 @@ static char* next_line(multipart_buffer* self) {
 		}
 		/* return entire buffer as a partial line */
 		line[self->bufsize] = 0;
-		self->buf_begin = ptr;
+		self->buf_begin = line + self->bufsize;
 		self->bytes_in_buffer = 0;
 	}
 
@@ -424,18 +424,15 @@ bool KMultiPartInputFilter::match_body(bool& success) {
 	char* buf = parse_body(&len, all);
 	if (buf) {
 		success = true;
-		if (all) {
-			mb->model = MULTIPART_BOUNDARY_MODEL;
-		}
-		if (filename) {
-			if (match_file_content(buf, len)) {
-				free(buf);
-				return true;
-			}
 			if (all) {
-				file_list.clear();
+				mb->model = MULTIPART_BOUNDARY_MODEL;
 			}
-		} else if (param) {
+			if (filename) {
+				if (match_file_content(buf, len)) {
+					free(buf);
+					return true;
+				}
+			} else if (param) {
 			len = url_decode(buf, len, NULL, true);
 			if (match_param(param, param_len, buf, len)) {
 				free(buf);
@@ -465,18 +462,22 @@ char* KMultiPartInputFilter::parse_body(int* len, bool& all) {
 		max = mb->bytes_in_buffer;
 	}
 	*len = max;
-	if (*len > 0) {
+	if (*len >= 0 && (bound || *len > 0)) {
 		char* buf = (char*)malloc(*len + 1);
 		if (buf == NULL) {
 			return NULL;
 		}
-		kgl_memcpy(buf, mb->buf_begin, *len);
-		buf[*len] = '\0';
-		if (bound && buf[*len - 1] == '\r') {
-			buf[--(*len)] = 0;
+		if (*len > 0) {
+			kgl_memcpy(buf, mb->buf_begin, *len);
 		}
-		mb->bytes_in_buffer -= *len;
-		mb->buf_begin += *len;
+		buf[*len] = '\0';
+		int consumed = *len;
+		if (bound && *len > 0 && buf[*len - 1] == '\r') {
+			buf[--(*len)] = 0;
+			consumed = *len + 1; /* still skip the CR in the input buffer */
+		}
+		mb->bytes_in_buffer -= consumed;
+		mb->buf_begin += consumed;
 		return buf;
 	}
 	return NULL;

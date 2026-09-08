@@ -40,17 +40,24 @@ KGL_RESULT cache_close(kgl_response_body_ctx* ctx, KGL_RESULT result) {
 		}
 #endif
 		if (have_cache && cache->obj->data->i.status_code == STATUS_CONTENT_PARTIAL) {
-			cache->obj->data->i.status_code = STATUS_OK;
-			cache->obj->remove_http_header(_KS("Content-Range"));
-			KBIT_CLR(cache->obj->index.flags, ANSW_HAS_CONTENT_RANGE);
+			if (cache->obj->IsContentRangeComplete()) {
+				cache->obj->data->i.status_code = STATUS_OK;
+				cache->obj->remove_http_header(_KS("Content-Range"));
+				KBIT_CLR(cache->obj->index.flags, ANSW_HAS_CONTENT_RANGE);
+			} else {
+				KBIT_SET(cache->obj->index.flags, ANSW_NO_CACHE);
+				cache->obj->cache_is_ready = 0;
+			}
 		}
 		if (cache->buffer) {
-			set_buffer_obj(cache->buffer, cache->obj);
+			if (!KBIT_TEST(cache->obj->index.flags, ANSW_NO_CACHE)) {
+				set_buffer_obj(cache->buffer, cache->obj);
+			}
 		}
 #ifdef ENABLE_DISK_CACHE
 		if (cache->disk_cache) {
 			kassert(cache->buffer == NULL);
-			if (cache->disk_cache->Close(cache->obj)) {
+			if (!KBIT_TEST(cache->obj->index.flags, ANSW_NO_CACHE) && cache->disk_cache->Close(cache->obj)) {
 				kassert(cache->obj->data->bodys == NULL);
 				KBIT_SET(cache->obj->index.flags, FLAG_IN_DISK);
 				cache->obj->cache_is_ready = 1;
@@ -132,7 +139,7 @@ bool pipe_cache_stream(KHttpRequest* rq, KHttpObject* obj, cache_model cache_lay
 	if (KBIT_TEST(obj->index.flags, ANSW_NO_CACHE|FLAG_DEAD) >0 || conf.default_cache == 0) {
 		return false;
 	}
-	if (!KBIT_TEST(rq->ctx.filter_flags, RF_NO_DISK_CACHE)) {
+	if (KBIT_TEST(rq->ctx.filter_flags, RF_NO_DISK_CACHE)) {
 		cache_layer = cache_memory;
 	}
 	KCacheStream* stream = new KCacheStream;

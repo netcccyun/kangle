@@ -11,6 +11,26 @@
 #include "KHttpResponseParser.h"
 #include "kmalloc.h"
 #include "KPoolableSocketContainer.h"
+#include "KHttpKeyValue.h"
+#define SC_M_JK_STORED 0xFF
+#define SC_A_STORED_METHOD 0x0D
+static unsigned char kgl_meth_to_ajp(uint8_t meth) {
+	switch (meth) {
+	case METH_OPTIONS:
+		return 1;
+	case METH_GET:
+		return 2;
+	case METH_HEAD:
+		return 3;
+	case METH_POST:
+		return 4;
+	default:
+		if (meth >= METH_PUT && meth <= METH_MKACTIVITY) {
+			return (unsigned char)meth;
+		}
+		return SC_M_JK_STORED;
+	}
+}
 #define MAX_AJP_RESPONSE_HEADERS 0xc
 #define MAX_AJP_REQUEST_HEADERS  0xf
 #if 0 
@@ -63,7 +83,8 @@ KGL_RESULT KAjpFetchObject::buildHead(KHttpRequest* rq)
 	KBIT_SET(obj->index.flags, ANSW_LOCAL_SERVER);
 	KAjpMessage b(buffer);
 	b.putByte(JK_AJP13_FORWARD_REQUEST);
-	b.putByte(rq->sink->data.meth);
+	unsigned char ajp_meth = kgl_meth_to_ajp(rq->sink->data.meth);
+	b.putByte(ajp_meth);
 	b.putString("HTTP/1.1");
 	if (KBIT_TEST(rq->sink->data.url->flags, KGL_URL_ENCODE)) {
 		size_t path_len = 0;
@@ -190,6 +211,11 @@ KGL_RESULT KAjpFetchObject::buildHead(KHttpRequest* rq)
 		b.putString(param->data, (int)param->len);
 		kstring_release(param);
 	}
+	if (ajp_meth == SC_M_JK_STORED) {
+		kgl_str_t* method = KHttpKeyValue::get_method(rq->sink->data.meth);
+		b.putByte(SC_A_STORED_METHOD);
+		b.putString(method->data, (int)method->len);
+	}
 	b.putByte(0xFF);
 	if (!b.end()) {
 		return KGL_EDATA_FORMAT;
@@ -208,6 +234,11 @@ void KAjpFetchObject::BuildPostEnd()
 	d[3] = 0;
 	buffer->Append(ebuff);
 	//*/
+}
+KGL_RESULT KAjpFetchObject::on_post_end()
+{
+	unsigned char pkt[4] = { 0x12, 0x34, 0, 0 };
+	return client->write_all((const char*)pkt, 4) == 0 ? KGL_OK : KGL_ECAN_RETRY_SOCKET_BROKEN;
 }
 KGL_RESULT KAjpFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end)
 {
@@ -274,6 +305,9 @@ kgl_parse_result KAjpFetchObject::parse_unknow_header(KHttpRequest* rq, char** d
 		switch (type) {
 		case JK_AJP13_SEND_HEADERS:
 			//printf("parse_finished *len=[%d]\n",*len);
+			return kgl_parse_finished;
+		case JK_AJP13_END_RESPONSE:
+			ReadBodyEnd(rq);
 			return kgl_parse_finished;
 		case JK_AJP13_GET_BODY_CHUNK:
 			if (*data == end) {

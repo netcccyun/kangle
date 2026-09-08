@@ -253,9 +253,9 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		if (KBIT_TEST(flag,kgl_precondition_if_time)) {
 			char* end = make_http_time(condition->time, tmpbuff, sizeof(tmpbuff));
 			if (KBIT_TEST(flag, kgl_precondition_if_match_unmodified)) {
-				if (!client->send_header(kgl_header_if_modified_since, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
-			} else {
 				if (!client->send_header(kgl_header_if_unmodified_since, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
+			} else {
+				if (!client->send_header(kgl_header_if_modified_since, tmpbuff, (hlen_t)(end - tmpbuff))) return false;
 			}
 		} else {
 			if (KBIT_TEST(flag, kgl_precondition_if_match_unmodified)) {

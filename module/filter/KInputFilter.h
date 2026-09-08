@@ -146,6 +146,7 @@ public:
 	{
 		filter = NULL;	
 		gParamHeader = NULL;
+		gParamCopy = NULL;
 	}
 	~KInputFilterContext()
 	{		
@@ -156,6 +157,9 @@ public:
 			KParamPair *t = gParamHeader->next;
 			delete gParamHeader;
 			gParamHeader = t;
+		}
+		if (gParamCopy) {
+			free(gParamCopy);
 		}
 	}
 	KInputFilter *get_filter(KREQUEST rq, kgl_access_context* ctx);
@@ -174,6 +178,7 @@ public:
 	void tee_body(kgl_request_body* body);
 	bool check_get(KParamFilterHook *hook, KREQUEST rq, kgl_access_context* ctx);
 	KParamPair *gParamHeader;
+	char *gParamCopy;
 	KInputFilter *filter;
 	kgl_request_body body;
 private:	

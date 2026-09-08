@@ -57,7 +57,7 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 		kfclose(fd);
 		return out->f->error(out->ctx, STATUS_NOT_FOUND, _KS("file not found"));
 	}
-	//´¦Àícontent-type
+	//å¤„ç†content-type
 	char* content_type = find_content_type(rq, obj);
 	if (content_type == NULL) {
 		return out->f->error(out->ctx, STATUS_FORBIDEN, _KS("cann't find such content-type"));
@@ -71,16 +71,20 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 		} else if (KBIT_TEST(rq->sink->data.raw_url.accept_encoding, KGL_ENCODING_BR)) {
 			may_compress = true;
 #endif
+#ifdef ENABLE_ZSTD
+		} else if (KBIT_TEST(rq->sink->data.raw_url.accept_encoding, KGL_ENCODING_ZSTD)) {
+			may_compress = true;
+#endif
 		}
 	}
 	if (may_compress && rq->file->get_file_size() >= conf.min_compress_length) {
-		//Èç¹û¿ÉÄÜÑ¹Ëõ£¬Ôò²»»ØÓ¦206
+		//å¦‚æžœå¯èƒ½åŽ‹ç¼©ï¼Œåˆ™ä¸å›žåº”206
 		range = nullptr;
 	}
 	int status_code = STATUS_OK;
 	int64_t left_send = (int64_t)rq->file->get_file_size();
 	if (range) {
-		//´¦Àí²¿·ÖÊý¾ÝÇëÇó
+		//å¤„ç†éƒ¨åˆ†æ•°æ®è¯·æ±‚
 		out->f->write_header(out->ctx, kgl_header_content_range, (char *)&left_send, KGL_HEADER_VALUE_INT64);
 		if (!rq->sink->adjust_range(&left_send)) {
 			return out->f->error(out->ctx, 416, _KS("range error"));
@@ -100,7 +104,7 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 			out->f->write_header(out->ctx, kgl_header_content_range, b.buf(), b.size());
 			status_code = STATUS_CONTENT_PARTIAL;
 		} else {
-			//url rangeµÄ±¾µØ²»»º´æ
+			//url rangeçš„æœ¬åœ°ä¸ç¼“å­˜
 			KBIT_SET(obj->index.flags, ANSW_NO_CACHE);
 		}
 	}
@@ -113,7 +117,7 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 	out->f->write_header(out->ctx, kgl_header_last_modified, (const char*)&last_modified, KGL_HEADER_VALUE_TIME);
 	out->f->write_header(out->ctx, kgl_header_content_type, content_type, (hlen_t)strlen(content_type));
 	//rq->buffer << "1234";
-	//Í¨ÖªhttpÍ·ÒÑ¾­´¦ÀíÍê³É
+	//é€šçŸ¥httpå¤´å·²ç»å¤„ç†å®Œæˆ
 	kgl_response_body body = { 0 };
 	KGL_RESULT result = out->f->write_header_finish(out->ctx, left_send, &body);
 	if (result != KGL_OK) {

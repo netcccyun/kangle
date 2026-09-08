@@ -4,6 +4,7 @@
 #include "http.h"
 #include "KUrlParser.h"
 #include "filter.h"
+#include "kmalloc.h"
 static int64_t input_filter_get_left(kgl_request_body_ctx* ctx)
 {
 	KInputFilterContext* if_ctx = (KInputFilterContext*)ctx;
@@ -118,7 +119,11 @@ bool KInputFilterContext::check_get(KParamFilterHook* hook, KREQUEST rq, kgl_acc
 			return false;
 		}		
 		assert(gParamHeader == NULL);
-		char* hot = url->param;
+		gParamCopy = xstrdup(url->param);
+		if (gParamCopy == NULL) {
+			return false;
+		}
+		char* hot = gParamCopy;
 		for (;;) {
 			char* p = strchr(hot, '&');
 			if (p == NULL) {

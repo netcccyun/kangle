@@ -25,7 +25,7 @@ struct kgl_pop_header {
 	int keep_alive_time_out;
 };
 /**
-* Òì²½µ÷ÓÃÀ©Õ¹£¬ËùÒÔÖ§³ÖÒì²½µ÷ÓÃµÄÀ©Õ¹´Ó¸ÃÀà¼Ì³Ğ
+* å¼‚æ­¥è°ƒç”¨æ‰©å±•ï¼Œæ‰€ä»¥æ”¯æŒå¼‚æ­¥è°ƒç”¨çš„æ‰©å±•ä»è¯¥ç±»ç»§æ‰¿
 */
 class KAsyncFetchObject : public KRedirectSource
 {
@@ -66,7 +66,7 @@ public:
 			xfree(us_buffer.buf);
 		}
 	}
-	//ÆÚÍûÖĞµÄÍê³É£¬³¤Á¬½ÓÖĞÓÃÓÚ±êÊ¶´ËÁ¬½Ó»¹¿ÉÓÃ
+	//æœŸæœ›ä¸­çš„å®Œæˆï¼Œé•¿è¿æ¥ä¸­ç”¨äºæ ‡è¯†æ­¤è¿æ¥è¿˜å¯ç”¨
 	virtual void expectDone(KHttpRequest *rq)
 	{
 		rq->ctx.upstream_expected_done = 1;
@@ -89,19 +89,19 @@ public:
 	KGL_RESULT SendHeader(KHttpRequest* rq);
 	KGL_RESULT ProcessPost(KHttpRequest* rq);
 	KGL_RESULT PostResult(KHttpRequest *rq,int got);
-	//µÃµ½post¶Á»º³å£¬·¢ËÍµ½upstream
+	//å¾—åˆ°postè¯»ç¼“å†²ï¼Œå‘é€åˆ°upstream
 	int getPostRBuffer(KHttpRequest *rq,LPWSABUF buf,int bc)
 	{
-		//ĞÂ°æÒÑ¾­¼ò»¯Á÷³Ì£¬Ö®Ç°¾Í°ÑÔ¤¼ÓÔØµÄÊı¾İ·¢ËÍµ½bufferÀïÃæÁË¡£
+		//æ–°ç‰ˆå·²ç»ç®€åŒ–æµç¨‹ï¼Œä¹‹å‰å°±æŠŠé¢„åŠ è½½çš„æ•°æ®å‘é€åˆ°bufferé‡Œé¢äº†ã€‚
 		//assert(rq->pre_post_length==0);
 		return buffer->getReadBuffer(buf,bc);
 	}
-	//µÃµ½postĞ´»º³å£¬´Óclient½ÓÊÕpostÊı¾İ
+	//å¾—åˆ°postå†™ç¼“å†²ï¼Œä»clientæ¥æ”¶postæ•°æ®
 	char *GetPostBuffer(int *len)
 	{
 		return buffer->getWriteBuffer(len);
 	}
-	//µÃµ½body»º³å,´Óupstream¶Á
+	//å¾—åˆ°bodyç¼“å†²,ä»upstreamè¯»
 	char *getUpstreamBuffer(int *len)
 	{
 		return ks_get_write_buffer(&us_buffer, len);
@@ -124,17 +124,22 @@ protected:
 	void BuildChunkHeader();
 	void PushStatus(KHttpRequest *rq, int status_code);
 	KGL_RESULT PushHeaderFinished(KHttpRequest *rq);
-	//´´½¨·¢ËÍÍ·µ½bufferÖĞ¡£
+	//åˆ›å»ºå‘é€å¤´åˆ°bufferä¸­ã€‚
 	virtual KGL_RESULT buildHead(KHttpRequest *rq) = 0;
-	//½âÎöhead
+	//è§£æhead
 	virtual kgl_parse_result parse_unknow_header(KHttpRequest *rq,char **data, char *end);
 	virtual KGL_RESULT ParseBody(KHttpRequest *rq, char **data, char* end);
-	//´´½¨postÊı¾İµ½bufferÖĞ¡£
+	//åˆ›å»ºpostæ•°æ®åˆ°bufferä¸­ã€‚
 	virtual void buildPost(KHttpRequest *rq)
 	{
 	}
-	//¼ì²éÊÇ·ñ»¹Òª¼ÌĞø¶Ábody,Ò»°ã³¤Á¬½ÓĞèÒª¡£
-	//Èç¹û±¾ÉíÓĞcontent-lengthÔò²»ÓÃ¸Ãº¯Êı
+	/* Allow framed upstream protocols to send their explicit end marker. */
+	virtual KGL_RESULT on_post_end()
+	{
+		return KGL_OK;
+	}
+	//æ£€æŸ¥æ˜¯å¦è¿˜è¦ç»§ç»­è¯»body,ä¸€èˆ¬é•¿è¿æ¥éœ€è¦ã€‚
+	//å¦‚æœæœ¬èº«æœ‰content-lengthåˆ™ä¸ç”¨è¯¥å‡½æ•°
 	virtual bool checkContinueReadBody(KHttpRequest *rq)
 	{
 		return true;
