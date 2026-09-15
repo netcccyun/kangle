@@ -932,9 +932,56 @@ int KAccess::dump_chain(KVirtualHostEvent* ctx, const KString table_name) {
 	(*it).second->dump_chain(ctx->data());
 	return WHM_OK;
 }
-void KAccess::listTable(KVirtualHostEvent* ctx) {
+bool KAccess::build_legacy_chain(const KString& table_name, const KString* chain_name, bool detail, KStringBuf& output) {
+	auto locker = read_lock();
+	auto table_it = tables.find(table_name);
+	if (table_it == tables.end()) {
+		return false;
+	}
+	auto table_xml = kconfig::new_xml("table"_CS);
+	table_xml->attributes().emplace("name"_CS, table_name);
+	bool matched = chain_name == nullptr;
+	for (auto&& chain_file : table_it->second->chains) {
+		for (auto&& chain : chain_file.second) {
+			if (chain_name && chain->name != *chain_name) {
+				continue;
+			}
+			matched = true;
+			table_xml->append(chain->to_legacy_xml(detail).get());
+		}
+	}
+	if (!matched) {
+		return false;
+	}
+	return table_xml->write(&output) == KGL_OK;
+}
+bool KAccess::find_chain_location(const KString& table_name, const KString* chain_name, KChainLocation& location) {
+	auto locker = read_lock();
+	auto table_it = tables.find(table_name);
+	if (table_it == tables.end()) {
+		return false;
+	}
+	for (auto&& chain_file : table_it->second->chains) {
+		for (size_t id = 0; id < chain_file.second.size(); ++id) {
+			auto chain = chain_file.second[id].get();
+			if (chain_name && chain->name != *chain_name) {
+				continue;
+			}
+			location.file = chain_file.first.name;
+			location.index = chain_file.first.index;
+			location.id = (uint32_t)id;
+			return true;
+		}
+	}
+	return false;
+}
+void KAccess::listTable(KVirtualHostEvent* ctx, bool detail) {
 	auto locker = read_lock();
 	for (auto it = tables.begin(); it != tables.end(); ++it) {
+		if (!detail) {
+			ctx->data()->add("table", (*it).first);
+			continue;
+		}
 		auto obj = ctx->data()->add_obj_array("table");
 		if (!obj) {
 			return;
@@ -1245,6 +1292,13 @@ bool KAccess::named_module_can_remove(const KString& name, int type) {
 	return true;
 }
 void KAccess::build_action_attribute(KXmlAttribute& attribute, const KUrlValue& uv) {
+	// The public WHM API used "action" directly for many years.  The new
+	// console splits it into jump_type plus a target field; accept both forms
+	// so existing panels and automation keep producing the same chain XML.
+	if (uv["jump_type"].empty() && !uv["action"].empty()) {
+		attribute.emplace("action"_CS, uv["action"]);
+		return;
+	}
 	KStringBuf action;
 	action << uv["jump_type"];
 	if (uv["jump_type"] == "server") {

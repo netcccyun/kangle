@@ -85,6 +85,7 @@ public:
 	void get_mark_short_html(KWStream& s);
 	void dump(kgl::serializable* s,bool is_short);
 	static khttpd::KSafeXmlNode to_xml(KUrlValue& uv);
+	khttpd::KSafeXmlNode to_legacy_xml(bool detail) const;
 
 	void clear();
 	friend class KAccess;
@@ -127,6 +128,8 @@ private:
 	kgl_jump_type jump_type;
 	int skip_to;
 	KSafeJump jump;
+	KString name;
+	khttpd::KSafeXmlNode config;
 	std::vector<KModelPtr<KAcl>> acls;
 	std::vector<KModelPtr<KMark>> marks;
 };

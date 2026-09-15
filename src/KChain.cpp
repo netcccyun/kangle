@@ -179,6 +179,9 @@ void KChain::get_mark_short_html(KWStream& s) {
 void KChain::parse_config(KAccess* access, const khttpd::KXmlNodeBody* xml) {
 	assert(acls.empty());
 	assert(marks.empty());
+	name = xml->attributes["name"];
+	config = kconfig::new_xml("chain"_CS);
+	xml->clone_to(config->get_first());
 	KString jumpName;
 	if (!access->parseChainAction(xml->attributes["action"], jump_type, jumpName)) {
 		throw KXmlException("chain action error");
@@ -242,6 +245,9 @@ void KChain::parse_config(KAccess* access, const khttpd::KXmlNodeBody* xml) {
 khttpd::KSafeXmlNode KChain::to_xml(KUrlValue& uv) {
 	auto xml = kconfig::new_xml("chain"_CS);
 	KAccess::build_action_attribute(xml->attributes(), uv);
+	if (!uv["name"].empty()) {
+		xml->attributes().emplace("name"_CS, uv["name"]);
+	}
 	for (auto it = uv.subs.begin(); it != uv.subs.end(); ++it) {
 		if (strncmp((*it).first.c_str(), _KS("acl_")) == 0) {
 			auto acl = (*it).second->to_xml(_KS("acl"));
@@ -254,4 +260,39 @@ khttpd::KSafeXmlNode KChain::to_xml(KUrlValue& uv) {
 		}
 	}
 	return xml;
+}
+khttpd::KSafeXmlNode KChain::to_legacy_xml(bool detail) const {
+	auto result = kconfig::new_xml("chain"_CS);
+	if (!config) {
+		return result;
+	}
+	result->attributes() = config->attributes();
+	if (!detail) {
+		return result;
+	}
+	auto source = config->get_first();
+	for (auto node : source->childs) {
+		bool is_acl = node->is_tag(_KS("acl"));
+		bool is_mark = node->is_tag(_KS("mark"));
+		if (!is_acl && !is_mark) {
+			continue;
+		}
+		for (uint32_t index = 0;; ++index) {
+			auto body = node->get_body(index);
+			if (!body) {
+				break;
+			}
+			auto module = body->attributes["module"];
+			if (module.empty()) {
+				module = "named";
+			}
+			KStringBuf tag;
+			tag << (is_acl ? "acl_" : "mark_") << module;
+			auto legacy_node = kconfig::new_xml(tag.c_str(), tag.size());
+			body->clone_to(legacy_node->get_first());
+			legacy_node->attributes().erase("module"_CS);
+			result->append(legacy_node.get());
+		}
+	}
+	return result;
 }

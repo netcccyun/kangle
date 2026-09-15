@@ -45,6 +45,11 @@
 class KTable;
 class KVirtualHostEvent;
 class WhmContext;
+struct KChainLocation {
+	KString file;
+	uint16_t index;
+	uint32_t id;
+};
 using KSafeTable = KSharedObj<KTable>;
 void bind_access_config(kconfig::KConfigTree* tree, KAccess* access);
 class KAccess final : public kconfig::KConfigListen
@@ -118,8 +123,10 @@ public:
 	bool isGlobal();
 public:
 	KString htmlAccess(const char* vh = "");
-	void listTable(KVirtualHostEvent* ctx);
+	void listTable(KVirtualHostEvent* ctx, bool detail = true);
 	int dump_chain(KVirtualHostEvent* ctx,const KString table_name);
+	bool build_legacy_chain(const KString& table_name, const KString* chain_name, bool detail, KStringBuf& output);
+	bool find_chain_location(const KString& table_name, const KString* chain_name, KChainLocation& location);
 	int dump_named_module(KVirtualHostEvent* ctx, bool detail);
 	/*
 	* type=0 acl

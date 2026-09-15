@@ -70,7 +70,7 @@ public:
 #endif
 		return tpid;
 	}
-	bool buildValue(const char *name,KStringBuf *s)
+	bool buildValue(const char *name,KWStream *s) override
 	{
 		if (strncasecmp(name,"vh:",3)==0) {
 			name += 3;

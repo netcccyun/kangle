@@ -92,10 +92,10 @@ static uint32_t process(KREQUEST rq, kgl_access_context* ctx, DWORD notify) {
 	KPostFileMark* mark = (KPostFileMark*)ctx->module;
 	auto filter_ctx = get_input_filter_context(rq, ctx);
 	if (!filter_ctx) {
-		return KF_STATUS_REQ_TRUE;
+		return KF_STATUS_REQ_FALSE;
 	}
 	filter_ctx->get_filter(rq, ctx)->register_file(mark);
-	return KF_STATUS_REQ_TRUE;
+	return KF_STATUS_REQ_FALSE;
 }
 kgl_access kgl_post_file_model = {
 	sizeof(kgl_access),

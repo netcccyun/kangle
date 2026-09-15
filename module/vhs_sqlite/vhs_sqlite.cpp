@@ -44,7 +44,7 @@ static void * createConnection()
 	sqlite3_busy_handler(cn->db,sqliteBusyHandle,NULL);
 	return cn;
 }
-// Copy one result row into the caller-provided data object.
+//查询操作,data作为输出参数
 static int query(void *stmt,vh_data *data)
 {
 	KVirtualHostData *rs_data = (KVirtualHostData *)stmt;
@@ -71,7 +71,7 @@ static void freeConnection(void *param)
 	KVirtualHostSqliteConnection *cn = (KVirtualHostSqliteConnection *)param;
 	delete cn;
 }
-// Return a statement used to enumerate virtual hosts.
+//读取操作，返回stmt
 static void * loadVirtualHost(void *cn)
 {
 	return ((KVirtualHostSqliteConnection *)cn)->loadVirtualHost();
@@ -85,7 +85,7 @@ static void * loadInfo(void *cn,const char *name)
 	return ((KVirtualHostSqliteConnection *)cn)->loadInfo(name);
 }
 
-// Return 1 on a successful update/insert, otherwise 0.
+//更新操作，成功返回1,错误返回0
 static int  addVirtualHost(void *cn,vh_data *data)
 {
 	KVirtualHostStmt *st = ((KVirtualHostSqliteConnection *)cn)->addVirtualHost();

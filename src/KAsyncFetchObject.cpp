@@ -10,6 +10,7 @@
 #include "KHttp2.h"
 #include "KHttpServer.h"
 #include "KHttp2Upstream.h"
+#include "HttpFiber.h"
 #ifdef ENABLE_BIG_OBJECT
 #include "KBigObjectContext.h"
 #endif
@@ -394,6 +395,13 @@ KGL_RESULT KAsyncFetchObject::PostResult(KHttpRequest* rq, int got) {
 		}
 		client->write_end();
 		return KGL_END;
+	}
+	if (got == KGL_EDENIED) {
+		// A request-body filter rejected the payload. The remainder of the
+		// client body must not be interpreted as another keep-alive request.
+		KBIT_SET(rq->sink->data.flags, RQ_CONNECTION_CLOSE);
+		KGL_RESULT result = send_error2(rq, STATUS_FORBIDEN, "denied by request body filter");
+		return result == KGL_OK ? KGL_EHAS_SEND_HEADER : result;
 	}
 	if (got <= 0) {
 		rq->sink->shutdown();

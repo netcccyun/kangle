@@ -555,6 +555,14 @@ static void init_config() {
 
 	kconfig::listen(_KS("vhs"), &conf.gvm->vhs);
 	kconfig::listen(_KS("vh"), conf.gvm);
+	// Keep the legacy WHM template inventory available to EasyPanel. Merge all
+	// declarations because templates are spread over several extension XML
+	// files, and a non-merge listener would expose only the highest-priority one.
+	static auto vh_template_config_listener = kconfig::config_listen([](kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev)->bool {
+		return conf.gvm->on_template_config_event(tree, ev);
+		}, kconfig::ev_subdir | kconfig::ev_skip_vary | kconfig::ev_merge);
+	kconfig::listen(_KS("vh_templete"), &vh_template_config_listener);
+	kconfig::listen(_KS("vhs/vh_templete"), &vh_template_config_listener);
 #ifdef ENABLE_SVH_SSL
 	kconfig::listen(_KS("ssl"), conf.gvm);
 #endif

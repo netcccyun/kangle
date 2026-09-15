@@ -40,6 +40,7 @@
 #include "KHttpObjectHash.h"
 #include "KSimulateRequest.h"
 #include "KVirtualHostManage.h"
+#include "KWhiteList.h"
 #include "KProcessManage.h"
 #include "KProcess.h"
 #include "KLogManage.h"
@@ -237,6 +238,17 @@ KTHREAD_FUNCTION time_thread(void* arg) {
 #endif		
 			kgl_flush_addr_cache(nowTime);
 		}
+#ifdef ENABLE_BLACK_LIST
+		// A zero timeout means that dynamic entries are permanent.  The old
+		// anti-CC implementation expired both lists from this periodic worker;
+		// keep that work here now that anti-CC is provided by a DSO.
+		if (conf.wl_time > 0) {
+			wlm.flush(nowTime, conf.wl_time);
+		}
+		if (conf.bl_time > 0 && conf.gvm && conf.gvm->vhs.blackList) {
+			conf.gvm->vhs.blackList->flush(conf.bl_time);
+		}
+#endif
 		server_container->flush(kgl_current_sec);
 #ifdef ENABLE_DISK_CACHE
 		scan_disk_cache();
@@ -257,4 +269,3 @@ KTHREAD_FUNCTION time_thread(void* arg) {
 	}
 	KTHREAD_RETURN;
 }
-

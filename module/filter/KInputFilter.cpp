@@ -17,7 +17,7 @@ static int input_filter_read(kgl_request_body_ctx* ctx, char* buf, int len) {
 		return len;
 	}
 	if (if_ctx->match(buf, len, if_ctx->body.f->get_left(if_ctx->body.ctx) == 0)) {
-		return -1;
+		return KGL_EDENIED;
 	}
 	return len;
 }

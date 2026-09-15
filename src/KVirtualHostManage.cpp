@@ -118,6 +118,114 @@ bool KVirtualHostManage::on_config_event(kconfig::KConfigTree* tree, kconfig::KC
 	}
 	return true;
 }
+
+bool KVirtualHostManage::on_template_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) {
+	const auto event_type = ev->type & ~kconfig::EvSubDir;
+	if (event_type == kconfig::EvUpdate) {
+		updateTemplateIndex(ev->old_xml, false);
+		updateTemplateIndex(ev->new_xml, true);
+	} else if (event_type == kconfig::EvRemove) {
+		updateTemplateIndex(ev->old_xml, false);
+	} else if (event_type == kconfig::EvNew) {
+		updateTemplateIndex(ev->new_xml, true);
+	}
+	return true;
+}
+
+void KVirtualHostManage::updateTemplateIndex(const khttpd::KXmlNode* xml, bool add) {
+	if (!xml) {
+		return;
+	}
+	KString name = xml->attributes()["name"];
+	if (name.empty()) {
+		return;
+	}
+	KString group = name;
+	KString sub;
+	size_t separator = name.find(':');
+	if (separator != KString::npos) {
+		group = name.substr(0, separator);
+		sub = name.substr(separator + 1);
+	}
+	if (group.empty()) {
+		return;
+	}
+	auto guard = locker();
+	if (add) {
+		++vh_templates[group][sub];
+		vh_template_config[name].attributes = xml->attributes();
+		++vh_template_generation;
+		return;
+	}
+	auto group_it = vh_templates.find(group);
+	if (group_it == vh_templates.end()) {
+		return;
+	}
+	auto sub_it = group_it->second.find(sub);
+	if (sub_it == group_it->second.end()) {
+		return;
+	}
+	if (sub_it->second > 1) {
+		--sub_it->second;
+	} else {
+		group_it->second.erase(sub_it);
+		vh_template_config.erase(name);
+		if (group_it->second.empty()) {
+			vh_templates.erase(group_it);
+		}
+	}
+	++vh_template_generation;
+}
+
+void KVirtualHostManage::inheritTemplateAttributes(KXmlAttribute& attributes) {
+	KString current = attributes["templete"];
+	if (!current.empty() && !attributes["subtemplete"].empty()) {
+		current += ":";
+		current += attributes["subtemplete"];
+	}
+	auto guard = locker();
+	// Template inheritance is user-configurable; cap traversal so a cycle in
+	// configuration cannot hang virtual-host loading.
+	for (int depth = 0; depth < 32 && !current.empty(); ++depth) {
+		auto it = vh_template_config.find(current);
+		if (it == vh_template_config.end()) {
+			return;
+		}
+		for (const auto& attribute : (*it).second.attributes) {
+			// The virtual host and the nearest template take precedence because
+			// std::map::insert leaves an existing value unchanged.
+			attributes.insert(attribute);
+		}
+		current = (*it).second.attributes["templete"];
+	}
+}
+
+uint64_t KVirtualHostManage::getTemplateGeneration() {
+	auto guard = locker();
+	return vh_template_generation;
+}
+
+void KVirtualHostManage::getAllGroupTemplete(std::list<KString>& templates) {
+	auto guard = locker();
+	for (const auto& item : vh_templates) {
+		templates.push_back(item.first);
+	}
+}
+
+bool KVirtualHostManage::getAllTempleteVh(const char* group_template, std::list<KString>& templates) {
+	if (!group_template || !*group_template) {
+		return false;
+	}
+	auto guard = locker();
+	auto group_it = vh_templates.find(group_template);
+	if (group_it == vh_templates.end()) {
+		return false;
+	}
+	for (const auto& item : group_it->second) {
+		templates.push_back(item.first);
+	}
+	return true;
+}
 KVirtualHostManage::KVirtualHostManage() {
 #ifdef ENABLE_BLACK_LIST
 	vhs.blackList = new KIpList;
@@ -803,7 +911,7 @@ void KVirtualHostManage::dumpFlow() {
 #ifdef _WIN32
 	const char* formatString = "%s\t%I64d\t%I64d\n";
 #else
-	const char* formatString = "%s\t%lld\t%lld";
+	const char* formatString = "%s\t%lld\t%lld\n";
 #endif
 	FILE* fp = NULL;
 	auto  flow_file = conf.path;

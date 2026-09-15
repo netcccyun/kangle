@@ -234,7 +234,7 @@ bool KVirtualHostDatabase::loadInfo(khttpd::KXmlNodeBody *vh, kgl_vh_connection 
 		{
 			auto svh = kconfig::new_child(vh, _KS("host"));
 			svh->set_text(name.c_str());
-			svh->attributes("dir", value.c_str());
+			svh->attributes.emplace("dir", value);
 			break;
 		}
 		case VH_INFO_ERROR_PAGE:
@@ -479,11 +479,18 @@ khttpd::KSafeXmlNode KVirtualHostDatabase::load(kconfig::KConfigFile* file) {
 			return nullptr;
 		}
 	}
+	// Raw database rows do not change when a referenced template is edited.
+	// Include the template generation in the in-memory config so the config
+	// tree reparses this vhost and reapplies inherited scalar settings.
+	body->attributes().emplace("_template_generation", std::to_string(conf.gvm->getTemplateGeneration()));
 	loadInfo(body->get_first(), cn);
 	return xml;
 }
 KFileModified KVirtualHostDatabase::get_last_modified(kconfig::KConfigFile* file) {
-	return KFileModified(0,0);
+	// Database-backed configuration has no filesystem mtime.  Return a
+	// non-empty generation so a forced single-vhost reload is treated as a
+	// successful load instead of clearing the config file after updating it.
+	return KFileModified(time(NULL), 0);
 }
 void KVirtualHostDatabase::freeConnection(kgl_vh_connection cn) {
 	if (vhm.freeConnection) {

@@ -98,18 +98,18 @@ static uint32_t process(KREQUEST rq, kgl_access_context* ctx, DWORD notify) {
 	KParamCountMark* mark = (KParamCountMark*)ctx->module;
 	auto filter_ctx = get_input_filter_context(rq, ctx);
 	if (!filter_ctx) {
-		return KF_STATUS_REQ_TRUE;
+		return KF_STATUS_REQ_FALSE;
 	}
 	auto context = mark->new_context();
 	if (mark->get) {
 		if (filter_ctx->check_get(context.get(), rq, ctx)) {
-			return KF_STATUS_REQ_FINISHED;
+			return KF_STATUS_REQ_TRUE;
 		}
 	}
 	if (mark->post) {
 		filter_ctx->get_filter(rq, ctx)->register_param(context.get());
 	}
-	return KF_STATUS_REQ_TRUE;
+	return KF_STATUS_REQ_FALSE;
 }
 kgl_access kgl_param_count_model = {
 	sizeof(kgl_access),

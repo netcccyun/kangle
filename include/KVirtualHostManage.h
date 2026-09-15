@@ -42,6 +42,7 @@ public:
 	bool update_ssl(const char* domain, const char* cert_file, const char* key_file);
 #endif
 	bool on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) override;
+	bool on_template_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev);
 	kconfig::KConfigEventFlag config_flag() const override {
 		return kconfig::ev_subdir | kconfig::ev_skip_vary;
 	}
@@ -95,6 +96,10 @@ public:
 	}
 	int find_domain(const char* domain, WhmContext* ctx);
 	void getAllVh(std::list<KString>& vhs, bool status, bool onlydb);
+	void getAllGroupTemplete(std::list<KString>& templates);
+	bool getAllTempleteVh(const char* group_template, std::list<KString>& templates);
+	void inheritTemplateAttributes(KXmlAttribute& attributes);
+	uint64_t getTemplateGeneration();
 	KVirtualHost* refsVirtualHostByName(const KString& name);
 	kserver* RefsServer(u_short port);
 #ifdef ENABLE_VH_FLOW
@@ -125,6 +130,18 @@ private:
 	 * 所有虚拟主机列表
 	 */
 	std::map<KString, KVirtualHost*> avh;
+	/*
+	 * Compatibility metadata for legacy virtual-host templates.  Besides the
+	 * WHM template inventory, retain scalar settings needed by database-backed
+	 * virtual hosts because those values are not stored in vhs.db.
+	 */
+	std::map<KString, std::map<KString, unsigned int> > vh_templates;
+	struct KVhTemplateCompatInfo {
+		KXmlAttribute attributes;
+	};
+	std::map<KString, KVhTemplateCompatInfo> vh_template_config;
+	uint64_t vh_template_generation = 0;
+	void updateTemplateIndex(const khttpd::KXmlNode* xml, bool add);
 	/*
 	* 绑定到侦听上
 	*/

@@ -211,10 +211,10 @@ KGL_RESULT send_error2(KHttpRequest* rq, int code, const char* reason) {
 		s << " style='display:none'";
 	}
 #endif
-	s << ">\n<h3>error: " << code;
-	s << "</h3><h3>";
+	s << ">\n<i><h2>Something error:</h2></i>\n<p><h3>" << code;
+	s << "</h3><h3><font color='red'>";
 	s << reason;
-	s << "</h3></p>\n<p>Please check.</p>\n";
+	s << "</font></h3></p>\n<p>Please check or <a href='javascript:location.reload()'>try again</a> later.</p>\n";
 	if (*conf.hostname) {
 		s << "<div>hostname: " << conf.hostname << "</div>";
 	}

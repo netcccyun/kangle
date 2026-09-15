@@ -14,6 +14,7 @@
 #include "KHttpLib.h"
 #include "KFiberLocker.h"
 #include "KXmlException.h"
+#include <errno.h>
 #define ASSERT_CONFIG_IS_LOCKED() kassert(kfiber_mutex_get_worker(locker)>0)
 namespace kconfig {
 	bool is_first_config = true;
@@ -136,7 +137,7 @@ namespace kconfig {
 				default_file = get_default_config_filename();
 				filename = default_file.data();
 			}
-			if (0 != unlink(filename->data)) {
+			if (0 != unlink(filename->data) && errno != ENOENT) {
 				unlink(tmpfile.c_str());
 				return false;
 			}
@@ -246,6 +247,57 @@ namespace kconfig {
 	class KVhAccessConfigFileDriver : public KDefaultConfigFileDriver
 	{
 	public:
+		khttpd::KSafeXmlNode load(KConfigFile* file) override {
+			auto xml = KDefaultConfigFileDriver::load(file);
+			if (!xml) {
+				// A vhost may enable access.xml before the file exists. Treat that
+				// state as an empty config so the first WHM rule can create the file.
+				// Invalid existing XML must still fail instead of being overwritten.
+				KFileName filename;
+				if (filename.setName(file->get_filename()->data)) {
+					return nullptr;
+				}
+				xml = new_xml("config"_CS);
+			}
+
+			// The legacy access loader always supplied an empty BEGIN table for
+			// both directions. EasyPanel relies on that invariant when toggling
+			// bandwidth, anti-CC and similar features: it inserts a jump into
+			// BEGIN without creating the table itself.
+			for (const char* direction : { "request", "response" }) {
+				auto direction_xml = find_child(xml->get_first(), direction, strlen(direction));
+				khttpd::KSafeXmlNode new_direction;
+				if (!direction_xml) {
+					new_direction = new_xml(direction, strlen(direction));
+					xml->append(new_direction.get());
+					direction_xml = new_direction.get();
+				}
+				bool found = false;
+				for (auto child : direction_xml->get_first()->childs) {
+					if (!child->is_tag(_KS("table"))) {
+						continue;
+					}
+					for (uint32_t index = 0;; ++index) {
+						auto body = child->get_body(index);
+						if (!body) {
+							break;
+						}
+						if (body->attributes["name"] == "BEGIN") {
+							found = true;
+							break;
+						}
+					}
+					if (found) {
+						break;
+					}
+				}
+				if (!found) {
+					auto table = new_xml(_KS("table"), _KS("BEGIN"));
+					direction_xml->append(table.get());
+				}
+			}
+			return xml;
+		}
 		bool enable_scan() override {
 			return false;
 		}
@@ -980,7 +1032,10 @@ namespace kconfig {
 			}, NULL);
 		for (int i = 0; i < static_cast<int>(KConfigFileSource::Size); ++i) {
 			if (sources[i] != nullptr) {
-				if (sources[i]->enable_scan()) {
+				// Database-backed virtual hosts inherit settings from the system
+				// templates. Apply the ordinary config sources first so a reload
+				// cannot rebuild vhosts against the previous template generation.
+				if (i != static_cast<int>(KConfigFileSource::Db) && sources[i]->enable_scan()) {
 					provider.current_source = static_cast<KConfigFileSource>(i);
 					sources[i]->scan(&provider);
 					scanned[i] = true;
@@ -1168,6 +1223,7 @@ namespace kconfig {
 		register_qname(_KS("ssl@domain"), true);
 		register_qname(_KS("vhs"));
 		register_qname(_KS("vh@name"));
+		register_qname(_KS("vh_templete@name"));
 		register_qname(_KS("error@code"));
 #ifdef _WIN32
 		register_qname(_KS("mime_type@ext"), true);

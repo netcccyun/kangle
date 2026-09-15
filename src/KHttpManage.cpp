@@ -12,6 +12,8 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <cerrno>
+#include <climits>
 #include <ctype.h>
 #include <time.h>
 #include "kmalloc.h"
@@ -626,9 +628,9 @@ bool KHttpManage::config() {
 		s << ">mallocdebug";
 		s << "<br>";
 #endif
-#ifdef ENABLE_FATBOY
-		s << klang["bl_time"] << ":" << conf.bl_time << "<br>";
-		s << klang["wl_time"] << ":" << conf.wl_time << "<br>";
+#ifdef ENABLE_BLACK_LIST
+		s << klang["bl_time"] << ":<input type='number' min='0' name='bl_time' size='6' value='" << conf.bl_time << "'><br>";
+		s << klang["wl_time"] << ":<input type='number' min='0' name='wl_time' size='6' value='" << conf.wl_time << "'><br>";
 #endif
 #ifdef ENABLE_BLACK_LIST
 		s << "<pre>";
@@ -669,6 +671,19 @@ bool KHttpManage::config() {
 	s << "<br><input type=submit value='" << LANG_SUBMIT << "'></form>" << endTag() << "</body></html>";
 	conf.admin_lock.Unlock();
 	return sendHttp(s.str());
+}
+static bool parse_nonnegative_time(const char* value, int& result) {
+	if (!value || !*value) {
+		return false;
+	}
+	errno = 0;
+	char* end = nullptr;
+	long parsed = strtol(value, &end, 10);
+	if (errno != 0 || end == value || *end != '\0' || parsed < 0 || parsed > INT_MAX) {
+		return false;
+	}
+	result = (int)parsed;
+	return true;
 }
 bool console_config_submit(size_t item, KUrlValue& uv,KString &err_msg) {
 	if (item == 0) {
@@ -720,6 +735,17 @@ bool console_config_submit(size_t item, KUrlValue& uv,KString &err_msg) {
 		kconfig::update("io"_CS, 0, nullptr, &io_attr, kconfig::EvUpdate | kconfig::FlagCreate);
 		kconfig::update("max_post_size"_CS, 0, &uv.get("max_post_size"_CS), nullptr, kconfig::EvUpdate | kconfig::FlagCreate);
 	} else if (item == 5) {
+#ifdef ENABLE_BLACK_LIST
+		const char* bl_time = uv.getx("bl_time");
+		const char* wl_time = uv.getx("wl_time");
+		int new_bl_time = conf.bl_time;
+		int new_wl_time = conf.wl_time;
+		if ((bl_time && !parse_nonnegative_time(bl_time, new_bl_time)) ||
+			(wl_time && !parse_nonnegative_time(wl_time, new_wl_time))) {
+			err_msg = "black/white list time must be a non-negative integer";
+			return false;
+		}
+#endif
 #ifdef MALLOCDEBUG
 		kconfig::update("mallocdebug"_CS, 0, &uv.get("mallocdebug"_CS), nullptr, kconfig::EvUpdate | kconfig::FlagCreate);
 #endif
@@ -740,10 +766,22 @@ bool console_config_submit(size_t item, KUrlValue& uv,KString &err_msg) {
 		kconfig::update("compress"_CS, 0, nullptr, &compress_attr, kconfig::EvUpdate | kconfig::FlagCreate);
 		kconfig::update("server_software"_CS, 0, &uv.get("server_software"_CS), nullptr, kconfig::EvUpdate | kconfig::FlagCreate);
 		kconfig::update("hostname"_CS, 0, &uv.get("hostname"_CS), nullptr, kconfig::EvUpdate | kconfig::FlagCreate);
-#ifdef ENABLE_FATBOY
-		//KXmlAttribute fw_attr;
-		//fw_attr.emplace("bl_time"_CS, getUrlValue("bl_time"));
-		//fw_attr.emplace("wl_time"_CS, getUrlValue("wl_time"));
+#ifdef ENABLE_BLACK_LIST
+		if (bl_time || wl_time) {
+			KXmlAttribute fw_attr;
+			fw_attr.emplace("bl_time"_CS, std::to_string(new_bl_time));
+			fw_attr.emplace("wl_time"_CS, std::to_string(new_wl_time));
+			fw_attr.emplace("block_ip_cmd"_CS, conf.block_ip_cmd);
+			fw_attr.emplace("unblock_ip_cmd"_CS, conf.unblock_ip_cmd);
+			fw_attr.emplace("flush_ip_cmd"_CS, conf.flush_ip_cmd);
+			fw_attr.emplace("report_url"_CS, conf.report_url);
+			auto result = kconfig::update("firewall"_CS, 0, nullptr, &fw_attr,
+				kconfig::EvUpdate | kconfig::FlagCreate);
+			if (result != kconfig::KConfigResult::Success) {
+				err_msg = "failed to save firewall configuration";
+				return false;
+			}
+		}
 #endif
 	} else if (item == 6) {
 		return changeAdminPassword(&uv, err_msg);

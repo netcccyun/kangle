@@ -152,16 +152,25 @@ KUpstream* KMPCmdProcess::get_connection(KHttpRequest* rq, KSingleListenPipeStre
 
 KUpstream* KMPCmdProcess::GetUpstream(KHttpRequest* rq, KExtendProgram* rd)
 {
-	KSingleListenPipeStream* sp = NULL;
-	stLock.Lock();
-	if (!klist_empty(freeProcessList)) {
-		sp = klist_head(freeProcessList);
-		klist_remove(sp);
-		klist_append(busyProcessList, sp);
-	}
-	stLock.Unlock();
-	if (sp) {
-		return get_connection(rq, sp);
+	for (;;) {
+		KSingleListenPipeStream* sp = NULL;
+		stLock.Lock();
+		if (!klist_empty(freeProcessList)) {
+			sp = klist_head(freeProcessList);
+			klist_remove(sp);
+			klist_append(busyProcessList, sp);
+		}
+		stLock.Unlock();
+		if (sp == NULL) {
+			break;
+		}
+		KUpstream* us = get_connection(rq, sp);
+		if (us != NULL) {
+			return us;
+		}
+		// A command process can exit after its previous response while its
+		// listener is still on the free list.  Discard it and continue so the
+		// current request starts a replacement instead of failing with 504.
 	}
 	KCmdPoolableRedirect* cmd = static_cast<KCmdPoolableRedirect*>(rd);
 	cmd->LockCommand();

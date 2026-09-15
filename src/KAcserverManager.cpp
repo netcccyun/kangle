@@ -333,6 +333,19 @@ KAcserverManager::~KAcserverManager() {
 }
 void KAcserverManager::killAllProcess(KVirtualHost* vh) {
 	spProcessManage.killAllProcess(vh);
+#ifdef ENABLE_VH_RUN_AS
+	// FastCGI programs started through a <cmd> redirect (including PHP-CGI)
+	// live in their command redirect's own process manager, not in
+	// spProcessManage.  Keep both families in sync so the WHM kill_process
+	// operation really restarts every application belonging to the vhost.
+	auto locker = get_rlocker();
+	for (auto&& it : cmds) {
+		KProcessManage* pm = it.second->getProcessManage();
+		if (pm) {
+			pm->killAllProcess(vh);
+		}
+	}
+#endif
 }
 #ifdef ENABLE_VH_RUN_AS
 void KAcserverManager::refreshCmd(time_t nowTime) {
@@ -379,7 +392,6 @@ void KAcserverManager::flushCpuUsage(ULONG64 cpuTime) {
 
 }
 #endif
-#if 0
 int KAcserverManager::getCmdPortMap(KVirtualHost* vh, KString cmd, KString name, int app) {
 	KCmdPoolableRedirect* rd = refsCmdRedirect(cmd);
 	if (rd == NULL) {
@@ -393,7 +405,6 @@ int KAcserverManager::getCmdPortMap(KVirtualHost* vh, KString cmd, KString name,
 	rd->release();
 	return port;
 }
-#endif
 //}}
 void KAcserverManager::dump_process(kgl::serializable* sl) {
 	auto locker = get_rlocker();

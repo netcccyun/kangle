@@ -380,7 +380,7 @@ void KVirtualHost::parse_log_config(const KXmlAttribute& attr) {
 	logger->logs_day = attr.get_int("logs_day");
 	logger->logs_size = get_size(attr("logs_size"));
 	logger->log_handle = (attr["log_handle"] == "on" || attr["log_handle"] == "1");
-	logger->mkdir_flag = (attr["log_mkdir"] == "on" || attr["log_handle"] == "1");
+	logger->mkdir_flag = (attr["log_mkdir"] == "on" || attr["log_mkdir"] == "1");
 #ifdef ENABLE_VH_RUN_AS
 #ifndef _WIN32
 	logger->uid = id[0];
@@ -650,6 +650,7 @@ void KVirtualHost::dump_info(kgl::serializable* s) {
 bool KVirtualHost::parse_xml(const khttpd::KXmlNodeBody* body, KVirtualHost* ov) {
 
 	auto attr = body->attr();
+	conf.gvm->inheritTemplateAttributes(attr);
 	envs.clear();
 	parseEnv(attr("envs"));
 	setDocRoot(attr["doc_root"]);

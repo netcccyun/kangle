@@ -510,7 +510,7 @@ static iterator_ret listen_whm_iterator(void *data, void *argv)
 #endif
 		s << "<multi_bind>" << (is_server_multi_selectable(server) ? 1 : 0) << "</multi_bind>";
 		s << "<refs>" << katom_get((void *)&server->refs) << "</refs>";
-		ctx->add("listen", s.str().c_str(), false);
+		ctx->add_raw_xml("listen", s.str());
 	}
 	return iterator_continue;
 }
