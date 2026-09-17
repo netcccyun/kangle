@@ -487,7 +487,18 @@ bool check_request_final_source(KHttpRequest* rq, RequestError* error) {
 		//postmap
 		if (htresponse) {
 			KSafeSource fo;
-			if (!rq->ctx.internal && htresponse->access[RESPONSE]->check_post_map(rq, rq->ctx.obj, fo) == JUMP_DENY) {
+			int jump_type = JUMP_ALLOW;
+			if (!rq->ctx.internal) {
+				jump_type = htresponse->access[RESPONSE]->check_post_map(rq, rq->ctx.obj, fo);
+			}
+			// Marks such as HTTP authentication return a response source while
+			// keeping the chain action as "continue".  POSTMAP used to discard
+			// that source, so directory authentication was silently bypassed.
+			bool has_source = (bool)fo;
+			if (has_source) {
+				rq->insert_source(fo.release());
+			}
+			if (jump_type == JUMP_DENY && !has_source) {
 				if (KBIT_TEST(rq->ctx.filter_flags, RQ_SEND_AUTH)) {
 					error->code = AUTH_STATUS_CODE;
 					error->msg = "";
@@ -504,7 +515,11 @@ bool check_request_final_source(KHttpRequest* rq, RequestError* error) {
 		KSafeSource fo;
 		if (svh) {
 			int jump_type = svh->vh->checkPostMap(rq, fo);
-			if (jump_type == JUMP_DENY) {
+			bool has_source = (bool)fo;
+			if (has_source) {
+				rq->insert_source(fo.release());
+			}
+			if (jump_type == JUMP_DENY && !has_source) {
 				if (KBIT_TEST(rq->ctx.filter_flags, RQ_SEND_AUTH)) {
 					error->code = AUTH_STATUS_CODE;
 					error->msg = "";
@@ -515,7 +530,12 @@ bool check_request_final_source(KHttpRequest* rq, RequestError* error) {
 				return false;
 			}
 		}
-		if (kaccess[RESPONSE]->check_post_map(rq, rq->ctx.obj, fo) == JUMP_DENY) {
+		auto jump_type = kaccess[RESPONSE]->check_post_map(rq, rq->ctx.obj, fo);
+		bool has_source = (bool)fo;
+		if (has_source) {
+			rq->insert_source(fo.release());
+		}
+		if (jump_type == JUMP_DENY && !has_source) {
 			if (KBIT_TEST(rq->ctx.filter_flags, RQ_SEND_AUTH)) {
 				error->code = AUTH_STATUS_CODE;
 				error->msg = "";
@@ -955,4 +975,3 @@ KGL_RESULT on_upstream_finished_header(KHttpRequest* rq, kgl_response_body* body
 	kassert(!kfiber_is_main());
 	return prepare_write_body(rq, body);
 }
-

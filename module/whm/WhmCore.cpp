@@ -265,42 +265,51 @@ int WhmCore::call_get_chain(const char* call_name, const char* event_type, WhmCo
 	return access->get_chain(ctx, whm_get_table_name(ctx->getUrlValue()));
 }
 int WhmCore::call_edit_chain(const char* call_name, const char* event_type, WhmContext* ctx) {
-	KStringBuf path;
 	auto access = whm_get_access(ctx);
 	if (!access) {
 		return WHM_CALL_FAILED;
 	}
 	auto&& uv = ctx->getUrlValue();
 	auto file = ctx->get_vh_config_file();
-	ctx->build_config_base_path(path, file);
 	auto table_name = whm_get_table_name(uv);
 	if (table_name.empty()) {
 		ctx->setStatus("table name is empty");
 		return WHM_PARAM_ERROR;
 	}
-	path << access->get_qname() << "/table@" << table_name << "/chain"_CS;
 	auto id = uv->attribute.get_int("id");
 	auto add = strcmp(call_name, "add_chain") == 0 || uv->attribute.get_int("add");
 	if (!add && uv->getx("id") == nullptr) {
 		KChainLocation location;
 		auto name = uv->get("name");
-		if (name.empty() || !access->find_chain_location(table_name, &name, location)) {
-			ctx->setStatus("chain not found");
+		if (name.empty()) {
+			ctx->setStatus("chain name is empty");
 			return WHM_PARAM_ERROR;
 		}
-		file = location.file;
-		id = location.id;
+		if (access->find_chain_location(table_name, &name, location)) {
+			file = location.file;
+			id = location.id;
+		} else {
+			// The legacy WHM edit_chain call is an upsert when a chain name is
+			// supplied.  EasyPanel relies on this while rebuilding access.xml
+			// from access.xml.db after first emptying the destination table.
+			add = true;
+			id = 0;
+		}
 	}
+	KStringBuf path;
+	ctx->build_config_base_path(path, file);
+	path << access->get_qname() << "/table@" << table_name << "/chain"_CS;
+	auto xml = KChain::to_xml(*uv);
 	if (add) {
 		if (file.empty()) {
-			return config_result(kconfig::update(path.str().str(), id, KChain::to_xml(*uv).get(), kconfig::EvNew), ctx);
+			return config_result(kconfig::update(path.str().str(), id, xml.get(), kconfig::EvNew), ctx);
 		}
-		return config_result(kconfig::update(file.str(), path.str().str(), id, KChain::to_xml(*uv).get(), kconfig::EvNew),ctx);
+		return config_result(kconfig::update(file.str(), path.str().str(), id, xml.get(), kconfig::EvNew),ctx);
 	}
 	if (file.empty()) {
-		return config_result(kconfig::update(path.str().str(), id, KChain::to_xml(*uv).get(), kconfig::EvUpdate), ctx);
+		return config_result(kconfig::update(path.str().str(), id, xml.get(), kconfig::EvUpdate), ctx);
 	}
-	return config_result(kconfig::update(file.str(), path.str().str(), id, KChain::to_xml(*uv).get(), kconfig::EvUpdate), ctx);
+	return config_result(kconfig::update(file.str(), path.str().str(), id, xml.get(), kconfig::EvUpdate), ctx);
 }
 int WhmCore::call_del_chain(const char* call_name, const char* event_type, WhmContext* ctx) {
 	KStringBuf path;

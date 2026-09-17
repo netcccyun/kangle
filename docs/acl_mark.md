@@ -159,8 +159,8 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | 模块 | 阶段 | 主要参数 | 用途 |
 | --- | --- | --- | --- |
 | `mark` | 请求/响应 | `op`、`v` | 比较请求的数值 mark；`op` 为 `eq`、`lt`、`gt`。 |
-| `work_model` | 请求/响应 | `ssl`、`tcp` | 匹配连接工作模式；企业功能。 |
-| `ip_rate` | 请求 | `request`、`second` | 按 IP 请求速率匹配；企业功能。 |
+| `work_model` | 请求/响应 | `ssl`、`tcp` | 匹配连接工作模式。 |
+| `ip_rate` | 请求 | `request`、`second` | 按 IP 请求速率匹配。 |
 | `ip_url_rate` | 请求/响应 | `request`、`second` | 按 IP 与 URL 速率匹配；黑名单功能。 |
 | `url_rate` | 请求/响应 | `request`、`second` | 按 URL 速率匹配；黑名单功能。 |
 | `cloud_ip` | 请求/响应 | `url`、`flush_time` | 从远程数据维护云 IP 集合；模拟 HTTP 功能。 |
@@ -184,7 +184,7 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | `host_alias` | 请求 | `map` | 应用主机别名映射。 |
 | `replace_ip` | 请求 | `ip`、`header`、`sign` | 替换请求使用的客户端 IP。 |
 | `parent` | 请求 | `val`、`self_ip` | 设置父级/上游相关地址。 |
-| `multi_server` | 请求 | `nodes` | 动态选择多节点服务；企业功能。 |
+| `multi_server` | 请求 | `nodes` | 动态选择多节点服务。 |
 | `port_map` | 请求 | `host`、`port`、`param` | 四层端口映射；TCP 工作模式构建可用。 |
 | `extend_flag` | 请求/响应 | `no_extend` | 设置或清除“禁止扩展处理”标志。 |
 
@@ -261,7 +261,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | `black_list` | 请求 | `enable`、`time_out` | 把客户端加入黑名单；需黑名单功能。 |
 | `check_black_list` | 请求 | `enable` | 检查黑名单；需黑名单功能。 |
 | `ip_url_rate` | 请求 | `request`、`second`、`block_time` | 速率超限后按 IP/URL 处理；需黑名单功能。 |
-| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量；企业功能。 |
+| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量。 |
 | `white_list` | 请求/响应 | `host`、`flush` | 更新白名单状态；企业/Fatboy 功能。 |
 
 认证示例：
