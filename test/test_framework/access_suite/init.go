@@ -18,6 +18,7 @@ func (a *access) Init() error {
 	server.Handle("/access/header", handle_header)
 	server.Handle("/access/auth", handle_auth)
 	server.Handle("/access/digest", handle_auth)
+	server.Handle("/status-code", handleStatusCode)
 
 	config := `<!--#start 300-->\r\n
 <config>
@@ -26,6 +27,11 @@ func (a *access) Init() error {
 	<map path='/' extend='server:upstream' confirm_file='0' allow_method='*'/>
 	<request>
 		<table name='BEGIN'>
+			<chain action='allow'>
+				<acl_path path='/status-code'/>
+				<acl_header header='X-Test-Status-Code' val='^1$'/>
+				<mark_status_code code='451'/>
+			</chain>
 			<chain  action='continue' >
 					<mark_rewrite prefix='/' path='^rw(.*)$' dst='/wr$1' internal='0' nc='1' qsa='1' code='302'></mark_rewrite>
 			</chain>
@@ -79,5 +85,6 @@ func init() {
 	s.AddCase("rewrite", "重写测试", check_rewrite)
 	s.AddCase("header", "header测试", check_header)
 	s.AddCase("auth", "http auth", check_http_auth)
+	s.AddCase("status_code", "HTTP状态码标记测试", check_status_code)
 	suite.Register(s)
 }

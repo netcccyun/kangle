@@ -299,6 +299,7 @@ void KAccess::loadModel() {
 	addMarkModel(REQUEST_RESPONSE, new KFlagMark());
 	addMarkModel(REQUEST, new KRewriteMark());
 	addMarkModel(REQUEST, new KRedirectMark());
+	addMarkModel(REQUEST, new KStatusCodeMark());
 	addMarkModel(REQUEST, new KMapRedirectMark());
 	addMarkModel(REQUEST_RESPONSE, new KCounterMark());
 	addMarkModel(REQUEST_RESPONSE, new KAuthMark());
@@ -321,7 +322,6 @@ void KAccess::loadModel() {
 	//addMarkModel(RESPONSE,new KRegContentMark());
 	addMarkModel(RESPONSE, new KResponseFlagMark());
 	addMarkModel(RESPONSE, new KExtendFlagMark());
-	//addMarkModel(RESPONSE,new KStatusCodeMark());
 
 	acl = new KMarkAcl();
 	acl->add_ref();

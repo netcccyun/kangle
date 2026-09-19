@@ -96,6 +96,7 @@ func CreateMainConfig(malloc_debug int) (err error) {
 	<request action='vhs'></request>
 	<vhs >
 		<index id='100' file='index.html'/>
+		<error code='451' file='file://www/status-code.html'/>
 		<mime_type ext='*' type='text/plain'/>
 		<mime_type ext='html' type='text/html' compress='1'/>
 		<mime_type ext='id' type='text/html' compress='2'/>

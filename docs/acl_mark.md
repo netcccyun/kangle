@@ -258,6 +258,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | `mark` | 请求/响应 | `v` | 设置请求数值 mark，供 `mark` ACL 使用。 |
 | `timeout` | 请求/响应 | `v` | 设置额外超时周期计数（`0`～`255`）；每个周期使用全局读写超时，并非直接填写秒数。 |
 | `connection_close` | 请求/响应 | 无 | 强制本次响应后关闭连接。 |
+| `status_code` | 请求 | `code` | 直接以指定的 `200`～`599` 状态码结束当前请求，并调用对应错误页；应配合 `allow` 动作使用。 |
 | `black_list` | 请求 | `enable`、`time_out` | 把客户端加入黑名单；需黑名单功能。 |
 | `check_black_list` | 请求 | `enable` | 检查黑名单；需黑名单功能。 |
 | `ip_url_rate` | 请求 | `request`、`second`、`block_time` | 速率超限后按 IP/URL 处理；需黑名单功能。 |
@@ -272,6 +273,24 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 ```
 
 `require='*'` 允许密码文件中的任意有效用户；以 `~` 开头可使用用户名正则。认证文件和 `crypt_type` 必须匹配，且 Digest 配置对 realm 和密码摘要格式有额外要求。
+
+自定义拦截状态码示例：
+
+```xml
+<vhs>
+    <error code='451' file='file:///vhs/kangle/www/block.html'/>
+</vhs>
+<request action='vhs'>
+    <table name='BEGIN'>
+        <chain action='allow'>
+            <acl module='safeline_waf'/>
+            <mark module='status_code' code='451'/>
+        </chain>
+    </table>
+</request>
+```
+
+`status_code` 会在读取缓存或源站内容前直接生成响应，后续 Mark 不再执行，因此应放在链的最后。全局请求控制使用全局 `<vhs>` 下的错误页；虚拟主机请求控制在 `403`～`499` 范围内会使用该虚拟主机配置或继承的错误页，其他状态码使用全局错误页。无效或超出范围的 `code` 会安全回退为 `403`。
 
 ## 常见完整示例
 
