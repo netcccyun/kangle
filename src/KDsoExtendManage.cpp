@@ -29,6 +29,13 @@ int KDsoExtendManage::dump(WhmContext* ctx) {
 }
 bool KDsoExtendManage::add(const KXmlAttribute &attribute)
 {
+	/* filter was shipped as a DSO between 3.5 and 3.6.  It is built into the
+	 * server again, so tolerate an old loader entry during rolling upgrades
+	 * without requiring the obsolete binary to remain installed. */
+	if (strcasecmp(attribute("name"), "filter") == 0) {
+		klog(KLOG_NOTICE, "ignore legacy filter dso entry; filters are built in\n");
+		return true;
+	}
 	KDsoExtend *dso = new KDsoExtend(attribute["name"].c_str());
 	if (!dso->load(attribute("filename"),attribute)) {
 		delete dso;

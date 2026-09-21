@@ -207,9 +207,9 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | `add_response_header` | 请求 | `attr`、`val` | 在请求阶段预先添加响应 Header。 |
 | `remove_param` | 请求 | `params`、`raw`、`nc` | 从查询参数中删除指定项。 |
 | `cookie` | 响应 | `cookie`、`http_only`、`secure` | 修改响应 Cookie 的 HttpOnly/Secure 属性。 |
-| `param` | 请求 | 模块的参数过滤配置 | 过滤请求参数；仅输入过滤构建。 |
-| `param_count` | 请求 | 模块的计数配置 | 限制参数数量；仅输入过滤构建。 |
-| `post_file` | 请求 | 模块的上传文件配置 | 过滤上传文件；仅输入过滤构建。 |
+| `param` | 请求 | 模块的参数过滤配置 | 使用内置请求体过滤器检查 GET/POST 参数。 |
+| `param_count` | 请求 | 模块的计数配置 | 使用内置请求体过滤器限制参数数量。 |
+| `post_file` | 请求 | 模块的上传文件配置 | 使用内置 multipart 过滤器检查上传文件。 |
 
 Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小写的正则，留空删除全部同名字段，以 `!` 开头则删除“不匹配后续正则”的值。`replace_header@val` 是正则，`replace` 可引用捕获结果；该模块只处理遇到的第一个同名字段。
 

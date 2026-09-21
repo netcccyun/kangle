@@ -36,7 +36,7 @@
 ./tools/migrate-config.sh --reload
 ```
 
-脚本会把旧的 `acl_xxx`/`mark_xxx` 节点、根级超时/线程/防火墙配置和旧版错误页属性转换为新格式，补充 Filter、WebDAV、WHM 及当前资源配置。写入前会先解析全部目标文件；任何一个文件无效时不会修改其他文件。可用 `--config`、`--ftp-root`、`--access-file` 和 `--output-dir` 在副本上测试或只转换指定文件。
+脚本会把旧的 `acl_xxx`/`mark_xxx` 节点、根级超时/线程/防火墙配置和旧版错误页属性转换为新格式，移除已经内置的 Filter DSO 加载项，并补充 WebDAV、WHM 及当前资源配置。写入前会先解析全部目标文件；任何一个文件无效时不会修改其他文件。可用 `--config`、`--ftp-root`、`--access-file` 和 `--output-dir` 在副本上测试或只转换指定文件。
 
 ## 最小配置
 
@@ -346,12 +346,14 @@ TLS 后缀还可使用 `端口s/协议/cipher-list` 指定该上游专用的 TLS
 ### `dso_extend`
 
 ```xml
-<dso_extend name='filter' filename='bin/filter.${dso}'/>
+<dso_extend name='example' filename='bin/example.${dso}'/>
 ```
 
 - `name`：唯一扩展名。
 - `filename`：动态库路径，支持 `${dso}` 等动态变量。
 - 其他属性原样提供给扩展自身解析。
+
+`footer`、`param`、`param_count`、`post_file` 及其请求体/响应体过滤代码已经内置到 Kangle，不再需要 `filter.so` 或对应的 `dso_extend` 配置。旧的 `name='filter'` 加载项会被兼容忽略，配置迁移工具会将其删除。
 
 DSO 开发接口见 [dso.md](./dso.md)。
 

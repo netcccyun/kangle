@@ -27,6 +27,9 @@ func (a *access) Init() error {
 	server.Handle("/filters/range", handleLegacyFilter)
 	server.Handle("/filters/url-range/", handleLegacyFilter)
 	server.Handle("/filters/guest-cache", handleGuestCache)
+	server.Handle("/builtin-filter/param", handleBuiltinFilter)
+	server.Handle("/builtin-filter/count", handleBuiltinFilter)
+	server.Handle("/builtin-filter/file", handleBuiltinFilter)
 
 	config := `<!--#start 300-->\r\n
 <config>
@@ -37,11 +40,22 @@ func (a *access) Init() error {
 			</chain>
 		</table>
 	</request>
-	<dso_extend name='filter' filename='bin/filter.${dso}'/>
 <vh name='access' doc_root='www'  inherit='on' app='1' access='-'>	
 	<map path='/' extend='server:upstream' confirm_file='0' allow_method='*'/>
 	<request>
 		<table name='BEGIN'>
+			<chain action='deny'>
+				<acl_path path='/builtin-filter/param'/>
+				<mark_param name='^blocked$' value='^yes$' get='1' post='0'/>
+			</chain>
+			<chain action='deny'>
+				<acl_path path='/builtin-filter/count'/>
+				<mark_param_count max_count='1' get='1' post='0'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/builtin-filter/file'/>
+				<mark_post_file filename='\.blocked$' />
+			</chain>
 			<chain action='allow'>
 				<acl_path path='/status-code'/>
 				<acl_header header='X-Test-Status-Code' val='^1$'/>
@@ -138,6 +152,7 @@ func init() {
 	s.AddCase("auth", "http auth", check_http_auth)
 	s.AddCase("status_code", "HTTP状态码标记测试", check_status_code)
 	s.AddCase("drop", "请求控制无响应断开连接测试", check_drop)
+	s.AddCase("builtin_filter", "内置过滤规则测试", check_builtin_filter)
 	s.AddCase("legacy_filters", "旧版回应过滤规则兼容测试", check_legacy_filters)
 	suite.Register(s)
 }

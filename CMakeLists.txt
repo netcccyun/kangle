@@ -28,7 +28,6 @@ file(GLOB TESTDSO_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/module/testdso/*.cpp)
 file(GLOB FILTER_SOURCE_FILES 
       ${CMAKE_CURRENT_SOURCE_DIR}/module/filter/*.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/module/filter/*.h)
-list(APPEND FILTER_SOURCE_FILES src/KReg.cpp)
 
 list(APPEND EXTWORKER_SOURCE_FILES 
     src/KHttpExt.cpp 
@@ -65,6 +64,13 @@ option(ENABLE_BROTLI "enable brotli compress support" OFF)
 option(HTTP_PROXY "build kangle as proxy server" OFF)
 option(ENABLE_DISK_CACHE "enable disk cache" ON)
 option(ENABLE_MALLOCDEBUG "enable malloc debug" OFF)
+
+if (NOT HTTP_PROXY)
+    # The standard access filters are part of the server.  Only third-party
+    # extensions use the runtime DSO registration path.
+    list(APPEND KANGLE_SOURCE_FILES ${FILTER_SOURCE_FILES})
+    list(APPEND KANGLE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/module/filter)
+endif()
 
 if (ENABLE_MALLOCDEBUG)
     add_compile_definitions(MALLOCDEBUG)
@@ -104,7 +110,6 @@ if (PCRE2_DIR)
     set(PCRE2_LIBRARIES pcre2-posix-static)
     set(ENABLE_PCRE2 ON)
     list(APPEND KANGLE_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/pcre2)
-    list(APPEND FILTER_LIBS ${PCRE2_LIBRARIES})
     list(APPEND KANGLE_LIBS ${PCRE2_LIBRARIES})
 else()
     include(./cmake/FindPCRE2.cmake)
@@ -112,7 +117,6 @@ else()
         message(STATUS "found pcre2 lib")
         list(APPEND KANGLE_INCLUDE_DIR ${PCRE2_INCLUDE_DIRS})
         set(ENABLE_PCRE2 ON)
-        list(APPEND FILTER_LIBS ${PCRE2_LIBRARIES})
         list(APPEND KANGLE_LIBS ${PCRE2_LIBRARIES})
     else()
         ## try find pcre        
@@ -123,7 +127,6 @@ else()
         message(STATUS "found pcre lib")
         list(APPEND KANGLE_INCLUDE_DIR ${PCRE_INCLUDE_DIRS})
         set(ENABLE_PCRE2 OFF)
-        list(APPEND FILTER_LIBS ${PCRE_LIBRARIES})
         list(APPEND KANGLE_LIBS ${PCRE_LIBRARIES})
     endif()
 endif()
@@ -200,7 +203,6 @@ if (NOT HTTP_PROXY)
     add_executable(extworker ${EXTWORKER_SOURCE_FILES})
     add_library(vhs_sqlite MODULE  ${VHS_SQLITE_SOURCE_FILES})
     add_library(testdso MODULE ${TESTDSO_SOURCE_FILES})
-    add_library(filter MODULE ${FILTER_SOURCE_FILES})
 
     target_include_directories(extworker PUBLIC ${KANGLE_INCLUDE_DIR})
     target_link_directories(extworker PUBLIC ${KANGLE_LIBS_DIR})
@@ -215,12 +217,7 @@ if (NOT HTTP_PROXY)
     target_include_directories(testdso PUBLIC ${KANGLE_INCLUDE_DIR})
     target_link_directories(testdso PUBLIC ${KANGLE_LIBS_DIR})
 
-    set_property(TARGET filter PROPERTY  PREFIX "")
-    target_include_directories(filter PUBLIC ${KANGLE_INCLUDE_DIR})
-    target_link_directories(filter PUBLIC ${KANGLE_LIBS_DIR})
-    target_link_libraries(filter ${FILTER_LIBS} khttpd)
-
-    install(TARGETS extworker vhs_sqlite filter
+    install(TARGETS extworker vhs_sqlite
         RUNTIME DESTINATION bin 
         LIBRARY DESTINATION bin
     )

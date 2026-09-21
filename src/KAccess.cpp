@@ -61,6 +61,9 @@
 #include "KFastcgiFetchObject.h"
 #include "KRewriteMark.h"
 #include "KCacheControlMark.h"
+#ifndef HTTP_PROXY
+#include "filter.h"
+#endif
 #include "KGuestCacheMark.h"
 #include "KContentFilterMarks.h"
 #include "KRedirectMark.h"
@@ -407,7 +410,6 @@ void KAccess::loadModel() {
 	addMarkModel(REQUEST_RESPONSE, new KRemoveHeaderMark());
 	addMarkModel(REQUEST_RESPONSE, new KReplaceHeaderMark());
 	addMarkModel(REQUEST_RESPONSE, new KTimeoutMark());
-	// footer is provided by filter.${dso}.
 	addMarkModel(RESPONSE, new KReplaceContentMark());
 	addMarkModel(REQUEST, new KUrlRangeMark());
 	addMarkModel(REQUEST, new KMarkMark());
@@ -416,6 +418,9 @@ void KAccess::loadModel() {
 #endif
 	addMarkModel(RESPONSE, new KMarkMark());
 	addMarkModel(REQUEST_RESPONSE, new KConnectionCloseMark());
+#ifndef HTTP_PROXY
+	register_builtin_filter_models();
+#endif
 }
 kgl_jump_type KAccess::check_post_map(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo) {
 	auto lock = read_lock();

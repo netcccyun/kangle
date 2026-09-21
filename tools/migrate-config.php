@@ -20,6 +20,8 @@ Usage:
 Default operation:
   - converts /vhs/kangle/etc/config.xml in place;
   - converts /home/ftp/\*/\*/access.xml (site-root files only);
+  - updates every /vhs/kangle/ext/php*/config.xml <cmd> lifetime;
+  - removes obsolete built-in JS/WebP/WAF test files and vh_db.xml;
   - creates a timestamped backup beside every changed file.
 
 Options:
@@ -333,15 +335,12 @@ function normalizeRuleModules($doc, &$stats, &$warnings, &$modules)
         'method' => 'meth',
         'file_name' => 'filename',
         'reg_file_name' => 'reg_filename',
+        // Some old configurations used the implementation class name even
+        // though the public module name has always been "content".
+        'reg_content' => 'content',
     );
     $unsupportedMarks = array(
-        'replace_content' => true,
-        'reg_content' => true,
-        'guest_cache' => true,
-        'replace_url' => true,
-        'fix_header' => true,
         'self_ip' => true,
-        'url_range' => true,
     );
     $textAttributes = array(
         'acl:url' => 'url',
@@ -902,7 +901,12 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
         }
     }
 
-    ensureNamedRootNode($doc, $root, 'dso_extend', 'filter', array('filename' => 'bin/filter.${dso}'), $stats);
+    foreach (directElements($root, 'dso_extend') as $extension) {
+        if (strcasecmp($extension->getAttribute('name'), 'filter') === 0) {
+            $root->removeChild($extension);
+            bump($stats, 'removed obsolete filter dso loader', 1);
+        }
+    }
     ensureNamedRootNode($doc, $root, 'api', 'webdav', array(
         'file' => 'bin/webdav.${dso}',
         'life_time' => '60',
@@ -918,9 +922,6 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
         if (!is_file($options['kangle_dir'] . '/bin/kwaf.so') && !is_file($options['kangle_dir'] . '/bin/kwaf.dll')) {
             addWarning($warnings, 'anti_cc rules were found but kwaf binary is not installed under KANGLE_DIR/bin');
         }
-    }
-    if (!is_file($options['kangle_dir'] . '/bin/filter.so') && !is_file($options['kangle_dir'] . '/bin/filter.dll')) {
-        addWarning($warnings, 'filter extension was configured but its binary is not installed under KANGLE_DIR/bin');
     }
     if (!is_file($options['kangle_dir'] . '/bin/webdav.so') && !is_file($options['kangle_dir'] . '/bin/webdav.dll')) {
         addWarning($warnings, 'WebDAV API was configured but its binary is not installed under KANGLE_DIR/bin');
@@ -960,6 +961,73 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
 function migrateAccessDocument($doc, &$stats, &$warnings, &$modules)
 {
     normalizeRuleModules($doc, $stats, $warnings, $modules);
+}
+
+function migratePhpExtensionDocument($doc, &$stats, &$warnings)
+{
+    $xpath = new DOMXPath($doc);
+    $commands = $xpath->query('//cmd');
+    if ($commands->length === 0) {
+        addWarning($warnings, 'PHP extension config contains no <cmd> element');
+        return;
+    }
+    foreach ($commands as $command) {
+        if (!($command instanceof DOMElement)) {
+            continue;
+        }
+        foreach (array('idle_time' => '600', 'life_time' => '60') as $name => $value) {
+            if ($command->getAttribute($name) !== $value) {
+                $command->setAttribute($name, $value);
+                bump($stats, 'updated PHP cmd lifetime attributes', 1);
+            }
+        }
+    }
+}
+
+function discoverPhpExtensionConfigs($kangleDirectory, &$warnings)
+{
+    $pattern = rtrim($kangleDirectory, '/') . '/ext/php*/config.xml';
+    $matches = glob($pattern);
+    if ($matches === false) {
+        throw new RuntimeException("cannot scan PHP extension configs: {$pattern}");
+    }
+    $files = array();
+    foreach ($matches as $path) {
+        // Do not follow a site-supplied link outside the Kangle installation.
+        if (is_link($path) || is_link(dirname($path))) {
+            addWarning($warnings, 'symbolic-link PHP extension config was skipped: ' . $path);
+            continue;
+        }
+        if (is_file($path)) {
+            $files[] = $path;
+        }
+    }
+    sort($files, SORT_STRING);
+    return $files;
+}
+
+function discoverObsoleteInstallationFiles($kangleDirectory, &$warnings)
+{
+    $relativePaths = array(
+        'bin/autoupdate',
+        'bin/js.so',
+        'bin/testdso.so',
+        'bin/wafdso.so',
+        'bin/webp.so',
+        'ext/js.dso.xml',
+        'ext/webp.dso.xml',
+        'etc/vh_db.xml',
+    );
+    $files = array();
+    foreach ($relativePaths as $relativePath) {
+        $path = rtrim($kangleDirectory, '/') . '/' . $relativePath;
+        if (is_file($path) || is_link($path)) {
+            $files[] = $path;
+        } elseif (file_exists($path)) {
+            addWarning($warnings, 'obsolete path is not a regular file and was not removed: ' . $path);
+        }
+    }
+    return $files;
 }
 
 function serializeDocument($doc)
@@ -1095,6 +1163,25 @@ if ($options['sites']) {
     }
 }
 
+// Installation-wide maintenance belongs only to a real main-config migration.
+// In particular, demo conversions using --output-dir must never modify or
+// copy unrelated files from the active Kangle installation.
+$maintenanceEnabled = $options['main'] && $options['output_dir'] === null;
+$cleanupPaths = array();
+if ($maintenanceEnabled) {
+    try {
+        foreach (discoverPhpExtensionConfigs($options['kangle_dir'], $globalWarnings) as $file) {
+            if (!isset($inputs[$file])) {
+                $inputs[$file] = 'php';
+            }
+        }
+        $cleanupPaths = discoverObsoleteInstallationFiles($options['kangle_dir'], $globalWarnings);
+    } catch (Exception $e) {
+        fwrite(STDERR, 'error: ' . $e->getMessage() . "\n");
+        exit(1);
+    }
+}
+
 $templateDoc = null;
 if (is_file($options['template'])) {
     try {
@@ -1126,6 +1213,11 @@ foreach ($inputs as $path => $type) {
         $ordered[$path] = $type;
     }
 }
+foreach ($inputs as $path => $type) {
+    if ($type === 'php') {
+        $ordered[$path] = $type;
+    }
+}
 
 $hadError = false;
 foreach ($ordered as $path => $type) {
@@ -1136,6 +1228,8 @@ foreach ($ordered as $path => $type) {
         $doc = loadXmlFile($path, $raw, $warnings);
         if ($type === 'access') {
             migrateAccessDocument($doc, $stats, $warnings, $allModules);
+        } elseif ($type === 'php') {
+            migratePhpExtensionDocument($doc, $stats, $warnings);
         } else {
             migrateMainDocument($doc, $templateDoc, $options, $allModules, $stats, $warnings);
         }
@@ -1179,9 +1273,12 @@ foreach ($plans as $plan) {
         fwrite(STDERR, '[WARN] ' . $plan['path'] . ': ' . $warning . "\n");
     }
 }
-
 if ($options['dry_run']) {
-    fwrite(STDOUT, "Dry run complete: {$changedCount} file(s) would change; no files were written.\n");
+    foreach ($cleanupPaths as $path) {
+        fwrite(STDOUT, '[REMOVE] ' . $path . " (obsolete installation file)\n");
+    }
+    $operationCount = $changedCount + count($cleanupPaths);
+    fwrite(STDOUT, "Dry run complete: {$operationCount} file operation(s) would run; nothing was changed.\n");
     exit(0);
 }
 
@@ -1197,6 +1294,8 @@ foreach ($plans as $plan) {
 
 $backups = array();
 $temporaries = array();
+$renamed = array();
+$removed = array();
 try {
     if ($options['output_dir'] === null) {
         foreach ($writePlans as $plan) {
@@ -1210,14 +1309,8 @@ try {
     foreach ($writePlans as $index => $plan) {
         $temporaries[$index] = prepareTemporaryFile($plan['target'], $plan['content'], $plan['path']);
     }
-    $renamed = array();
     foreach ($writePlans as $index => $plan) {
         if (!@rename($temporaries[$index], $plan['target'])) {
-            foreach ($renamed as $source => $backup) {
-                if ($backup !== null) {
-                    @copy($backup, $source);
-                }
-            }
             throw new RuntimeException("cannot replace {$plan['target']}");
         }
         unset($temporaries[$index]);
@@ -1228,9 +1321,25 @@ try {
         }
         fwrite(STDOUT, "\n");
     }
+    foreach ($cleanupPaths as $path) {
+        $backup = uniqueBackupPath($path, $options['backup_suffix']);
+        if (!@rename($path, $backup)) {
+            throw new RuntimeException("cannot remove obsolete file {$path}");
+        }
+        $removed[$path] = $backup;
+        fwrite(STDOUT, '[REMOVE] ' . $path . ' (backup: ' . $backup . ")\n");
+    }
 } catch (Exception $e) {
     foreach ($temporaries as $temporary) {
         @unlink($temporary);
+    }
+    foreach (array_reverse($removed, true) as $source => $backup) {
+        @rename($backup, $source);
+    }
+    foreach ($renamed as $source => $backup) {
+        if ($backup !== null) {
+            @copy($backup, $source);
+        }
     }
     fwrite(STDERR, '[ERROR] ' . $e->getMessage() . "\n");
     fwrite(STDERR, "Migration write failed; original files were retained or restored from backups.\n");
@@ -1256,5 +1365,5 @@ if ($options['reload']) {
     }
 }
 
-fwrite(STDOUT, 'Migration complete: ' . count($writePlans) . " file(s) written.\n");
+fwrite(STDOUT, 'Migration complete: ' . count($writePlans) . ' file(s) written, ' . count($removed) . " obsolete file(s) removed.\n");
 exit(0);

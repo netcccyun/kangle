@@ -1,5 +1,6 @@
 #include "KInputFilter.h"
 #include "KMultiPartInputFilter.h"
+#include "KHttpRequest.h"
 #include "utils.h"
 #include "http.h"
 #include "KUrlParser.h"
@@ -196,14 +197,17 @@ static void input_filter_context_cleanup(void* data) {
 	delete (KInputFilterContext*)data;
 }
 KInputFilterContext* get_input_filter_context(KREQUEST rq, kgl_access_context* ctx) {
-	auto pool = dso_version->pool->get_request_pool(rq);
-	auto filter_ctx = dso_version->pool->cleanup_insert(pool, input_filter_context_cleanup);
-	KInputFilterContext *fc = (KInputFilterContext *)dso_version->pool->cleanup_get_data(filter_ctx);
+	auto* request = static_cast<KHttpRequest*>(rq);
+	auto filter_ctx = kgl_cleanup_insert(request->sink->pool, input_filter_context_cleanup);
+	if (!filter_ctx) {
+		return nullptr;
+	}
+	KInputFilterContext *fc = (KInputFilterContext *)kgl_cleanup_get_data(filter_ctx);
 	if (fc != NULL) {
 		return fc;
 	}
 	fc = new KInputFilterContext;
-	dso_version->pool->cleanup_set_data(filter_ctx, fc);
+	kgl_cleanup_set_data(filter_ctx, fc);
 	ctx->f->support_function(rq, ctx->cn, KF_REQ_IN_FILTER, &input_filter, (void **)&fc);
 	return fc;
 }
