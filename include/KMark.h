@@ -30,6 +30,15 @@ public:
 	virtual KMark* new_instance() = 0;
 	/* return KF_STATUS_REQ_FALSE, KF_STATUS_REQ_TRUE,KF_STATUS_REQ_FINISHED */
 	virtual uint32_t process(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo) = 0;
+	/*
+	 * Most marks run before the chain action is selected.  Response-body marks
+	 * need to defer that action until body data is available, so they can
+	 * override this overload and return KF_STATUS_REQ_DEFERRED.
+	 */
+	virtual uint32_t process_with_chain(KHttpRequest* rq, KHttpObject* obj,
+		KSafeSource& fo, kgl_jump_type chain_jump_type) {
+		return process(rq, obj, fo);
+	}
 protected:
 	virtual ~KMark() {
 	}

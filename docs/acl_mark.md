@@ -33,7 +33,7 @@ ACL 是条件匹配模块，Mark 是命中规则时执行的处理模块。它�
 
 - `BEGIN`：请求或响应阶段的入口表。
 - `POSTMAP`：仅响应规则使用，在 URL 已映射为物理文件后执行，适合文件类 ACL。
-- 常用动作：`allow`、`deny`、`drop`、`continue`、`return`（别名 `default`）、`table:名称`、`server:名称`、`wback:名称`、`proxy`。
+- 常用动作：`allow`、`deny`、`drop`、`continue`、`return`（别名 `default`）、`table:名称`、`server:名称`、`wback:名称`、`proxy`。请求侧的 `drop` 不发送状态行、响应头或正文，直接关闭客户端连接，效果类似 Nginx 的非标准 `return 444`。
 - 根级请求规则还可使用 `vhs`、`api:名称`、`cmd:名称`、`dso:扩展:处理器`。这些全局跳转在 `<vh>` 内的局部规则中不可用。
 - `tablechain:表:序号` 是管理界面使用的内部跳链格式，不建议手写。
 
@@ -218,6 +218,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | 模块 | 阶段 | 主要参数 | 用途 |
 | --- | --- | --- | --- |
 | `cache_control` | 响应 | `max_age`、`force`、`static`、`must_revalidate` | 设置缓存寿命，或在相应构建中强制缓存。 |
+| `guest_cache` | 响应 | `max_age`、`last_modified`、`soft`、`must_revalidate`、`skip_set_cookie` | 将已标记为访客的不可缓存响应转为访客缓存；默认拒绝缓存带 `Set-Cookie` 的响应。 |
 | `response_flag` | 响应 | `flagvalue` | 逗号分隔：`compress`、`nocache`、`nodiskcache`、`cache_response`、`identity_encoding`。兼容值 `gzip` 等同 `compress`。 |
 | `flag` | 请求/响应 | 多个布尔属性、`clear`、`age` | 设置请求处理标志，详见下一节。 |
 | `min_obj_verified` | 请求 | `v`、`hard` | 设置大对象验证阈值。 |
@@ -259,6 +260,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | `timeout` | 请求/响应 | `v` | 设置额外超时周期计数（`0`～`255`）；每个周期使用全局读写超时，并非直接填写秒数。 |
 | `connection_close` | 请求/响应 | 无 | 强制本次响应后关闭连接。 |
 | `status_code` | 请求 | `code` | 直接以指定的 `200`～`599` 状态码结束当前请求，并调用对应错误页；应配合 `allow` 动作使用。 |
+| `status_code` | 响应 | `code` | 修改源站或本地响应的状态码，保留原响应正文；不会重新进入错误页处理。 |
 | `black_list` | 请求 | `enable`、`time_out` | 把客户端加入黑名单；需黑名单功能。 |
 | `check_black_list` | 请求 | `enable` | 检查黑名单；需黑名单功能。 |
 | `ip_url_rate` | 请求 | `request`、`second`、`block_time` | 速率超限后按 IP/URL 处理；需黑名单功能。 |
@@ -291,6 +293,37 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 ```
 
 `status_code` 会在读取缓存或源站内容前直接生成响应，后续 Mark 不再执行，因此应放在链的最后。全局请求控制使用全局 `<vhs>` 下的错误页；虚拟主机请求控制在 `403`～`499` 范围内会使用该虚拟主机配置或继承的错误页，其他状态码使用全局错误页。无效或超出范围的 `code` 会安全回退为 `403`。
+
+### 正文和 URL 过滤
+
+| 模块 | 阶段 | 主要参数 | 用途 |
+| --- | --- | --- | --- |
+| `replace_content` | 响应 | `content`、`replace`、`nc`、`charset`、`buffer`、`mark_acl`、`mark_mark`、`replaced_stop` | 正则替换响应正文，支持捕获组和请求变量展开。 |
+| `content` | 响应 | `content`/元素文本、`charset`、`buffer` | 正则扫描响应正文；命中后执行所在链的动作。旧源码类名为 `KRegContentMark`，配置模块名一直是 `content`。 |
+| `replace_url` | 响应 | `src`、`dst`、`nc`、`location` | 改写 HTML 标签中的 URL；默认同时改写 3xx `Location`。 |
+| `fix_header` | 响应 | `header` | 对起点大于 0 的 Range 响应，在正文前补充 URL 编码的字节串。 |
+| `url_range` | 请求 | `range_from`、`range_to` | 从完整 URL 的正则捕获组生成单段 `Range: bytes=from-to` 请求头。 |
+
+`replace_content` 和 `content` 的 `buffer` 是跨网络数据块部分匹配的最大暂存量，默认 `1M`，安全上限为 `16M`。超过限制时会记录警告并放弃当前跨块匹配，避免恶意或异常正则导致内存无限增长。`replace_content@replaced_stop='1'` 保持旧行为：第一次命中后只输出替换结果并丢弃其余正文。
+
+`content` 是延迟判定模块。链动作是 `continue` 或 `allow` 时只记录命中并继续输出；`deny`、`drop`、跳表等其他动作命中后会中止正文输出。它应作为所在链的最后一个 Mark，避免把正文阶段的判定与需要在响应头阶段完成的 Mark 混合。
+
+示例：
+
+```xml
+<response action='allow'>
+    <table name='BEGIN'>
+        <chain action='continue'>
+            <acl module='header' header='Content-Type' val='^text/html' nc='1'/>
+            <mark module='replace_content' content='http://old\.example/'
+                  replace='https://www.example/' nc='1' buffer='1M'/>
+        </chain>
+        <chain action='deny'>
+            <mark module='content' buffer='1M'><![CDATA[malware-pattern]]></mark>
+        </chain>
+    </table>
+</response>
+```
 
 ## 常见完整示例
 

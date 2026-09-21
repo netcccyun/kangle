@@ -179,6 +179,7 @@ typedef struct _kgl_async_http
 
 
 #define KF_STATUS_REQ_FINISHED  (1<<31)
+#define KF_STATUS_REQ_DEFERRED  (1<<30) /* chain action is handled by a body filter */
 #define KF_STATUS_REQ_TRUE		1 /* check result true */
 #define KF_STATUS_REQ_FALSE     0 /* check result false*/
 

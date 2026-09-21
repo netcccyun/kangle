@@ -67,6 +67,7 @@
  LANG_ACTION="action"
  LANG_MODEL0="deny"
  LANG_DENY="deny"
+ LANG_DROP="drop"
  LANG_MODEL1="allow"
  LANG_ALLOW="allow"
  LANG_CONTINUE="continue"

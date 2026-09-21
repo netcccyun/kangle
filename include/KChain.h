@@ -38,6 +38,7 @@ public:
 	~KChain();
 	uint32_t match(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo) {
 		uint32_t result = KF_STATUS_REQ_TRUE;
+		bool deferred = false;
 		bool last_or = false;
 		//OR NEXT
 		for (auto it = acls.begin(); it != acls.end(); ++it) {
@@ -60,10 +61,14 @@ public:
 				last_or = (*it).is_or;
 				continue;
 			}
-			result = (*it).m->process(rq, obj, fo);
+			result = (*it).m->process_with_chain(rq, obj, fo, jump_type);
 			if (KBIT_TEST(result, KF_STATUS_REQ_FINISHED)) {
 				++hit_count;
 				return result;
+			}
+			if (KBIT_TEST(result, KF_STATUS_REQ_DEFERRED)) {
+				deferred = true;
+				KBIT_CLR(result, KF_STATUS_REQ_DEFERRED);
 			}
 			result = (!!result != (*it).revers) ? KF_STATUS_REQ_TRUE : KF_STATUS_REQ_FALSE;
 			last_or = (*it).is_or;
@@ -75,10 +80,10 @@ public:
 				return KF_STATUS_REQ_TRUE;
 			}
 		}
-		if (result) {
+		if (result && !deferred) {
 			++hit_count;
 		}
-		return result;
+		return result && deferred ? (KF_STATUS_REQ_TRUE | KF_STATUS_REQ_DEFERRED) : result;
 	}
 	void parse_config(KAccess* access, const khttpd::KXmlNodeBody* xml);
 	void get_acl_short_html(KWStream& s);

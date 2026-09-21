@@ -61,6 +61,8 @@
 #include "KFastcgiFetchObject.h"
 #include "KRewriteMark.h"
 #include "KCacheControlMark.h"
+#include "KGuestCacheMark.h"
+#include "KContentFilterMarks.h"
 #include "KRedirectMark.h"
 #include "KAuthMark.h"
 #include "KMultiHostAcl.h"
@@ -119,6 +121,7 @@
 #include "KCounterMark.h"
 #include "KStatusCodeAcl.h"
 #include "KStatusCodeMark.h"
+#include "KResponseStatusCodeMark.h"
 #include "KPerIpAcl.h"
 #include "KTimeoutMark.h"
 #include "KKeepConnectionAcl.h"
@@ -318,10 +321,11 @@ void KAccess::loadModel() {
 	addAclModel(RESPONSE, new KContentLengthAcl());
 	addAclModel(RESPONSE, new KStatusCodeAcl());
 	addMarkModel(RESPONSE, new KCacheControlMark());
-	//addMarkModel(RESPONSE, new KGuestCacheMark());
-	//addMarkModel(RESPONSE,new KRegContentMark());
+	addMarkModel(RESPONSE, new KGuestCacheMark());
+	addMarkModel(RESPONSE, new KRegContentMark());
 	addMarkModel(RESPONSE, new KResponseFlagMark());
 	addMarkModel(RESPONSE, new KExtendFlagMark());
+	addMarkModel(RESPONSE, new KResponseStatusCodeMark());
 
 	acl = new KMarkAcl();
 	acl->add_ref();
@@ -378,8 +382,8 @@ void KAccess::loadModel() {
 #endif
 	addAclModel(REQUEST, new KIpRateAcl());
 	addMarkModel(REQUEST, new KMultiServerMark());
-	//addMarkModel(RESPONSE,new KReplaceUrlMark());
-	//addMarkModel(REQUEST_RESPONSE,new KFixHeaderMark());
+	addMarkModel(RESPONSE, new KReplaceUrlMark());
+	addMarkModel(RESPONSE, new KFixHeaderMark());
 	addMarkModel(REQUEST, new KGeoMark());
 #endif
 #ifdef ENABLE_BLACK_LIST
@@ -403,9 +407,9 @@ void KAccess::loadModel() {
 	addMarkModel(REQUEST_RESPONSE, new KRemoveHeaderMark());
 	addMarkModel(REQUEST_RESPONSE, new KReplaceHeaderMark());
 	addMarkModel(REQUEST_RESPONSE, new KTimeoutMark());
-	//addMarkModel(RESPONSE,new KFooterMark());
-	//addMarkModel(RESPONSE,new KReplaceContentMark());
-	//addMarkModel(REQUEST,new KUrlRangeMark());
+	// footer is provided by filter.${dso}.
+	addMarkModel(RESPONSE, new KReplaceContentMark());
+	addMarkModel(REQUEST, new KUrlRangeMark());
 	addMarkModel(REQUEST, new KMarkMark());
 #ifdef ENABLE_STAT_STUB
 	addMarkModel(REQUEST, new KStubStatusMark());
@@ -998,6 +1002,14 @@ void KAccess::htmlChainAction(KWStream& s, kgl_jump_type jump_type, KJump* jump,
 	}
 	s << " value='deny' name=jump_type>" << LANG_DENY;
 	jump_value++;
+	if (type == REQUEST) {
+		s << "\n<input type=radio ";
+		if (jump_type == JUMP_DROP) {
+			s << "checked";
+		}
+		s << " value='drop' name=jump_type>" << klang["LANG_DROP"];
+		jump_value++;
+	}
 	if (skipTable.size() > 0) {
 		s << "<input type=radio ";
 		if (jump_type == JUMP_RETURN) {

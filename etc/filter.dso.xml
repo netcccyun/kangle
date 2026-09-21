@@ -1,4 +1,0 @@
-<!--#start 1 -->
-<config>
-	<dso_extend name="filter" filename="bin/filter.${dso}" />
-</config>

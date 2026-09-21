@@ -24,6 +24,20 @@
 
 数字越小越先加载，主配置文件的默认顺序为 `100`。多个文件中的同名对象（例如带相同 `name` 的 `server` 或 `vh`）会按配置树规则合并或覆盖，因此建议给扩展文件分配明确且不重复的顺序。
 
+### 旧版 XML 配置迁移
+
+可在源码目录使用 `tools/migrate-config.sh` 将旧版主配置以及站点 `access.xml` 转换为当前格式。默认处理 `/vhs/kangle/etc/config.xml`， `/home/ftp/*/*/access.xml`：
+
+```sh
+# 先预览，不写文件
+./tools/migrate-config.sh --dry-run
+
+# 转换、为每个变更文件创建带时间戳的备份，并平滑重载
+./tools/migrate-config.sh --reload
+```
+
+脚本会把旧的 `acl_xxx`/`mark_xxx` 节点、根级超时/线程/防火墙配置和旧版错误页属性转换为新格式，补充 Filter、WebDAV、WHM 及当前资源配置。写入前会先解析全部目标文件；任何一个文件无效时不会修改其他文件。可用 `--config`、`--ftp-root`、`--access-file` 和 `--output-dir` 在副本上测试或只转换指定文件。
+
 ## 最小配置
 
 ```xml

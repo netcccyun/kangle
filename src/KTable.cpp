@@ -82,6 +82,10 @@ kgl_jump_type KTable::match(KHttpRequest* rq, KHttpObject* obj, unsigned& checke
 		for (size_t i = 0; i < vec.size(); ++i) {
 			auto&& chain = vec[i];
 			uint32_t result = chain->match(rq, obj, fo);
+			if (KBIT_TEST(result, KF_STATUS_REQ_DEFERRED)) {
+				/* The body filter owns this chain's eventual action. */
+				continue;
+			}
 			if (fo) {
 				return chain->jump_type;
 			}
@@ -187,6 +191,9 @@ void KTable::htmlTable(KWStream& s, const char* vh, u_short accessType) {
 			switch (chain->jump_type) {
 			case JUMP_DENY:
 				s << LANG_DENY;
+				break;
+			case JUMP_DROP:
+				s << klang["LANG_DROP"];
 				break;
 			case JUMP_ALLOW:
 				s << LANG_ALLOW;

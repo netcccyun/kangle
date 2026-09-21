@@ -67,6 +67,7 @@
  LANG_ACTION="目标"
  LANG_MODEL0="拒绝"
  LANG_DENY="拒绝"
+ LANG_DROP="断开"
  LANG_MODEL1="接受"
  LANG_ALLOW="接受"
  LANG_CONTINUE="继续"

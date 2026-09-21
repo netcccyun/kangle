@@ -283,6 +283,12 @@ void start_request_fiber(KSink* sink, int header_length) {
 	jump_type = kaccess[REQUEST]->check(&rq, NULL, fo);
 	switch (jump_type) {
 	case JUMP_DROP:
+		/* A drop action is the equivalent of nginx's non-standard 444:
+		 * close the client connection without sending an HTTP response. */
+		KBIT_SET(rq.sink->data.flags, RQ_CONNECTION_CLOSE);
+		if (fo) {
+			fo = nullptr;
+		}
 		goto clean;
 	case JUMP_DENY:
 		if (fo) {

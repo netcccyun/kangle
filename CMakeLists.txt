@@ -224,11 +224,6 @@ if (NOT HTTP_PROXY)
         RUNTIME DESTINATION bin 
         LIBRARY DESTINATION bin
     )
-    # Load the input-filter DSO from an extension fragment so both fresh
-    # installations and upgrades with an existing config.xml discover it.
-    install(FILES
-        ${KANGLE_DIR}/etc/filter.dso.xml
-        DESTINATION ext)
 endif()
 add_subdirectory(module/webdav)
 add_subdirectory(test/test_child)

@@ -19,10 +19,25 @@ func (a *access) Init() error {
 	server.Handle("/access/auth", handle_auth)
 	server.Handle("/access/digest", handle_auth)
 	server.Handle("/status-code", handleStatusCode)
+	server.Handle("/filters/replace-content", handleLegacyFilter)
+	server.Handle("/filters/replace-url", handleLegacyFilter)
+	server.Handle("/filters/replace-location", handleLegacyFilter)
+	server.Handle("/filters/content-deny", handleLegacyFilter)
+	server.Handle("/filters/status", handleLegacyFilter)
+	server.Handle("/filters/range", handleLegacyFilter)
+	server.Handle("/filters/url-range/", handleLegacyFilter)
+	server.Handle("/filters/guest-cache", handleGuestCache)
 
 	config := `<!--#start 300-->\r\n
 <config>
-<dso_extend name='filter' filename='bin/filter.${dso}'/>
+	<request>
+		<table name='BEGIN'>
+			<chain action='drop'>
+				<acl_path path='/drop-no-response'/>
+			</chain>
+		</table>
+	</request>
+	<dso_extend name='filter' filename='bin/filter.${dso}'/>
 <vh name='access' doc_root='www'  inherit='on' app='1' access='-'>	
 	<map path='/' extend='server:upstream' confirm_file='0' allow_method='*'/>
 	<request>
@@ -31,6 +46,14 @@ func (a *access) Init() error {
 				<acl_path path='/status-code'/>
 				<acl_header header='X-Test-Status-Code' val='^1$'/>
 				<mark_status_code code='451'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/url-range/*'/>
+				<mark_url_range range_from='url-range/([0-9]+)-([0-9]+)' range_to=''/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/guest-cache'/>
+				<mark_flag guest='1'/>
 			</chain>
 			<chain  action='continue' >
 					<mark_rewrite prefix='/' path='^rw(.*)$' dst='/wr$1' internal='0' nc='1' qsa='1' code='302'></mark_rewrite>
@@ -61,6 +84,34 @@ func (a *access) Init() error {
 	</request>
 	<response >
 		<table name='BEGIN'>
+			<chain action='continue'>
+				<acl_path path='/filters/replace-content'/>
+				<mark_replace_content content='foo([0-9]+)' replace='bar$1' buffer='1m'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/replace-url'/>
+				<mark_replace_url src='^http://old\.test/(.*)$' dst='https://new.test/$1'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/replace-location'/>
+				<mark_replace_url src='^http://old\.test/(.*)$' dst='https://new.test/$1'/>
+			</chain>
+			<chain action='deny'>
+				<acl_path path='/filters/content-deny'/>
+				<mark_content buffer='1m'><![CDATA[blocked-value]]></mark_content>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/status'/>
+				<mark_status_code code='418'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/range'/>
+				<mark_fix_header header='%48%44%52'/>
+			</chain>
+			<chain action='continue'>
+				<acl_path path='/filters/guest-cache'/>
+				<mark_guest_cache max_age='60' skip_set_cookie='1'/>
+			</chain>
 			<chain  action='continue' >
 				<acl_path  path='/footer'></acl_path>
 				<mark_footer ><![CDATA[footer]]></mark_footer>
@@ -86,5 +137,7 @@ func init() {
 	s.AddCase("header", "header测试", check_header)
 	s.AddCase("auth", "http auth", check_http_auth)
 	s.AddCase("status_code", "HTTP状态码标记测试", check_status_code)
+	s.AddCase("drop", "请求控制无响应断开连接测试", check_drop)
+	s.AddCase("legacy_filters", "旧版回应过滤规则兼容测试", check_legacy_filters)
 	suite.Register(s)
 }
