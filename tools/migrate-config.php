@@ -22,7 +22,7 @@ Default operation:
   - converts /home/ftp/\*/\*/access.xml (site-root files only);
   - updates every /vhs/kangle/ext/php*/config.xml <cmd> lifetime;
   - removes obsolete built-in JS/WebP/WAF test files and vh_db.xml;
-  - creates a timestamped backup beside every changed file.
+  - does not create backups or roll back completed operations on failure.
 
 Options:
   --kangle-dir DIR      Kangle installation directory (default: /vhs/kangle)
@@ -34,7 +34,6 @@ Options:
   --no-sites            Do not scan --ftp-root
   --dry-run             Parse and report changes without writing files
   --output-dir DIR      Write converted copies below DIR instead of replacing
-  --backup-suffix TEXT  Backup suffix (default: .bak.YYYYmmdd-HHMMSS)
   --reload              Run "bin/kangle -r" after a successful in-place update
   -h, --help            Show this help
 
@@ -65,7 +64,6 @@ function parseArguments($argv)
         'sites' => true,
         'dry_run' => false,
         'output_dir' => null,
-        'backup_suffix' => '.bak.' . date('Ymd-His'),
         'reload' => false,
     );
 
@@ -75,7 +73,6 @@ function parseArguments($argv)
         '--template' => 'template',
         '--ftp-root' => 'ftp_root',
         '--output-dir' => 'output_dir',
-        '--backup-suffix' => 'backup_suffix',
     );
 
     for ($i = 1; $i < count($argv); ++$i) {
@@ -146,10 +143,6 @@ function parseArguments($argv)
     }
     if ($options['output_dir'] !== null) {
         $options['output_dir'] = rtrim($options['output_dir'], '/');
-    }
-    if ($options['backup_suffix'] === '' || strpos($options['backup_suffix'], '/') !== false || strpos($options['backup_suffix'], "\0") !== false) {
-        fwrite(STDERR, "error: invalid --backup-suffix\n");
-        exit(2);
     }
     if (!$options['main'] && !$options['sites'] && count($options['access_files']) === 0) {
         fwrite(STDERR, "error: no input files were selected\n");
@@ -679,7 +672,7 @@ function migrateFirewall($doc, $root, &$stats, &$warnings)
         }
     }
     if (!$firewall->hasAttribute('bl_time')) {
-        $firewall->setAttribute('bl_time', '0');
+        $firewall->setAttribute('bl_time', '1800');
         bump($stats, 'filled firewall attributes', 1);
     }
     if (!$firewall->hasAttribute('wl_time')) {
@@ -1094,17 +1087,6 @@ function formatStats($stats)
     return implode(', ', $parts);
 }
 
-function uniqueBackupPath($path, $suffix)
-{
-    $candidate = $path . $suffix;
-    $index = 0;
-    while (file_exists($candidate) || is_link($candidate)) {
-        ++$index;
-        $candidate = $path . $suffix . '.' . $index;
-    }
-    return $candidate;
-}
-
 function prepareTemporaryFile($target, $content, $sourceForMetadata)
 {
     $directory = dirname($target);
@@ -1292,20 +1274,9 @@ foreach ($plans as $plan) {
     $writePlans[] = $plan;
 }
 
-$backups = array();
 $temporaries = array();
-$renamed = array();
-$removed = array();
+$removedCount = 0;
 try {
-    if ($options['output_dir'] === null) {
-        foreach ($writePlans as $plan) {
-            $backup = uniqueBackupPath($plan['path'], $options['backup_suffix']);
-            if (!@copy($plan['path'], $backup)) {
-                throw new RuntimeException("cannot create backup {$backup}");
-            }
-            $backups[$plan['path']] = $backup;
-        }
-    }
     foreach ($writePlans as $index => $plan) {
         $temporaries[$index] = prepareTemporaryFile($plan['target'], $plan['content'], $plan['path']);
     }
@@ -1314,35 +1285,21 @@ try {
             throw new RuntimeException("cannot replace {$plan['target']}");
         }
         unset($temporaries[$index]);
-        $renamed[$plan['path']] = isset($backups[$plan['path']]) ? $backups[$plan['path']] : null;
-        fwrite(STDOUT, '[WRITE] ' . $plan['target']);
-        if (isset($backups[$plan['path']])) {
-            fwrite(STDOUT, ' (backup: ' . $backups[$plan['path']] . ')');
-        }
-        fwrite(STDOUT, "\n");
+        fwrite(STDOUT, '[WRITE] ' . $plan['target'] . "\n");
     }
     foreach ($cleanupPaths as $path) {
-        $backup = uniqueBackupPath($path, $options['backup_suffix']);
-        if (!@rename($path, $backup)) {
+        if (!@unlink($path)) {
             throw new RuntimeException("cannot remove obsolete file {$path}");
         }
-        $removed[$path] = $backup;
-        fwrite(STDOUT, '[REMOVE] ' . $path . ' (backup: ' . $backup . ")\n");
+        ++$removedCount;
+        fwrite(STDOUT, '[REMOVE] ' . $path . "\n");
     }
 } catch (Exception $e) {
     foreach ($temporaries as $temporary) {
         @unlink($temporary);
     }
-    foreach (array_reverse($removed, true) as $source => $backup) {
-        @rename($backup, $source);
-    }
-    foreach ($renamed as $source => $backup) {
-        if ($backup !== null) {
-            @copy($backup, $source);
-        }
-    }
     fwrite(STDERR, '[ERROR] ' . $e->getMessage() . "\n");
-    fwrite(STDERR, "Migration write failed; original files were retained or restored from backups.\n");
+    fwrite(STDERR, "Migration stopped; completed writes and removals were not rolled back.\n");
     exit(1);
 }
 
@@ -1358,12 +1315,12 @@ if ($options['reload']) {
         $command = escapeshellarg($binary) . ' -r';
         passthru($command, $reloadStatus);
         if ($reloadStatus !== 0) {
-            fwrite(STDERR, "[ERROR] Kangle reload failed with status {$reloadStatus}; backups are available for rollback.\n");
+            fwrite(STDERR, "[ERROR] Kangle reload failed with status {$reloadStatus}.\n");
             exit(1);
         }
         fwrite(STDOUT, "Kangle configuration reloaded successfully.\n");
     }
 }
 
-fwrite(STDOUT, 'Migration complete: ' . count($writePlans) . ' file(s) written, ' . count($removed) . " obsolete file(s) removed.\n");
+fwrite(STDOUT, 'Migration complete: ' . count($writePlans) . ' file(s) written, ' . $removedCount . " obsolete file(s) removed.\n");
 exit(0);

@@ -11,7 +11,7 @@
 	<fiber stack_size='0'/>
 	<dns worker='8'/>
 	<io worker='2' max='0' buffer='256K'/>
-	<firewall bl_time='0' wl_time='1800'/>
+	<firewall bl_time='1800' wl_time='1800'/>
 	<path_info>1</path_info>
 	<log level='3' rotate_size='100M' error_rotate_size='100M' logs_size='2G'/>
 	<!--
