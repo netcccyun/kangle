@@ -496,7 +496,8 @@ KGL_RESULT KHttpRequest::open_next(KFetchObject* fo, kgl_input_stream* in, kgl_o
 		} else
 #endif
 			result = fo->Open(this, in, out);
-		if (KBIT_TEST(sink->data.flags, RQ_HAS_SEND_HEADER | RQ_HAS_READ_POST)) {
+		if (KBIT_TEST(sink->data.flags, RQ_HAS_SEND_HEADER) ||
+			(KBIT_TEST(sink->data.flags, RQ_HAS_READ_POST) && !ctx.request_body_replayable)) {
 			return result;
 		}
 		if (result != KGL_NEXT) {

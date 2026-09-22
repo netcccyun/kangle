@@ -121,6 +121,8 @@ public:
 		//client主动关闭
 		uint32_t read_huped : 1;
 		uint32_t upstream_expected_done : 1;
+		/* Bytes read during request ACL evaluation are fully replayable. */
+		uint32_t request_body_replayable : 1;
 		//precondition类型
 		uint32_t precondition_flag : 3;
 		int64_t left_read;	//final fetchobj 使用
@@ -277,7 +279,8 @@ public:
 		return fo_head;
 	}
 	bool continue_next_source(KGL_RESULT result) {
-		if (KBIT_TEST(sink->data.flags, RQ_HAS_SEND_HEADER | RQ_HAS_READ_POST | RQ_NEXT_CALLED)) {
+		if (KBIT_TEST(sink->data.flags, RQ_HAS_SEND_HEADER | RQ_NEXT_CALLED) ||
+			(KBIT_TEST(sink->data.flags, RQ_HAS_READ_POST) && !ctx.request_body_replayable)) {
 			//has touched input/output stream.
 			//or open_next called.
 			return false;

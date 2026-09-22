@@ -413,6 +413,28 @@ static KGL_RESULT support_function(
 		in_filter->tee_body((kgl_request_body_ctx*)*ret, NULL, NULL);
 		return KGL_ENO_DATA;
 	}
+	case KF_REQ_BODY_REPLAY:
+	{
+		kgl_request_body_replay* replay = (kgl_request_body_replay*)data;
+		if (replay == nullptr || replay->size < sizeof(kgl_request_body_replay)) {
+			return KGL_EINVALID_PARAMETER;
+		}
+		switch (replay->state) {
+		case KGL_REQUEST_BODY_REPLAY_QUERY:
+			return KGL_OK;
+		case KGL_REQUEST_BODY_REPLAY_READY:
+			if (!rq->ctx.in_body || !KBIT_TEST(rq->sink->data.flags, RQ_HAS_READ_POST)) {
+				return KGL_ENOT_READY;
+			}
+			rq->ctx.request_body_replayable = 1;
+			return KGL_OK;
+		case KGL_REQUEST_BODY_REPLAY_CONSUMING:
+			rq->ctx.request_body_replayable = 0;
+			return KGL_OK;
+		default:
+			return KGL_EINVALID_PARAMETER;
+		}
+	}
 	default:
 		return base_support_function(rq, req, data, ret);
 	}
