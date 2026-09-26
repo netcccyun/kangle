@@ -662,6 +662,25 @@ bool KBaseVirtualHost::on_config_event(kconfig::KConfigTree* tree, kconfig::KCon
 			this->indexFiles.swap(indexs);
 			return true;
 		}
+		if (xml->is_tag(_KS("env"))) {
+			std::map<char*, char*, lessp_icase> new_envs;
+			for (auto&& body : xml->body) {
+				for (const auto& item : body->attributes) {
+					if (new_envs.find((char*)item.first.c_str()) == new_envs.end()) {
+						new_envs.emplace(xstrdup(item.first.c_str()), xstrdup(item.second.c_str()));
+					}
+			}
+			}
+			{
+				auto locker = get_locker();
+				new_envs.swap(envs);
+			}
+			for (auto& item : new_envs) {
+				xfree(item.first);
+				xfree(item.second);
+			}
+			return true;
+		}
 		if (xml->is_tag(_KS("map_file"))) {
 			auto locker = get_locker();
 			auto& attr2 = xml->attributes();
@@ -731,6 +750,15 @@ bool KBaseVirtualHost::on_config_event(kconfig::KConfigTree* tree, kconfig::KCon
 		if (xml->is_tag(_KS("index"))) {
 			auto locker = this->get_locker();
 			this->indexFiles.clear();
+			return true;
+		}
+		if (xml->is_tag(_KS("env"))) {
+			auto locker = get_locker();
+			for (auto& item : envs) {
+				xfree(item.first);
+				xfree(item.second);
+			}
+			envs.clear();
 			return true;
 		}
 		if (xml->is_tag(_KS("alias"))) {

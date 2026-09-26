@@ -99,6 +99,10 @@ public:
 	void getAllGroupTemplete(std::list<KString>& templates);
 	bool getAllTempleteVh(const char* group_template, std::list<KString>& templates);
 	void inheritTemplateAttributes(KXmlAttribute& attributes);
+	void getTemplateEvents(const KXmlAttribute& attributes,
+		std::vector<KString>& init_events,
+		std::vector<KString>& update_events,
+		std::vector<KString>& destroy_events);
 	uint64_t getTemplateGeneration();
 	KVirtualHost* refsVirtualHostByName(const KString& name);
 	kserver* RefsServer(u_short port);
@@ -138,6 +142,9 @@ private:
 	std::map<KString, std::map<KString, unsigned int> > vh_templates;
 	struct KVhTemplateCompatInfo {
 		KXmlAttribute attributes;
+		std::vector<KString> init_events;
+		std::vector<KString> update_events;
+		std::vector<KString> destroy_events;
 	};
 	std::map<KString, KVhTemplateCompatInfo> vh_template_config;
 	uint64_t vh_template_generation = 0;

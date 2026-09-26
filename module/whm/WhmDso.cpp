@@ -154,6 +154,12 @@ static BOOL whmHasVh(void* param) {
 	}
 	return FALSE;
 }
+static void whmRedirect(void* param, const char* package, const char* call) {
+	WhmContext* ctx = (WhmContext*)param;
+	KStringBuf event;
+	event << package << ":" << call;
+	ctx->redirect(event.c_str());
+}
 static void whmFree(void* ctx, void* ptr) {
 	free(ptr);
 }
@@ -219,7 +225,7 @@ int WhmDso::call(const char* callName, const char* eventType,
 	if (WhmCall == NULL) {
 		return WHM_CALL_NOT_FOUND;
 	}
-	WHM_CONTEXT whmCtx;
+	WHM_CONTEXT whmCtx{};
 	whmCtx.ctx = (void*)context;
 	whmCtx.getUrl = whmGetUrlValue;
 	whmCtx.getVh = whmGetVhValue;
@@ -227,6 +233,7 @@ int WhmDso::call(const char* callName, const char* eventType,
 	whmCtx.setError = whmSetError;
 	whmCtx.setValue = whmSetValue;
 	whmCtx.hasVh = whmHasVh;
+	whmCtx.redirect = whmRedirect;
 	whmCtx.ServerSupportFunction = whmServerSupportFunction;
 	whmCtx.free = whmFree;
 	return WhmCall(callName, eventType, &whmCtx);

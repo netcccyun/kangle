@@ -81,6 +81,9 @@ public:
 	}
 	void dump_info(kgl::serializable *s);
 	bool parse_xml(const khttpd::KXmlNodeBody* body, KVirtualHost* ov);
+	void initEvent(KVirtualHostEvent* ctx) const;
+	void updateEvent(KVirtualHostEvent* ctx) const;
+	void destroyEvent(KVirtualHostEvent* ctx) const;
 	bool on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) override;
 	kconfig::KConfigEventFlag config_flag() const override {
 		return kconfig::ev_subdir;
@@ -285,6 +288,9 @@ public:
 	KFetchObject* findFileExtRedirect(KHttpRequest* rq, KFileName* file, bool fileExsit, bool& result);
 	//KFetchObject *findDefaultRedirect(KHttpRequest *rq,KFileName *file,bool fileExsit);
 	KString name;
+	std::vector<KString> template_init_events;
+	std::vector<KString> template_update_events;
+	std::vector<KString> template_destroy_events;
 
 #ifdef ENABLE_BASED_PORT_VH
 	std::list<KString> binds;

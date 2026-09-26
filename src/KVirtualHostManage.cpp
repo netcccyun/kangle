@@ -132,6 +132,24 @@ bool KVirtualHostManage::on_template_config_event(kconfig::KConfigTree* tree, kc
 	return true;
 }
 
+static void collect_template_events(const khttpd::KXmlNode* xml, const char* tag,
+	size_t tag_len, std::vector<KString>& events) {
+	auto event_nodes = kconfig::find_child(xml->get_first(), tag, tag_len);
+	if (!event_nodes) {
+		return;
+	}
+	for (uint32_t index = 0;; ++index) {
+		auto body = event_nodes->get_body(index);
+		if (!body) {
+			break;
+		}
+		auto event = body->attributes["event"];
+		if (!event.empty()) {
+			events.push_back(event);
+		}
+	}
+}
+
 void KVirtualHostManage::updateTemplateIndex(const khttpd::KXmlNode* xml, bool add) {
 	if (!xml) {
 		return;
@@ -153,7 +171,14 @@ void KVirtualHostManage::updateTemplateIndex(const khttpd::KXmlNode* xml, bool a
 	auto guard = locker();
 	if (add) {
 		++vh_templates[group][sub];
-		vh_template_config[name].attributes = xml->attributes();
+		auto& info = vh_template_config[name];
+		info.attributes = xml->attributes();
+		info.init_events.clear();
+		info.update_events.clear();
+		info.destroy_events.clear();
+		collect_template_events(xml, _KS("init_event"), info.init_events);
+		collect_template_events(xml, _KS("update_event"), info.update_events);
+		collect_template_events(xml, _KS("destroy_event"), info.destroy_events);
 		++vh_template_generation;
 		return;
 	}
@@ -175,6 +200,42 @@ void KVirtualHostManage::updateTemplateIndex(const khttpd::KXmlNode* xml, bool a
 		}
 	}
 	++vh_template_generation;
+}
+
+void KVirtualHostManage::getTemplateEvents(const KXmlAttribute& attributes,
+	std::vector<KString>& init_events, std::vector<KString>& update_events,
+	std::vector<KString>& destroy_events) {
+	init_events.clear();
+	update_events.clear();
+	destroy_events.clear();
+	KString current = attributes["templete"];
+	if (!current.empty() && !attributes["subtemplete"].empty()) {
+		current += ":";
+		current += attributes["subtemplete"];
+	}
+	std::vector<const KVhTemplateCompatInfo*> chain;
+	auto guard = locker();
+	for (int depth = 0; depth < 32 && !current.empty(); ++depth) {
+		auto it = vh_template_config.find(current);
+		if (it == vh_template_config.end()) {
+			break;
+		}
+		chain.push_back(&it->second);
+		current = it->second.attributes["templete"];
+		if (!current.empty() && !it->second.attributes["subtemplete"].empty()) {
+			current += ":";
+			current += it->second.attributes["subtemplete"];
+		}
+	}
+	// Legacy templates ran parent callbacks before child callbacks for init and
+	// update, and in the opposite order for destroy.
+	for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
+		init_events.insert(init_events.end(), (*it)->init_events.begin(), (*it)->init_events.end());
+		update_events.insert(update_events.end(), (*it)->update_events.begin(), (*it)->update_events.end());
+	}
+	for (auto info : chain) {
+		destroy_events.insert(destroy_events.end(), info->destroy_events.begin(), info->destroy_events.end());
+	}
 }
 
 void KVirtualHostManage::inheritTemplateAttributes(KXmlAttribute& attributes) {

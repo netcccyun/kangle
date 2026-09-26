@@ -650,6 +650,8 @@ void KVirtualHost::dump_info(kgl::serializable* s) {
 bool KVirtualHost::parse_xml(const khttpd::KXmlNodeBody* body, KVirtualHost* ov) {
 
 	auto attr = body->attr();
+	conf.gvm->getTemplateEvents(attr, template_init_events,
+		template_update_events, template_destroy_events);
 	conf.gvm->inheritTemplateAttributes(attr);
 	envs.clear();
 	parseEnv(attr("envs"));
@@ -758,6 +760,28 @@ bool KVirtualHost::parse_xml(const khttpd::KXmlNodeBody* body, KVirtualHost* ov)
 		}
 	}
 	return true;
+}
+
+static void redirect_vh_template_events(KVirtualHostEvent* ctx,
+	const std::vector<KString>& events) {
+	if (!ctx) {
+		return;
+	}
+	for (const auto& event : events) {
+		ctx->redirect(event.c_str());
+	}
+}
+
+void KVirtualHost::initEvent(KVirtualHostEvent* ctx) const {
+	redirect_vh_template_events(ctx, template_init_events);
+}
+
+void KVirtualHost::updateEvent(KVirtualHostEvent* ctx) const {
+	redirect_vh_template_events(ctx, template_update_events);
+}
+
+void KVirtualHost::destroyEvent(KVirtualHostEvent* ctx) const {
+	redirect_vh_template_events(ctx, template_destroy_events);
 }
 bool KVirtualHost::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) {
 	if (KBaseVirtualHost::on_config_event(tree, ev)) {

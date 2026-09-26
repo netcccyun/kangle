@@ -509,6 +509,11 @@ int WhmCore::call_reload_vh(const char* call_name, const char* event_type, WhmCo
 		return WHM_OK;
 	}
 
+	const bool deleting = strcmp(call_name, "del_vh") == 0;
+	const bool destroy = deleting &&
+		(uv->get("destroy") == "1" || strcasecmp(uv->get("destroy").c_str(), "true") == 0);
+	KVirtualHost* old_vh = destroy ? conf.gvm->refsVirtualHostByName(name) : nullptr;
+
 	KStringBuf config_name;
 	config_name << "@vhd|"_CS << name;
 	auto config_ref = kstring_from2(config_name.c_str(), config_name.size());
@@ -521,18 +526,28 @@ int WhmCore::call_reload_vh(const char* call_name, const char* event_type, WhmCo
 		kconfig::reload();
 	}
 
-	// EasyPanel creates module-less hosts (notably CDN hosts) by asking the
-	// legacy reload_vh call to run the template initialization event.  The
-	// new configuration loader no longer retains template event objects, so
-	// preserve that WHM contract explicitly.  Refresh the context first: a
-	// newly-created virtual host did not exist when the request was parsed.
+	if (deleting) {
+		if (destroy && old_vh) {
+			ctx->buildVh(old_vh);
+			old_vh->destroyEvent(ctx);
+		}
+		return WHM_OK;
+	}
+
+	KVirtualHost* vh = conf.gvm->refsVirtualHostByName(name);
+	if (!vh) {
+		ctx->setStatus("cann't find such vh after reload");
+		return WHM_CALL_FAILED;
+	}
+	ctx->buildVh(vh);
 	KString init = uv->get("init");
 	if (init == "1" || strcasecmp(init.c_str(), "true") == 0) {
-		if (!ctx->buildVh() || ctx->getVh() == nullptr) {
-			ctx->setStatus("cann't find such vh after reload");
-			return WHM_CALL_FAILED;
-		}
-		ctx->redirect("vhost.whm:init_vh");
+		vh->initEvent(ctx);
+#ifndef HTTP_PROXY
+		conf.gam->killAllProcess(vh);
+#endif
+	} else {
+		vh->updateEvent(ctx);
 	}
 	return WHM_OK;
 }
