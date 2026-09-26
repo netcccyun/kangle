@@ -264,9 +264,9 @@ void upgrade_vh_xml(khttpd::KXmlNode* node) {
 		}
 		new_node_body->attributes.insert(body->attributes.begin(), body->attributes.end());
 		new_node_body->childs.swap(body->childs);
+		new_node_body->child_order.swap(body->child_order);
 	}
-	map_node->release();
-	node_body->childs.erase(it);
+	node_body->remove_child(&map_node->key);
 }
 void upgrade_chain_access(const kgl_ref_str_t& access, khttpd::KXmlNode* node) {
 	node = kconfig::find_child(node->get_first(), access.data, access.len);
@@ -288,16 +288,14 @@ void upgrade_chain_access(const kgl_ref_str_t& access, khttpd::KXmlNode* node) {
 						body->clone_to(new_module);
 						new_module->attributes.emplace(KString(_KS("module")), KString(module_node->key.tag->data + 4, module_node->key.tag->len - 4));
 					}
-					module_node->release();
-					module->childs.erase(it2);
+					module->remove_child(&module_node->key);
 				} else if (kgl_ncasecmp(module_node->key.tag->data, module_node->key.tag->len, _KS("mark_")) == 0) {
 					for (auto&& body : module_node->body) {
 						auto new_module = kconfig::new_child(module, _KS("mark"));
 						body->clone_to(new_module);
 						new_module->attributes.emplace(KString(_KS("module")), KString(module_node->key.tag->data + 5, module_node->key.tag->len - 5));
 					}
-					module_node->release();
-					module->childs.erase(it2);
+					module->remove_child(&module_node->key);
 				}
 				it2 = it_next;
 			}

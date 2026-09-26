@@ -403,8 +403,7 @@ void KVirtualHostDatabase::scan(kconfig::KConfigFileScanInfo* info) {
 		auto name2 = name.reset();
 		KString vh_name(attr("name"));
 		info->new_file(name2.data(), vh_name.data(), KFileModified(time(NULL),0), false);
-		body->attributes.clear();
-		body->childs.clear();
+		body->clear();
 	}
 
 #if 0

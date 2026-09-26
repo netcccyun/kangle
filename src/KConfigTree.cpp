@@ -1101,13 +1101,13 @@ namespace kconfig {
 			auto tag = it2->value();
 			key.tag_id = tag->tag_id;
 		}
-		int new_flag;
-		auto it = node->childs.insert(&key, &new_flag);
-		if (new_flag) {
-			khttpd::KXmlNode* child_node = new khttpd::KXmlNode(&key);
-			it->value(child_node);
+		auto child_node = node->find_child(&key);
+		if (!child_node) {
+			khttpd::KSafeXmlNode new_node(new khttpd::KXmlNode(&key));
+			node->add(new_node.get(), khttpd::last_pos);
+			child_node = node->find_child(&key);
 		}
-		return it->value();
+		return child_node;
 	}
 	khttpd::KXmlNode* find_child(const khttpd::KXmlNodeBody* node, const char* name, size_t len) {
 		khttpd::KXmlKey key(name, len);
@@ -1393,6 +1393,21 @@ namespace kconfig {
 		register_qname(_KS("a"));
 		register_qname(_KS("b"));
 		register_qname(_KS("c"));
+		char order_xml_text[] = "<config><a id='1'/><b/><a id='2'/><c/></config>";
+		auto order_xml = parse_xml(order_xml_text);
+		assert(order_xml);
+		auto assert_document_order = [](const khttpd::KXmlNodeBody* body) {
+			assert(body->child_order.size() == 4);
+			assert(body->child_order[0].node->is_tag(_KS("a")));
+			assert(body->child_order[0].body->attributes.get_int("id") == 1);
+			assert(body->child_order[1].node->is_tag(_KS("b")));
+			assert(body->child_order[2].node->is_tag(_KS("a")));
+			assert(body->child_order[2].body->attributes.get_int("id") == 2);
+			assert(body->child_order[3].node->is_tag(_KS("c")));
+		};
+		assert_document_order(order_xml->get_first());
+		auto order_xml_clone = order_xml->clone();
+		assert_document_order(order_xml_clone->get_first());
 		KConfigTree test_ev(nullptr, _KS("config"));
 		test_config_context ctx;
 		memset(&ctx, 0, sizeof(ctx));
