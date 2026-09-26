@@ -908,10 +908,6 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
     ensureNamedRootNode($doc, $root, 'api', 'whm', array('file' => 'buildin:whm'), $stats);
 
     if (isset($modules['anti_cc']) || isset($modules['anti_session'])) {
-        if (!firstDirectByAttribute($root, 'dso_extend', 'name', 'kwaf') && !extensionConfigContains($options['kangle_dir'] . '/ext', 'kwaf')) {
-            ensureNamedRootNode($doc, $root, 'dso_extend', 'kwaf', array('filename' => 'bin/kwaf.${dso}'), $stats);
-            addWarning($warnings, 'anti_cc rules require kwaf; a kwaf dso_extend entry was added because no ext/*.xml loader was found');
-        }
         if (!is_file($options['kangle_dir'] . '/bin/kwaf.so') && !is_file($options['kangle_dir'] . '/bin/kwaf.dll')) {
             addWarning($warnings, 'anti_cc rules were found but kwaf binary is not installed under KANGLE_DIR/bin');
         }
