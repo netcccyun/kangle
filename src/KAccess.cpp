@@ -20,6 +20,8 @@
 #include <climits>
 #include "KAccess.h"
 #include <map>
+#include <set>
+#include <mutex>
 #include "KChain.h"
 #include "whm.h"
 #include "WhmContext.h"
@@ -142,9 +144,13 @@ using namespace std;
 KAccess* kaccess[2] = { 0 };
 std::map<KString, KAcl*> KAccess::acl_factorys[2];
 std::map<KString, KMark*> KAccess::mark_factorys[2];
+static std::mutex access_registry_lock;
+static std::set<KAccess*> access_registry;
 
 void bind_access_config(kconfig::KConfigTree* tree, KAccess* access) {
-	if (tree->add(_KS(""), access) != nullptr) {
+	auto access_tree = tree->add(_KS(""), access);
+	if (access_tree != nullptr) {
+		access->set_config_tree(access_tree);
 		access->add_ref();
 	}
 	return;
@@ -158,8 +164,14 @@ KAccess::KAccess(bool is_global, uint8_t type) {
 	this->global_flag = is_global;
 	this->type = type;
 	ref = 1;
+	std::lock_guard<std::mutex> guard(access_registry_lock);
+	access_registry.insert(this);
 }
 KAccess::~KAccess() {
+	{
+		std::lock_guard<std::mutex> guard(access_registry_lock);
+		access_registry.erase(this);
+	}
 	inter_destroy();
 	kfiber_rwlock_destroy(rwlock);
 }
@@ -199,6 +211,171 @@ bool KAccess::is_table_used(const KString& table_name) {
 		return table->get_ref() > refs;
 	}
 	return false;
+}
+static bool validate_table_name(const KString& name, KString& error) {
+	if (name.size() < 2 || name.size() > 16) {
+		error = LANG_TABLE_NAME_LENGTH_ERROR;
+		return false;
+	}
+	if (name.find('/') != KString::npos || name.find('#') != KString::npos) {
+		error = LANG_TABLE_NAME_ERR;
+		return false;
+	}
+	return true;
+}
+bool KAccess::has_table(const KString& name) {
+	auto lock = read_lock();
+	return tables.find(name) != tables.end();
+}
+bool KAccess::can_create_table(const KString& name, KString& error) {
+	if (!validate_table_name(name, error)) {
+		return false;
+	}
+	auto lock = read_lock();
+	if (tables.find(name) != tables.end()) {
+		error = LANG_TABLE_NAME_IS_USED;
+		return false;
+	}
+	return true;
+}
+bool KAccess::can_delete_table(const KString& name, KString& error) {
+	auto lock = read_lock();
+	auto it = tables.find(name);
+	if (it == tables.end() || name == BEGIN_TABLE ||
+		(type == RESPONSE && name == "POSTMAP")) {
+		error = LANG_TABLE_NAME_ERR;
+		return false;
+	}
+	auto table = it->second.get();
+	int base_refs = 2;
+	if (table == begin.get() || table == post_map.get()) {
+		++base_refs;
+	}
+	if (table->get_ref() > base_refs) {
+		error = LANG_TABLE_REFS_ERR;
+		return false;
+	}
+	if (!table->chains.empty()) {
+		error = LANG_TABLE_NOT_EMPTY;
+		return false;
+	}
+	return true;
+}
+bool KAccess::can_rename_table(const KString& from, const KString& to, KString& error) {
+	if (!validate_table_name(to, error)) {
+		return false;
+	}
+	if (from.empty() || from == BEGIN_TABLE || (type == RESPONSE && from == "POSTMAP")) {
+		error = "invalid table name";
+		return false;
+	}
+	auto lock = read_lock();
+	auto source = tables.find(from);
+	if (source == tables.end()) {
+		error = "table not found";
+		return false;
+	}
+	if (tables.find(to) != tables.end()) {
+		error = "table name is used";
+		return false;
+	}
+	return true;
+}
+bool KAccess::prepare_chain_name(const KString& table_name, const KString& file,
+	uint16_t index, uint32_t id, bool name_provided, KString& name, KString& error) {
+	auto lock = read_lock();
+	auto table_it = tables.find(table_name);
+	if (table_it == tables.end()) {
+		error = "table not found";
+		return false;
+	}
+	auto current = table_it->second->find_chain(file, index, id);
+	if (!current) {
+		error = "rule not found";
+		return false;
+	}
+	if (!name_provided && !current->name.empty()) {
+		name = current->name;
+	}
+	if (name.empty()) {
+		return true;
+	}
+	for (auto&& chain_file : table_it->second->chains) {
+		for (auto&& chain : chain_file.second) {
+			if (chain.get() != current && chain->name == name) {
+				error = "rule name is already used in this table";
+				return false;
+			}
+		}
+	}
+	return true;
+}
+bool KAccess::references_table(const KTable* target) {
+	auto lock = read_lock();
+	if (default_jump.get() == target) {
+		return true;
+	}
+	for (auto&& table : tables) {
+		for (auto&& chain_file : table.second->chains) {
+			for (auto&& chain : chain_file.second) {
+				if (chain->jump.get() == target) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+bool KAccess::rename_table(const KString& from, const KString& to, KString& error) {
+	if (!can_rename_table(from, to, error)) {
+		return false;
+	}
+	KSafeTable target;
+	{
+		auto lock = read_lock();
+		target = tables.find(from)->second;
+	}
+	std::vector<KAccess*> accesses;
+	{
+		std::lock_guard<std::mutex> guard(access_registry_lock);
+		for (auto access : access_registry) {
+			access->add_ref();
+			accesses.push_back(access);
+		}
+	}
+	defer(for (auto access : accesses) { access->release(); });
+	std::map<kconfig::KConfigTree*, bool> trees;
+	if (!config_tree) {
+		error = "table configuration source is unavailable";
+		return false;
+	}
+	trees[config_tree] = true;
+	for (auto access : accesses) {
+		if (!access->references_table(target.get())) {
+			continue;
+		}
+		if (!access->config_tree) {
+			error = "referencing configuration source is unavailable";
+			return false;
+		}
+		if (access != this && access->has_table(to)) {
+			error = "renamed table conflicts with a table in a referencing virtual host";
+			return false;
+		}
+		trees.emplace(access->config_tree, access == this);
+	}
+	std::vector<kconfig::KConfigTableRename> rename_trees;
+	for (auto&& tree : trees) {
+		rename_trees.push_back({ tree.first, tree.second });
+	}
+	auto result = kconfig::rename_table(rename_trees, from, to);
+	if (result != kconfig::KConfigResult::Success) {
+		error = result == kconfig::KConfigResult::ErrSaveFile
+			? "cannot save one of the table configuration source files"
+			: "cannot rename table in its source configuration file";
+		return false;
+	}
+	return true;
 }
 void KAccess::remove_all_factorys() {
 	for (int i = 0; i < 2; ++i) {
@@ -484,7 +661,7 @@ void KAccess::add_chain_form(KWStream& s, const char* vh, const KString& table_n
 	s << "}\n};\n";
 	s << "function downmodel(model,mark){\n";
 	s << "	window.location='/downmodel?vh=" << vh << "&access_type=" << type << "&table_name="
-		<< table_name << "&id=" << id
+		<< table_name << "&file=" << file << "&index=" << index << "&id=" << id
 		<< "&model='+model+'&mark='+mark;\n";
 	s << "};\n";
 	s << "function addmodel(model,mark){\n";
@@ -618,7 +795,7 @@ KString KAccess::htmlAccess(const char* vh) {
 		"function tablerename(access_type,name_from){"
 		"	tbl = prompt('" << LANG_RENAME_TABLE_INPUT_MSG << "',name_from);"
 		"	if(tbl==null){ return; }"
-		"	window.location='tablerename?vh=" << vh << "&access_type='+access_type+'&name_from='+name_from+'&name_to='+tbl;"
+		"	window.location='tablerename?vh=" << vh << "&access_type='+access_type+'&name_from='+encodeURIComponent(name_from)+'&name_to='+encodeURIComponent(tbl);"
 		"}"
 		"</script>";
 	s << "<span>";
@@ -1025,6 +1202,12 @@ void KAccess::htmlChainAction(KWStream& s, kgl_jump_type jump_type, KJump* jump,
 	}
 	//CONTINUE
 	if (showTable) {
+		s << "\n<input type=radio ";
+		if (jump_type == JUMP_ALLOW) {
+			s << "checked";
+		}
+		s << " value='allow' name=jump_type>" << LANG_ALLOW;
+		jump_value++;
 		s << "\n<input type=radio ";
 		if (jump_type == JUMP_CONTINUE) {
 			s << "checked";

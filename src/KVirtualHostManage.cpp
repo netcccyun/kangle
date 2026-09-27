@@ -1126,6 +1126,7 @@ void KVirtualHostManage::getAllVhHtml(KWStream& s) {
 		"	}"
 		"</script>\r\n";
 	s << "[<a href='/vhlist?id=4'>" << klang["new_vh"] << "</a>] ";
+	s << avh.size();
 	s << "<table border=1><tr><td>" << LANG_OPERATOR << "</td><td>" << LANG_NAME << "</td>";
 	s << "<td>" << klang["vh_host"] << "</td><td>" << klang["doc_root"] << "</td>";
 #ifdef ENABLE_VH_RUN_AS

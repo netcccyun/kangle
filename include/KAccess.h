@@ -120,6 +120,15 @@ public:
 	bool parseChainAction(const KString& action, kgl_jump_type& jumpType, KString& jumpName);
 	static void buildChainAction(kgl_jump_type jumpType, const KSafeJump& jump, KWStream& s);
 	bool is_table_used(const KString& table_name);
+	bool can_create_table(const KString& name, KString& error);
+	bool can_delete_table(const KString& name, KString& error);
+	bool can_rename_table(const KString& from, const KString& to, KString& error);
+	bool rename_table(const KString& from, const KString& to, KString& error);
+	bool prepare_chain_name(const KString& table_name, const KString& file,
+		uint16_t index, uint32_t id, bool name_provided, KString& name, KString& error);
+	void set_config_tree(kconfig::KConfigTree* tree) {
+		config_tree = tree;
+	}
 	bool isGlobal();
 public:
 	KString htmlAccess(const char* vh = "");
@@ -169,7 +178,10 @@ private:
 	std::map<KString, KSafeTable> tables;
 	std::map<KString, KSafeNamedModel> named_acls;
 	std::map<KString, KSafeNamedModel> named_marks;
+	kconfig::KConfigTree* config_tree = nullptr;
 	KSafeTable get_table(const KString& table_name,bool always_new=true);
+	bool references_table(const KTable* table);
+	bool has_table(const KString& name);
 	std::vector<KString> getTableNames(KString skipName, bool show_global);
 };
 using KSafeAccess = KSharedObj<KAccess>;

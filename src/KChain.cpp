@@ -62,9 +62,12 @@ void KChain::get_edit_html(kgl::serializable* s) {
 	}
 }
 void KChain::get_edit_html(KWStream& s, u_short accessType) {
+	s << "<input type='hidden' name='chain_name_present' value='1'>";
+	s << "<tr><td>name</td><td><input type='text' name='name' value='" << name << "'";
+	s << "></td></tr>";
 	int index = 0;
 	for (auto it = acls.begin(); it != acls.end(); ++it) {
-		getModelHtml((*it), s, 0, index);
+		getModelHtml((*it), s, 0, index, static_cast<size_t>(index + 1) < acls.size());
 		index++;
 	}
 	s << "<tr><td>" << klang["available_acls"] << "</td><td>";
@@ -81,7 +84,7 @@ void KChain::get_edit_html(KWStream& s, u_short accessType) {
 	s << "</td></tr>\n";
 	index = 0;
 	for (auto it = marks.begin(); it != marks.end(); ++it) {
-		getModelHtml((*it), s, 1, index);
+		getModelHtml((*it), s, 1, index, static_cast<size_t>(index + 1) < marks.size());
 		index++;
 	}
 	//?mark
@@ -158,7 +161,7 @@ void KChain::get_acl_short_html(KWStream& s) {
 		s << ((*it).revers ? "!" : "") << (*it).m->get_module() << ": ";
 		(*it).m->get_display(s);
 		if ((*it).is_or) {
-			s << " [OR]";
+			s << " [OR NEXT]";
 		}
 		s << "<br>";
 	}
@@ -171,7 +174,7 @@ void KChain::get_mark_short_html(KWStream& s) {
 		s << ((*it).revers ? "!" : "") << (*it).m->get_module() << ": ";
 		(*it).m->get_display(s);
 		if ((*it).is_or) {
-			s << " [OR]";
+			s << " [OR NEXT]";
 		}
 		s << "<br>";
 	}

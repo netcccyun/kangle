@@ -151,12 +151,23 @@ void KTable::dump_chain(kgl::serializable* s) {
 }
 void KTable::htmlTable(KWStream& s, const char* vh, u_short accessType) {
 	s << name << "," << LANG_REFS << get_ref();
-	s << "[<a href=\"javascript:if(confirm('" << LANG_CONFIRM_DELETE << name
-		<< "')){ window.location='tabledel?vh=" << vh << "&access_type=" << accessType
-		<< "&table_name=" << name << "';}\">" << LANG_DELETE << "</a>]";
+	if (name != BEGIN_TABLE && !(accessType == RESPONSE && name == "POSTMAP")) {
+		s << "[<a href=\"javascript:if(confirm('" << LANG_CONFIRM_DELETE << name
+			<< "')){ window.location='tabledel?vh=" << vh << "&access_type=" << accessType
+			<< "&table_name=" << name << "';}\">" << LANG_DELETE << "</a>]";
+	}
+	s << "[<a href=\"javascript:if(confirm('" << LANG_CONFIRM_EMPTY << name
+		<< "')){ window.location='tableempty?vh=" << vh << "&access_type=" << accessType
+		<< "&table_name=" << name << "';}\">" << LANG_EMPTY << "</a>]";
+	if (name != BEGIN_TABLE && !(accessType == RESPONSE && name == "POSTMAP")) {
+		s << "[<a href=\"javascript:tablerename(" << accessType << ",'" << name << "');\">"
+			<< LANG_RENAME << "</a>]";
+	}
 	s << "<table border=1 cellspacing=0 width=100%><tr>";
 	s << "<td>" << LANG_OPERATOR << "</td>";
-	s << "<td>" << LANG_ACTION << "</td><td>acl</td><td>mark</td><td>";
+	s << "<td>" << klang["id"] << "</td>";
+	s << "<td>" << LANG_ACTION << "</td><td>" << klang["acl"] << "</td><td>"
+		<< klang["mark"] << "</td><td>";
 	s << LANG_HIT_COUNT << "</td></tr>\n";
 	int id = 0;
 	KString last_file;
@@ -187,6 +198,17 @@ void KTable::htmlTable(KWStream& s, const char* vh, u_short accessType) {
 				<< "&id=" << j
 				<< "&table_name=" << name
 				<< "'>" << LANG_INSERT << "</a>]";
+			if (j + 1 < chain_file.second.size()) {
+				s << "[<a href='/downchain?vh=" << vh
+					<< "&file=" << chain_file.first.name
+					<< "&access_type=" << accessType
+					<< "&id=" << j << "&table_name=" << name
+					<< "'>down</a>]";
+			}
+			s << "</td><td>" << id++;
+			if (!chain->name.empty()) {
+				s << " " << chain->name;
+			}
 			s << "</td><td>";
 			switch (chain->jump_type) {
 			case JUMP_DENY:

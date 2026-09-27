@@ -2,6 +2,7 @@
 #define KURLVALUE_H_
 #include<map>
 #include<string>
+#include<vector>
 #include "KXmlAttribute.h"
 #include "KXmlDocument.h"
 #include "KConfigTree.h"
@@ -48,7 +49,9 @@ public:
 	{
 		return attribute[name];
 	}
-	std::multimap<KString,KUrlValue *> subs;
+	// Rule modules must retain their form order; sorting by module name changes
+	// ACL and mark evaluation order whenever a rule is edited.
+	std::vector<std::pair<KString, KUrlValue *>> subs;
 };
 
 #endif /*KURLVALUE_H_*/

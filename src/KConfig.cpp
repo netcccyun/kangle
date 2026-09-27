@@ -572,10 +572,14 @@ static void init_config() {
 	kconfig::listen(_KS("firewall"), &firewall_config_listener);
 #endif
 	auto ev_root = kconfig::find(_KS(""));
-	if (ev_root->add(_KS("request"), kaccess[REQUEST]) != nullptr) {
+	auto request_tree = ev_root->add(_KS("request"), kaccess[REQUEST]);
+	if (request_tree != nullptr) {
+		kaccess[REQUEST]->set_config_tree(request_tree);
 		kaccess[REQUEST]->add_ref();
 	}
-	if (ev_root->add(_KS("response"), kaccess[RESPONSE]) != nullptr) {
+	auto response_tree = ev_root->add(_KS("response"), kaccess[RESPONSE]);
+	if (response_tree != nullptr) {
+		kaccess[RESPONSE]->set_config_tree(response_tree);
 		kaccess[RESPONSE]->add_ref();
 	}
 }

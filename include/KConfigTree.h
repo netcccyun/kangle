@@ -2,6 +2,7 @@
 #define KCONFIGTREE_H_INCLUDED
 #include <map>
 #include <string>
+#include <vector>
 #include "krbtree.h"
 #include "kmalloc.h"
 #include "KXmlDocument.h"
@@ -267,6 +268,11 @@ namespace kconfig {
 		bool save();
 		void update(khttpd::KSafeXmlNode new_nodes);
 		bool update(const char* name, size_t size, uint32_t index, khttpd::KXmlNode* xml, KConfigEventType ev_type);
+		bool move_down(const char* path, size_t size, uint32_t index);
+		bool rename_table(const char* path, size_t size, const KString& new_name);
+		khttpd::KSafeXmlNode clone_nodes() const {
+			return nodes ? nodes->clone() : nullptr;
+		}
 		void set_last_modified(const KFileModified& last_modified) {
 			this->last_modified = last_modified;
 			need_save = 0;
@@ -341,6 +347,14 @@ namespace kconfig {
 
 	KConfigResult add(const kgl_ref_str_t& file, const kgl_ref_str_t& path, uint32_t index, khttpd::KXmlNode* xml);
 	KConfigResult update(const kgl_ref_str_t& file, const kgl_ref_str_t& path, uint32_t index, khttpd::KXmlNode* xml, KConfigEventType ev_type);
+	KConfigResult move_down(const kgl_ref_str_t& file, const kgl_ref_str_t& path, uint32_t index);
+	KConfigResult rename_table(const kgl_ref_str_t& path, const KString& new_name);
+	struct KConfigTableRename {
+		KConfigTree* access_tree;
+		bool rename_definition;
+	};
+	KConfigResult rename_table(const std::vector<KConfigTableRename>& accesses,
+		const KString& old_name, const KString& new_name);
 	KConfigTree* find(const char** name, size_t* size);
 	KConfigTree* find(const char* name, size_t size);
 	KConfigTree* remove_config_file(const kgl_ref_str_t* name);

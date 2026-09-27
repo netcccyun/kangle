@@ -99,17 +99,20 @@ private:
 	void get_edit_html(kgl::serializable* s);
 	void get_edit_html(KWStream& s, u_short accessType);
 	template<typename T>
-	void getModelHtml(KModelPtr<T> &ptr, KWStream& s, int type, int index) {
+	void getModelHtml(KModelPtr<T> &ptr, KWStream& s, int type, int index, bool can_move_down) {
 		s << "<tr><td><input type=hidden name='begin_sub_form' value='"
 			<< (type == 0 ? "acl_"_CS : "mark_"_CS)
 			<< ptr.m->get_module() << "'>";
 		s << "[<a href=\"javascript:delmodel('" << index << "'," << type << ");\">del</a>]";
+		if (can_move_down) {
+			s << "[<a href=\"javascript:downmodel('" << index << "'," << type << ");\">down</a>]";
+		}
 		if (ptr.named.empty()) {
 			s << "<input type = checkbox name = 'or' value = '1' ";
 			if (ptr.is_or) {
 				s << "checked";
 			}
-			s << ">OR";
+			s << ">OR NEXT";
 			s << "<input type=checkbox name='revers' value='1' ";
 			if (ptr.revers) {
 				s << "checked";

@@ -354,6 +354,209 @@ namespace kconfig {
 		size -= name_len;
 		return update_xml_node(nodes, name, size, index, xml, ev_type);
 	}
+	static bool move_xml_node_down(khttpd::KXmlNodeBody* nodes, const char* path, size_t size, uint32_t index) {
+		while (size && *path == '/') {
+			++path;
+			--size;
+		}
+		if (!size) {
+			return false;
+		}
+		const char* slash = (const char*)memchr(path, '/', size);
+		size_t segment_len = slash ? static_cast<size_t>(slash - path) : size;
+		const char* hash = (const char*)memchr(path, '#', segment_len);
+		size_t key_len = hash ? static_cast<size_t>(hash - path) : segment_len;
+		auto child = find_child(nodes, path, key_len);
+		if (!child) {
+			return false;
+		}
+		if (slash) {
+			uint32_t body_index = hash ? static_cast<uint32_t>(atoi(hash + 1)) : 0;
+			auto body = child->get_body(body_index);
+			return body && move_xml_node_down(body, slash + 1, size - segment_len - 1, index);
+		}
+		auto first = child->get_body_address(index);
+		auto second = index == UINT32_MAX ? nullptr : child->get_body_address(index + 1);
+		if (!first || !second) {
+			return false;
+		}
+		auto old_first = *first;
+		auto old_second = *second;
+		for (auto& entry : nodes->child_order) {
+			if (entry.node == child) {
+				if (entry.body == old_first) {
+					entry.body = old_second;
+				} else if (entry.body == old_second) {
+					entry.body = old_first;
+				}
+			}
+		}
+		std::swap(*first, *second);
+		return true;
+	}
+	static bool rename_xml_table(khttpd::KXmlNodeBody* nodes, const char* path, size_t size, const KString& new_name) {
+		while (size && *path == '/') {
+			++path;
+			--size;
+		}
+		if (!size) {
+			return false;
+		}
+		const char* slash = (const char*)memchr(path, '/', size);
+		size_t segment_len = slash ? static_cast<size_t>(slash - path) : size;
+		const char* hash = (const char*)memchr(path, '#', segment_len);
+		size_t key_len = hash ? static_cast<size_t>(hash - path) : segment_len;
+		auto child = find_child(nodes, path, key_len);
+		if (!child) {
+			return false;
+		}
+		if (slash) {
+			uint32_t body_index = hash ? static_cast<uint32_t>(atoi(hash + 1)) : 0;
+			auto body = child->get_body(body_index);
+			return body && rename_xml_table(body, slash + 1, size - segment_len - 1, new_name);
+		}
+		if (!child->is_tag(_KS("table")) || !child->key.vary) {
+			return false;
+		}
+		auto replacement = child->clone();
+		kstring_release(replacement->key.vary);
+		replacement->key.vary = kstring_from2(new_name.c_str(), new_name.size());
+		if (nodes->childs.find(&replacement->key)) {
+			return false;
+		}
+		for (uint32_t i = 0; i < replacement->get_body_count(); ++i) {
+			auto& attrs = replacement->get_body(i)->attributes;
+			attrs.erase("name"_CS);
+			attrs.emplace("name"_CS, new_name);
+		}
+		auto old_entry = nodes->childs.find(&child->key);
+		if (!old_entry) {
+			return false;
+		}
+		nodes->childs.erase(old_entry);
+		int inserted = 0;
+		auto new_entry = nodes->childs.insert(&replacement->key, &inserted);
+		if (!inserted) {
+			return false;
+		}
+		new_entry->value(replacement->add_ref());
+		for (auto& entry : nodes->child_order) {
+			if (entry.node != child) {
+				continue;
+			}
+			for (uint32_t i = 0; i < child->get_body_count(); ++i) {
+				if (entry.body == child->get_body(i)) {
+					entry.node = replacement.get();
+					entry.body = replacement->get_body(i);
+					break;
+				}
+			}
+		}
+		child->release();
+		return true;
+	}
+	static bool rewrite_table_action(KXmlAttribute& attributes,
+		const KString& old_name, const KString& new_name) {
+		KStringBuf old_action;
+		old_action << "table:" << old_name;
+		if (attributes["action"] != old_action.str()) {
+			return false;
+		}
+		KStringBuf new_action;
+		new_action << "table:" << new_name;
+		attributes.erase("action"_CS);
+		attributes.emplace("action"_CS, new_action.str());
+		return true;
+	}
+	static bool rewrite_access_table(khttpd::KXmlNodeBody* access,
+		const KString& old_name, const KString& new_name,
+		bool rename_definition, bool& found_definition) {
+		bool changed = rewrite_table_action(access->attributes, old_name, new_name);
+		for (auto table : access->childs) {
+			if (!table->is_tag(_KS("table"))) {
+				continue;
+			}
+			for (uint32_t table_index = 0;; ++table_index) {
+				auto table_body = table->get_body(table_index);
+				if (!table_body) {
+					break;
+				}
+				auto chains = find_child(table_body, _KS("chain"));
+				if (!chains) {
+					continue;
+				}
+				for (uint32_t chain_index = 0;; ++chain_index) {
+					auto chain = chains->get_body(chain_index);
+					if (!chain) {
+						break;
+					}
+					changed |= rewrite_table_action(chain->attributes, old_name, new_name);
+				}
+			}
+		}
+		if (!rename_definition) {
+			return changed;
+		}
+		KStringBuf table_path;
+		table_path << "table@" << old_name;
+		if (rename_xml_table(access, table_path.c_str(), table_path.size(), new_name)) {
+			found_definition = true;
+			changed = true;
+		}
+		return changed;
+	}
+	static khttpd::KXmlNode* find_xml_path(khttpd::KXmlNodeBody* nodes,
+		const char* path, size_t size) {
+		while (size && *path == '/') {
+			++path;
+			--size;
+		}
+		if (!size) {
+			return nullptr;
+		}
+		const char* slash = (const char*)memchr(path, '/', size);
+		size_t segment_len = slash ? static_cast<size_t>(slash - path) : size;
+		const char* hash = (const char*)memchr(path, '#', segment_len);
+		size_t key_len = hash ? static_cast<size_t>(hash - path) : segment_len;
+		auto child = find_child(nodes, path, key_len);
+		if (!child || !slash) {
+			return child;
+		}
+		uint32_t body_index = hash ? static_cast<uint32_t>(atoi(hash + 1)) : 0;
+		auto body = child->get_body(body_index);
+		return body ? find_xml_path(body, slash + 1, size - segment_len - 1) : nullptr;
+	}
+	static bool build_relative_config_path(KConfigFile* file, KConfigTree* tree, KString& path) {
+		std::vector<KConfigTree*> parts;
+		auto root = file->get_ev();
+		for (auto current = tree; current && current != root; current = current->parent) {
+			parts.push_back(current);
+		}
+		auto current = tree;
+		while (current && current != root) {
+			current = current->parent;
+		}
+		if (current != root) {
+			return false;
+		}
+		KStringBuf result;
+		for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+			auto key = &(*it)->key;
+			if (!key->tag || key->tag->len == 0) {
+				continue;
+			}
+			if (!result.empty()) {
+				result << "/";
+			}
+			result.write_all(key->tag->data, key->tag->len);
+			if (key->vary && key->vary->len > 0) {
+				result << "@";
+				result.write_all(key->vary->data, key->vary->len);
+			}
+		}
+		path = result.str();
+		return !path.empty();
+	}
 	iterator_ret config_tree_clean_iterator(void* data, void* argv) {
 		KConfigTree* rn = (KConfigTree*)data;
 		delete rn;
@@ -842,6 +1045,28 @@ namespace kconfig {
 			return false;
 		}
 		update(std::move(nodes));
+		return true;
+	}
+	bool KConfigFile::move_down(const char* path, size_t size, uint32_t index) {
+		if (!nodes) {
+			return false;
+		}
+		auto updated = nodes->clone();
+		if (!move_xml_node_down(updated->get_first(), path, size, index)) {
+			return false;
+		}
+		update(std::move(updated));
+		return true;
+	}
+	bool KConfigFile::rename_table(const char* path, size_t size, const KString& new_name) {
+		if (!nodes) {
+			return false;
+		}
+		auto updated = nodes->clone();
+		if (!rename_xml_table(updated->get_first(), path, size, new_name)) {
+			return false;
+		}
+		update(std::move(updated));
 		return true;
 	}
 	bool KConfigFile::save() {
@@ -1374,6 +1599,149 @@ namespace kconfig {
 		}
 		return update(file, path, index, xml, ev_type);
 	}
+	KConfigResult move_down(const kgl_ref_str_t& file_name, const kgl_ref_str_t& path, uint32_t index) {
+		KFiberLocker lock(locker);
+		auto file = find_file(file_name);
+		if (!file) {
+			klog(KLOG_ERR, "move config item failed: source [%.*s] was not found, path=[%.*s], index=%u\n",
+				(int)file_name.len, file_name.data, (int)path.len, path.data, index);
+			return KConfigResult::ErrNotFound;
+		}
+		if (!file->get_source_driver()->enable_save()) {
+			klog(KLOG_ERR, "move config item failed: source [%.*s] is read-only, path=[%.*s], index=%u\n",
+				(int)file_name.len, file_name.data, (int)path.len, path.data, index);
+			return KConfigResult::ErrSaveFile;
+		}
+		if (!file->move_down(path.data, path.len, index)) {
+			klog(KLOG_ERR, "move config item failed: path [%.*s] index=%u was not found in source [%.*s] (%s)\n",
+				(int)path.len, path.data, index, (int)file_name.len, file_name.data,
+				file->get_filename() ? file->get_filename()->data : "");
+			return KConfigResult::ErrNotFound;
+		}
+		if (!file->save()) {
+			klog(KLOG_ERR, "move config item failed: cannot save source [%.*s] (%s)\n",
+				(int)file_name.len, file_name.data, file->get_filename() ? file->get_filename()->data : "");
+			return KConfigResult::ErrSaveFile;
+		}
+		return KConfigResult::Success;
+	}
+	KConfigResult rename_table(const kgl_ref_str_t& path, const KString& new_name) {
+		KFiberLocker lock(locker);
+		const char* tree_path = path.data;
+		size_t tree_len = path.len;
+		auto tree = kconfig::find(&tree_path, &tree_len);
+		if (!tree || !tree->node || tree->node->next) {
+			return KConfigResult::ErrNotFound;
+		}
+		auto file = tree->node->file;
+		if (!file || !file->get_source_driver()->enable_save()) {
+			return KConfigResult::ErrSaveFile;
+		}
+		if (!file->rename_table(path.data, path.len, new_name)) {
+			return KConfigResult::ErrNotFound;
+		}
+		return file->save() ? KConfigResult::Success : KConfigResult::ErrSaveFile;
+	}
+	KConfigResult rename_table(const std::vector<KConfigTableRename>& accesses,
+		const KString& old_name, const KString& new_name) {
+		struct rename_operation {
+			KString path;
+			bool rename_definition;
+		};
+		struct rename_file {
+			KConfigFile* file = nullptr;
+			std::vector<rename_operation> operations;
+			khttpd::KSafeXmlNode original;
+			khttpd::KSafeXmlNode updated;
+			bool changed = false;
+			bool has_definition = false;
+		};
+		KFiberLocker lock(locker);
+		std::map<KConfigFile*, rename_file> files;
+		for (auto&& access : accesses) {
+			if (!access.access_tree) {
+				return KConfigResult::ErrNotFound;
+			}
+			for (auto node = access.access_tree->node; node; node = node->next) {
+				auto file = node->file;
+				if (!file || !file->get_source_driver()->enable_save()) {
+					return KConfigResult::ErrSaveFile;
+				}
+				KString path;
+				if (!build_relative_config_path(file, access.access_tree, path)) {
+					return KConfigResult::ErrNotFound;
+				}
+				auto& work = files[file];
+				work.file = file;
+				bool duplicate = false;
+				for (auto& operation : work.operations) {
+					if (operation.path == path) {
+						operation.rename_definition |= access.rename_definition;
+						duplicate = true;
+						break;
+					}
+				}
+				if (!duplicate) {
+					work.operations.push_back({ path, access.rename_definition });
+				}
+			}
+		}
+		bool found_definition = false;
+		for (auto&& entry : files) {
+			auto& work = entry.second;
+			work.original = work.file->clone_nodes();
+			if (!work.original) {
+				return KConfigResult::ErrNotFound;
+			}
+			work.updated = work.original->clone();
+			for (auto&& operation : work.operations) {
+				auto access_node = find_xml_path(work.updated->get_first(),
+					operation.path.c_str(), operation.path.size());
+				if (!access_node) {
+					return KConfigResult::ErrNotFound;
+				}
+				for (uint32_t index = 0;; ++index) {
+					auto access_body = access_node->get_body(index);
+					if (!access_body) {
+						break;
+					}
+					bool this_definition = false;
+					work.changed |= rewrite_access_table(access_body, old_name, new_name,
+						operation.rename_definition, this_definition);
+					work.has_definition |= this_definition;
+					found_definition |= this_definition;
+				}
+			}
+		}
+		if (!found_definition) {
+			return KConfigResult::ErrNotFound;
+		}
+		std::vector<rename_file*> ordered;
+		for (auto&& entry : files) {
+			if (entry.second.changed && entry.second.has_definition) {
+				ordered.push_back(&entry.second);
+			}
+		}
+		for (auto&& entry : files) {
+			if (entry.second.changed && !entry.second.has_definition) {
+				ordered.push_back(&entry.second);
+			}
+		}
+		size_t applied = 0;
+		for (; applied < ordered.size(); ++applied) {
+			auto work = ordered[applied];
+			work->file->update(work->updated);
+			if (work->file->save()) {
+				continue;
+			}
+			for (size_t rollback = 0; rollback <= applied; ++rollback) {
+				ordered[rollback]->file->update(ordered[rollback]->original);
+				ordered[rollback]->file->save();
+			}
+			return KConfigResult::ErrSaveFile;
+		}
+		return KConfigResult::Success;
+	}
 	KFiberLocker lock() {
 		return KFiberLocker(locker);
 	}
@@ -1408,6 +1776,31 @@ namespace kconfig {
 		assert_document_order(order_xml->get_first());
 		auto order_xml_clone = order_xml->clone();
 		assert_document_order(order_xml_clone->get_first());
+		assert(move_xml_node_down(order_xml_clone->get_first(), _KS("a"), 0));
+		auto moved_a = find_child(order_xml_clone->get_first(), _KS("a"));
+		assert(moved_a && moved_a->get_body(0)->attributes.get_int("id") == 2);
+		assert(moved_a->get_body(1)->attributes.get_int("id") == 1);
+		assert(order_xml_clone->get_first()->child_order[0].body == moved_a->get_body(0));
+		assert(order_xml_clone->get_first()->child_order[2].body == moved_a->get_body(1));
+		char rename_xml_text[] = "<config><request><table name='OLD'><chain action='continue'/></table></request></config>";
+		auto renamed_xml = parse_xml(rename_xml_text);
+		assert(renamed_xml && rename_xml_table(renamed_xml->get_first(), _KS("request/table@OLD"), "NEW"));
+		auto request_node = find_child(renamed_xml->get_first(), _KS("request"));
+		assert(request_node && !find_child(request_node->get_first(), _KS("table@OLD")));
+		auto renamed_table = find_child(request_node->get_first(), _KS("table@NEW"));
+		assert(renamed_table && renamed_table->get_first()->attributes["name"] == "NEW");
+		assert(find_child(renamed_table->get_first(), _KS("chain")));
+		char rename_ref_xml_text[] = "<config><request action='table:OLD'><table name='OLD'/><table name='CALLER'><chain action='table:OLD'/></table></request></config>";
+		auto renamed_ref_xml = parse_xml(rename_ref_xml_text);
+		auto renamed_ref_request = find_child(renamed_ref_xml->get_first(), _KS("request"));
+		bool found_definition = false;
+		assert(renamed_ref_request && rewrite_access_table(renamed_ref_request->get_first(),
+			"OLD", "NEW", true, found_definition));
+		assert(found_definition);
+		assert(renamed_ref_request->get_first()->attributes["action"] == "table:NEW");
+		auto caller_table = find_child(renamed_ref_request->get_first(), _KS("table@CALLER"));
+		auto caller_chain = find_child(caller_table->get_first(), _KS("chain"));
+		assert(caller_chain->get_first()->attributes["action"] == "table:NEW");
 		KConfigTree test_ev(nullptr, _KS("config"));
 		test_config_context ctx;
 		memset(&ctx, 0, sizeof(ctx));

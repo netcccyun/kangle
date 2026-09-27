@@ -435,6 +435,15 @@ function normalizeRuleModules($doc, &$stats, &$warnings, &$modules)
     }
 }
 
+function migrateRequestVhsActions($doc, &$stats)
+{
+    $xpath = new DOMXPath($doc);
+    foreach ($xpath->query('//request[@action="vhs"] | //request//chain[@action="vhs"]') as $node) {
+        $node->setAttribute('action', 'allow');
+        bump($stats, 'converted request vhs actions', 1);
+    }
+}
+
 function removeLegacyCaptchaProxyMarks($doc, &$stats)
 {
     $xpath = new DOMXPath($doc);
@@ -717,7 +726,7 @@ function ensureGlobalFlagChain($doc, $root, $attributes, &$stats)
     $request = firstDirectElement($root, 'request');
     if (!$request) {
         $request = $doc->createElement('request');
-        $request->setAttribute('action', 'vhs');
+        $request->setAttribute('action', 'allow');
         insertRootConfiguration($root, $request);
     }
     $begin = firstDirectByAttribute($request, 'table', 'name', 'BEGIN');
@@ -941,7 +950,7 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
 
     if (!firstDirectElement($root, 'request')) {
         $request = $doc->createElement('request');
-        $request->setAttribute('action', 'vhs');
+        $request->setAttribute('action', 'allow');
         insertRootConfiguration($root, $request);
         bump($stats, 'added <request>', 1);
     }
@@ -957,6 +966,7 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
 {
     $root = $doc->documentElement;
     $modules = $externalModules;
+    migrateRequestVhsActions($doc, $stats);
     normalizeRuleModules($doc, $stats, $warnings, $modules);
     removeLegacyCaptchaProxyMarks($doc, $stats);
     migrateTimeout($doc, $root, $stats);
@@ -973,6 +983,7 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
 
 function migrateAccessDocument($doc, &$stats, &$warnings, &$modules)
 {
+    migrateRequestVhsActions($doc, $stats);
     normalizeRuleModules($doc, $stats, $warnings, $modules);
     removeLegacyCaptchaProxyMarks($doc, $stats);
 }
