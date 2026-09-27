@@ -22,6 +22,7 @@ Default operation:
   - converts /home/ftp/\*/\*/access.xml (site-root files only);
   - updates every /vhs/kangle/ext/php*/config.xml <cmd> lifetime;
   - removes obsolete built-in JS/WebP/WAF test files and vh_db.xml;
+  - stops and removes CDNBest, its startup service, cdn_home, and binaries;
   - does not create backups or roll back completed operations on failure.
 
 Options:
@@ -429,6 +430,33 @@ function normalizeRuleModules($doc, &$stats, &$warnings, &$modules)
                 $node->setAttribute($textAttributes[$key], $value);
                 removeTextChildren($node);
                 bump($stats, 'moved legacy text values to attributes', 1);
+            }
+        }
+    }
+}
+
+function removeLegacyCaptchaProxyMarks($doc, &$stats)
+{
+    $xpath = new DOMXPath($doc);
+    foreach ($xpath->query('//request//chain') as $chain) {
+        if (!($chain instanceof DOMElement)) {
+            continue;
+        }
+        $isCaptchaRule = false;
+        foreach (directElements($chain, 'acl') as $acl) {
+            if ($acl->getAttribute('module') === 'path' &&
+                $acl->getAttribute('path') === '/KANGLE_CCIMG.php') {
+                $isCaptchaRule = true;
+                break;
+            }
+        }
+        if (!$isCaptchaRule) {
+            continue;
+        }
+        foreach (directElements($chain, 'mark') as $mark) {
+            if ($mark->getAttribute('module') === 'host') {
+                $chain->removeChild($mark);
+                bump($stats, 'removed legacy captcha proxy marks', 1);
             }
         }
     }
@@ -907,11 +935,6 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
     ), $stats);
     ensureNamedRootNode($doc, $root, 'api', 'whm', array('file' => 'buildin:whm'), $stats);
 
-    if (isset($modules['anti_cc']) || isset($modules['anti_session'])) {
-        if (!is_file($options['kangle_dir'] . '/bin/kwaf.so') && !is_file($options['kangle_dir'] . '/bin/kwaf.dll')) {
-            addWarning($warnings, 'anti_cc rules were found but kwaf binary is not installed under KANGLE_DIR/bin');
-        }
-    }
     if (!is_file($options['kangle_dir'] . '/bin/webdav.so') && !is_file($options['kangle_dir'] . '/bin/webdav.dll')) {
         addWarning($warnings, 'WebDAV API was configured but its binary is not installed under KANGLE_DIR/bin');
     }
@@ -935,6 +958,7 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
     $root = $doc->documentElement;
     $modules = $externalModules;
     normalizeRuleModules($doc, $stats, $warnings, $modules);
+    removeLegacyCaptchaProxyMarks($doc, $stats);
     migrateTimeout($doc, $root, $stats);
     migrateRunAs($doc, $root, $stats);
     migrateWorkers($doc, $root, $stats, $warnings);
@@ -950,6 +974,7 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
 function migrateAccessDocument($doc, &$stats, &$warnings, &$modules)
 {
     normalizeRuleModules($doc, $stats, $warnings, $modules);
+    removeLegacyCaptchaProxyMarks($doc, $stats);
 }
 
 function migratePhpExtensionDocument($doc, &$stats, &$warnings)
@@ -999,6 +1024,8 @@ function discoverObsoleteInstallationFiles($kangleDirectory, &$warnings)
 {
     $relativePaths = array(
         'bin/autoupdate',
+        'bin/cdnbest',
+        'bin/daemon',
         'bin/js.so',
         'bin/testdso.so',
         'bin/wafdso.so',
@@ -1017,6 +1044,234 @@ function discoverObsoleteInstallationFiles($kangleDirectory, &$warnings)
         }
     }
     return $files;
+}
+
+function findCdnBestProcessIds($kangleDirectory)
+{
+    $binary = rtrim($kangleDirectory, '/') . '/bin/cdnbest';
+    $daemon = rtrim($kangleDirectory, '/') . '/bin/daemon';
+    $pids = array();
+    $processes = glob('/proc/[0-9]*/cmdline');
+    if ($processes === false) {
+        return $pids;
+    }
+    foreach ($processes as $cmdlinePath) {
+        $data = @file_get_contents($cmdlinePath);
+        if ($data === false || $data === '') {
+            continue;
+        }
+        $args = explode("\0", rtrim($data, "\0"));
+        if ($args[0] !== $binary && !($args[0] === $daemon && in_array($binary, $args, true))) {
+            continue;
+        }
+        $pid = (int)basename(dirname($cmdlinePath));
+        if ($pid > 1) {
+            $pids[] = $pid;
+        }
+    }
+    return $pids;
+}
+
+function discoverCdnBestRemoval($kangleDirectory)
+{
+    $serviceFiles = array();
+    $seenServiceLocations = array();
+    foreach (array(
+        '/etc/systemd/system/cdnbest.service',
+        '/lib/systemd/system/cdnbest.service',
+        '/usr/lib/systemd/system/cdnbest.service',
+        '/etc/init.d/cdnbest',
+        '/etc/rc.d/init.d/cdnbest',
+    ) as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $content = @file_get_contents($path);
+        if ($content !== false && strpos($content, rtrim($kangleDirectory, '/') . '/bin/cdnbest') !== false) {
+            $location = realpath(dirname($path)) . '/' . basename($path);
+            if (!isset($seenServiceLocations[$location])) {
+                $serviceFiles[] = $path;
+                $seenServiceLocations[$location] = true;
+            }
+        }
+    }
+
+    $startupLinks = array();
+    $seenStartupLocations = array();
+    if (count($serviceFiles) > 0) {
+        foreach (array('/etc', '/etc/rc.d') as $root) {
+            for ($level = 0; $level <= 6; ++$level) {
+                $matches = glob($root . '/rc' . $level . '.d/[SK][0-9][0-9]cdnbest');
+                if ($matches === false) {
+                    continue;
+                }
+                foreach ($matches as $path) {
+                    if (is_link($path)) {
+                        $location = realpath(dirname($path)) . '/' . basename($path);
+                        if (!isset($seenStartupLocations[$location])) {
+                            $startupLinks[] = $path;
+                            $seenStartupLocations[$location] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    $home = rtrim($kangleDirectory, '/') . '/cdn_home';
+    return array(
+        'service_files' => $serviceFiles,
+        'startup_links' => $startupLinks,
+        'home' => (is_dir($home) || is_link($home)) ? $home : null,
+        'process_ids' => findCdnBestProcessIds($kangleDirectory),
+    );
+}
+
+function availableProgram($paths)
+{
+    foreach ($paths as $path) {
+        if (is_executable($path)) {
+            return $path;
+        }
+    }
+    return null;
+}
+
+function runCdnBestCommand($program, $arguments, &$detail)
+{
+    $parts = array(escapeshellarg($program));
+    foreach ($arguments as $argument) {
+        $parts[] = escapeshellarg($argument);
+    }
+    $lines = array();
+    $exitCode = 0;
+    exec(implode(' ', $parts) . ' 2>&1', $lines, $exitCode);
+    $detail = implode('; ', $lines);
+    return $exitCode === 0;
+}
+
+function signalCdnBestProcesses($kangleDirectory, $signal)
+{
+    foreach (findCdnBestProcessIds($kangleDirectory) as $pid) {
+        if (function_exists('posix_kill')) {
+            @posix_kill($pid, $signal);
+        } else {
+            $detail = '';
+            runCdnBestCommand('/bin/kill', array('-' . $signal, (string)$pid), $detail);
+        }
+    }
+}
+
+function waitForCdnBestProcesses($kangleDirectory)
+{
+    for ($attempt = 0; $attempt < 20; ++$attempt) {
+        if (count(findCdnBestProcessIds($kangleDirectory)) === 0) {
+            return true;
+        }
+        usleep(100000);
+    }
+    return count(findCdnBestProcessIds($kangleDirectory)) === 0;
+}
+
+function removeCdnHome($kangleDirectory, $home)
+{
+    $expected = rtrim($kangleDirectory, '/') . '/cdn_home';
+    if ($home !== $expected) {
+        throw new RuntimeException('refusing to remove unexpected CDNBest directory: ' . $home);
+    }
+    if (is_link($home)) {
+        if (!@unlink($home)) {
+            throw new RuntimeException('cannot unlink CDNBest directory link: ' . $home);
+        }
+        return;
+    }
+    if (!is_dir($home)) {
+        return;
+    }
+    $parent = realpath($kangleDirectory);
+    if ($parent === false || realpath($home) !== $parent . '/cdn_home') {
+        throw new RuntimeException('refusing to recursively remove CDNBest directory outside Kangle: ' . $home);
+    }
+    $items = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($home, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($items as $item) {
+        $path = $item->getPathname();
+        $removed = ($item->isDir() && !$item->isLink()) ? @rmdir($path) : @unlink($path);
+        if (!$removed) {
+            throw new RuntimeException('cannot remove CDNBest data: ' . $path);
+        }
+    }
+    if (!@rmdir($home)) {
+        throw new RuntimeException('cannot remove CDNBest directory: ' . $home);
+    }
+}
+
+function uninstallCdnBest($kangleDirectory, $plan, &$warnings)
+{
+    $serviceFiles = $plan['service_files'];
+    $systemctl = availableProgram(array('/bin/systemctl', '/usr/bin/systemctl'));
+    $detail = '';
+    if (count($serviceFiles) > 0) {
+        $stopped = false;
+        if ($systemctl !== null) {
+            $stopped = runCdnBestCommand($systemctl, array('stop', 'cdnbest'), $detail);
+        }
+        if (!$stopped && is_executable('/etc/init.d/cdnbest')) {
+            $stopped = runCdnBestCommand('/etc/init.d/cdnbest', array('stop'), $detail);
+        }
+        if (!$stopped && count(findCdnBestProcessIds($kangleDirectory)) > 0) {
+            addWarning($warnings, 'CDNBest service stop failed; stopping its verified processes directly: ' . $detail);
+        }
+    }
+    if (!waitForCdnBestProcesses($kangleDirectory)) {
+        signalCdnBestProcesses($kangleDirectory, 15);
+        if (!waitForCdnBestProcesses($kangleDirectory)) {
+            signalCdnBestProcesses($kangleDirectory, 9);
+            if (!waitForCdnBestProcesses($kangleDirectory)) {
+                throw new RuntimeException('CDNBest processes are still running; installation files were not removed');
+            }
+        }
+    }
+    if (count($plan['process_ids']) > 0 || count($serviceFiles) > 0) {
+        fwrite(STDOUT, "[STOP] cdnbest\n");
+    }
+
+    if (count($serviceFiles) > 0) {
+        if ($systemctl !== null && !runCdnBestCommand($systemctl, array('disable', 'cdnbest'), $detail)) {
+            addWarning($warnings, 'systemctl disable cdnbest failed; startup links will be removed directly: ' . $detail);
+        }
+        $chkconfig = availableProgram(array('/sbin/chkconfig', '/usr/sbin/chkconfig'));
+        if ($chkconfig !== null) {
+            runCdnBestCommand($chkconfig, array('--del', 'cdnbest'), $detail);
+        }
+    }
+
+    $removedCount = 0;
+    foreach (array_merge($plan['startup_links'], $serviceFiles) as $path) {
+        if (!is_file($path) && !is_link($path)) {
+            continue;
+        }
+        if (!@unlink($path)) {
+            throw new RuntimeException('cannot remove CDNBest service or startup link: ' . $path);
+        }
+        ++$removedCount;
+        fwrite(STDOUT, '[REMOVE] ' . $path . "\n");
+    }
+    if (count($serviceFiles) > 0 && $systemctl !== null &&
+        !runCdnBestCommand($systemctl, array('daemon-reload'), $detail)) {
+        addWarning($warnings, 'systemctl daemon-reload failed: ' . $detail);
+    }
+    if (count($serviceFiles) > 0 && $systemctl !== null) {
+        runCdnBestCommand($systemctl, array('reset-failed', 'cdnbest'), $detail);
+    }
+    if ($plan['home'] !== null) {
+        removeCdnHome($kangleDirectory, $plan['home']);
+        ++$removedCount;
+        fwrite(STDOUT, '[REMOVE] ' . $plan['home'] . " (directory)\n");
+    }
+    return $removedCount;
 }
 
 function serializeDocument($doc)
@@ -1146,6 +1401,7 @@ if ($options['sites']) {
 // copy unrelated files from the active Kangle installation.
 $maintenanceEnabled = $options['main'] && $options['output_dir'] === null;
 $cleanupPaths = array();
+$cdnBestPlan = null;
 if ($maintenanceEnabled) {
     try {
         foreach (discoverPhpExtensionConfigs($options['kangle_dir'], $globalWarnings) as $file) {
@@ -1154,6 +1410,7 @@ if ($maintenanceEnabled) {
             }
         }
         $cleanupPaths = discoverObsoleteInstallationFiles($options['kangle_dir'], $globalWarnings);
+        $cdnBestPlan = discoverCdnBestRemoval($options['kangle_dir']);
     } catch (Exception $e) {
         fwrite(STDERR, 'error: ' . $e->getMessage() . "\n");
         exit(1);
@@ -1252,10 +1509,27 @@ foreach ($plans as $plan) {
     }
 }
 if ($options['dry_run']) {
+    if ($cdnBestPlan !== null) {
+        if (count($cdnBestPlan['service_files']) > 0 || count($cdnBestPlan['process_ids']) > 0) {
+            fwrite(STDOUT, "[STOP] cdnbest\n");
+        }
+        if (count($cdnBestPlan['service_files']) > 0) {
+            fwrite(STDOUT, "[DISABLE] cdnbest service\n");
+        }
+        foreach (array_merge($cdnBestPlan['startup_links'], $cdnBestPlan['service_files']) as $path) {
+            fwrite(STDOUT, '[REMOVE] ' . $path . " (CDNBest service or startup link)\n");
+        }
+        if ($cdnBestPlan['home'] !== null) {
+            fwrite(STDOUT, '[REMOVE] ' . $cdnBestPlan['home'] . " (CDNBest directory)\n");
+        }
+    }
     foreach ($cleanupPaths as $path) {
         fwrite(STDOUT, '[REMOVE] ' . $path . " (obsolete installation file)\n");
     }
-    $operationCount = $changedCount + count($cleanupPaths);
+    $cdnBestCount = $cdnBestPlan === null ? 0 :
+        count($cdnBestPlan['startup_links']) + count($cdnBestPlan['service_files']) +
+        ($cdnBestPlan['home'] === null ? 0 : 1);
+    $operationCount = $changedCount + count($cleanupPaths) + $cdnBestCount;
     fwrite(STDOUT, "Dry run complete: {$operationCount} file operation(s) would run; nothing was changed.\n");
     exit(0);
 }
@@ -1282,6 +1556,13 @@ try {
         }
         unset($temporaries[$index]);
         fwrite(STDOUT, '[WRITE] ' . $plan['target'] . "\n");
+    }
+    if ($cdnBestPlan !== null) {
+        $runtimeWarnings = array();
+        $removedCount += uninstallCdnBest($options['kangle_dir'], $cdnBestPlan, $runtimeWarnings);
+        foreach ($runtimeWarnings as $warning) {
+            fwrite(STDERR, '[WARN] ' . $warning . "\n");
+        }
     }
     foreach ($cleanupPaths as $path) {
         if (!@unlink($path)) {
