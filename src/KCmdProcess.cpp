@@ -206,9 +206,12 @@ KPipeStream *KMPCmdProcess::PowerThread(KVirtualHost* vh, KExtendProgram* erd)
 	}
 #endif
 	//we need cmdLock and the stLock
+	stLock.Lock();
+	bool is_same_running = !klist_empty(busyProcessList);
+	stLock.Unlock();
 	cmdLock.Lock();
 	st->setLifeTime(this->life_time);
-	bool result = rd->Exec(vh, st, !klist_empty(busyProcessList));
+	bool result = rd->Exec(vh, st, is_same_running);
 	if (!result) {
 		cmdLock.Unlock();
 		delete st;
@@ -316,6 +319,19 @@ bool KMPCmdProcess::killProcess(int pid)
 				break;
 			}
 		}		
+	}
+	if (pid != 0 && successKilled) {
+		//返回true表示全部进程已杀掉，调用者会销毁整个进程池，还有存活进程时不能返回true
+		if (!klist_empty(freeProcessList)) {
+			successKilled = false;
+		} else {
+			klist_foreach(st, busyProcessList) {
+				if (!st->process.isKilled()) {
+					successKilled = false;
+					break;
+				}
+			}
+		}
 	}
 	stLock.Unlock();
 	return successKilled;

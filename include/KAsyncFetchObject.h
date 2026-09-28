@@ -144,6 +144,16 @@ protected:
 	{
 		return true;
 	}
+	//上游协议是否会自己回应100-continue。不支持的协议(fastcgi/ajp等)需直接转发post,由KSink::read回应100给客户端
+	virtual bool upstream_handle_expect()
+	{
+		return false;
+	}
+	//长度未知的post是否用chunked编码发送。只有http上游需要,fastcgi/ajp等协议有自己的分包格式
+	virtual bool upstream_chunk_post()
+	{
+		return false;
+	}
 	KGL_RESULT ParseBody(KHttpRequest* rq);
 	khttp_parser parser;
 	kgl_pop_header pop_header;

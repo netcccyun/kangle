@@ -160,14 +160,15 @@ KGL_RESULT KAsyncFetchObject::InternalProcess(KHttpRequest* rq, kfiber** post_fi
 	client->set_time_out(rq->sink->get_time_out());
 	assert(rq->sink->get_selector() == kgl_get_tls_selector());
 	int64_t post_length = in->f->body.get_left(in->body_ctx);	
-	if (post_length == -1 && !client->IsMultiStream() && !KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE)) {
+	if (post_length == -1 && upstream_chunk_post() && !client->IsMultiStream() && !KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE)) {
 		pop_header.post_is_chunk = 1;
 	}
 	KGL_RESULT ret = SendHeader(rq);
 	if (ret != KGL_OK) {
 		return ret;
 	}
-	if (post_length != 0 && !KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE | RQ_HAVE_EXPECT)) {
+	if (post_length != 0 && !KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) &&
+		(!KBIT_TEST(rq->sink->data.flags, RQ_HAVE_EXPECT) || !upstream_handle_expect())) {
 		ret = ProcessPost(rq);
 		if (ret != KGL_END) {
 			return ret;
@@ -497,6 +498,10 @@ KGL_RESULT KAsyncFetchObject::PushHeaderFinished(KHttpRequest* rq) {
 		//如果是websocket，则长度未知
 		rq->ctx.left_read = -1;
 	}
+	if (pop_header.upstream_is_chunk && rq->sink->data.meth != METH_HEAD && !pop_header.no_body) {
+		//Transfer-Encoding: chunked 优先于 Content-Length (RFC 7230 3.3.3)
+		rq->ctx.left_read = -1;
+	}
 	assert(body.ctx == nullptr);
 	auto result =  out->f->write_header_finish(out->ctx, rq->ctx.left_read, &body);
 	if (result != KGL_OK) {
@@ -550,6 +555,9 @@ KGL_RESULT KAsyncFetchObject::PushHeader(KHttpRequest* rq, const char* attr, int
 				rq->ctx.upstream_connection_keep_alive = true;
 			} else if (http_major == 1 && http_minor == 1) {
 				rq->ctx.upstream_connection_keep_alive = true;
+			} else {
+				//HTTP/1.0默认不保持连接，除非后续有Connection: keep-alive
+				rq->ctx.upstream_connection_keep_alive = false;
 			}
 			int status_code = kgl_atoi((u_char*)val, val_len);
 			PushStatus(rq, status_code);

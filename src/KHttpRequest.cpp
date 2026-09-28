@@ -473,9 +473,9 @@ void KHttpRequest::append_source(KFetchObject* fo) {
 }
 KFetchObject* KHttpRequest::replace_next(KFetchObject* fo, KFetchObject* next_fo) {
 	assert(next_fo);
-	next_fo = nullptr;
 	assert(fo->next != nullptr || fo == fo_last);
 	KFetchObject* old_next = fo->next;
+	next_fo->next = nullptr;
 	fo->next = next_fo;
 	fo_last = next_fo;
 	return old_next;

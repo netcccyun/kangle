@@ -85,6 +85,9 @@ KGL_RESULT KFastcgiFetchObject::buildHead(KHttpRequest* rq)
 		chrooted = svh->vh->chroot;
 	}
 #endif
+	if (fbuf.extend && in->f->body.get_left(in->body_ctx) == -1) {
+		fbuf.addEnv(API_UNKNOWN_CONTENT_LENGTH, "1");
+	}
 	bool sendResult = make_http_env(rq, in, brd, rq->file, &fbuf, chrooted);
 	if (!sendResult) {//send error
 		buffer->destroy();

@@ -29,6 +29,7 @@
 #include "KAsyncFetchObject.h"
 #include "KHttpResponseParser.h"
 #include "KHttpEnv.h"
+#include "KPushGate.h"
 class KHttpProxyFetchObject : public KAsyncFetchObject
 {
 public:
@@ -48,6 +49,23 @@ protected:
 			return false;
 		}
 		return true;
+	}
+	bool upstream_handle_expect() override
+	{
+		return true;
+	}
+	bool upstream_chunk_post() override
+	{
+		return true;
+	}
+	KGL_RESULT ParseBody(KHttpRequest* rq, char** data, char* end) override
+	{
+		KGL_RESULT result = KAsyncFetchObject::ParseBody(rq, data, end);
+		//下游写入也可能返回KGL_END(不再需要数据)，必须确认chunked已读到结束块
+		if (result == KGL_END && pop_header.upstream_is_chunk && is_dechunk_body_end(&body)) {
+			expectDone(rq);
+		}
+		return result;
 	}
 private:
 };

@@ -36,6 +36,7 @@ Token_t KApiFetchObject::getVhToken(const char* vh_name) {
 				}
 				bool result;
 				token = vh->createToken(result);
+				vh->release();
 				return token;
 			}
 		}

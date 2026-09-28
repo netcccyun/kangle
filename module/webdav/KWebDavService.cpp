@@ -217,9 +217,7 @@ bool KWebDavService::doPut() {
 		return send(status_code);
 	}
 	int64_t content_length = provider->getContentLength();
-	if (content_length < 0) {
-		return send(STATUS_BAD_REQUEST);
-	}
+	bool unknown_length = content_length < 0;
 	KResource* old_rs = rsMaker->bindResource(provider->getFileName(), provider->getRequestUri());
 	bool existed = old_rs != NULL;
 	delete old_rs;
@@ -234,19 +232,28 @@ bool KWebDavService::doPut() {
 		return send(STATUS_SERVER_ERROR);
 	}
 	bool result = true;
-	while (content_length > 0) {
+	while (unknown_length || content_length > 0) {
 		char buf[512];
-		int this_read_len = (int)(KGL_MIN(content_length, sizeof(buf)));
+		int this_read_len = unknown_length ? (int)sizeof(buf) : (int)(KGL_MIN(content_length, (int64_t)sizeof(buf)));
 		int actual_read_len = in->read(buf, this_read_len);
+		if (unknown_length && actual_read_len == 0) {
+			break;
+		}
 		if (actual_read_len <= 0) {
 			result = false;
 			break;
 		}
-		content_length -= actual_read_len;
+		if (!unknown_length) {
+			content_length -= actual_read_len;
+		}
 		if (rs->write(buf, actual_read_len) != actual_read_len) {
 			result = false;
 			break;
 		}
+	}
+	if (!result && !existed) {
+		rs->close();
+		rs->remove();
 	}
 	delete rs;
 	if (result) {
@@ -259,20 +266,44 @@ bool KWebDavService::parseDocument(khttpd::KXmlDocument& document) {
 	if (content_length > MAX_DOCUMENT_SIZE) {
 		return false;
 	}
-	if (content_length <= 0) {
+	if (content_length == 0) {
 		return false;
 	}
-	int len = 0;
-	char* buf = (char*)xmalloc(content_length + 1);
-	if (len < content_length) {
-		//not all data have
-		KRStream* in = provider->getInputStream();
-		if (!in->read_all(buf + len, (int)(content_length - len))) {
+	KRStream* in = provider->getInputStream();
+	char* buf;
+	if (content_length < 0) {
+		//长度未知(chunked),读到结束,最多MAX_DOCUMENT_SIZE
+		buf = (char*)xmalloc(MAX_DOCUMENT_SIZE + 1);
+		int len = 0;
+		for (;;) {
+			//多读1字节，以区分恰好达到上限和确实超过上限。
+			int got = in->read(buf + len, MAX_DOCUMENT_SIZE + 1 - len);
+			if (got == 0) {
+				break;
+			}
+			if (got < 0) {
+				xfree(buf);
+				return false;
+			}
+			len += got;
+			if (len > MAX_DOCUMENT_SIZE) {
+				xfree(buf);
+				return false;
+			}
+		}
+		if (len == 0) {
 			xfree(buf);
 			return false;
 		}
+		buf[len] = '\0';
+	} else {
+		buf = (char*)xmalloc(content_length + 1);
+		if (!in->read_all(buf, (int)content_length)) {
+			xfree(buf);
+			return false;
+		}
+		buf[content_length] = '\0';
 	}
-	buf[content_length] = '\0';	
 	try {
 		document.parse(buf);
 		xfree(buf);

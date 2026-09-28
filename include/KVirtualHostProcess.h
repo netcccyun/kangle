@@ -59,11 +59,17 @@ public:
 			if (kgl_current_sec - lastCheckTime > 5) {
 				lastCheckTime = kgl_current_sec;
 				if (!isProcessActive() || (max_error_count > 0 && error_count >= max_error_count)) {
+					int last_error_count = error_count;
 					clean();
-					status = VProcess_Close;
+					lock.Lock();
+					//正在启动中的进程不能改状态，否则会被重复启动
+					if (status != VProcess_Inprogress) {
+						status = VProcess_Close;
+					}
+					lock.Unlock();
 					//reset the error_count
 					error_count = 0;
-					klog(KLOG_ERR, "restart the virtual process error_count=%d\n", error_count);
+					klog(KLOG_ERR, "restart the virtual process error_count=%d\n", last_error_count);
 				}
 			}
 			break;

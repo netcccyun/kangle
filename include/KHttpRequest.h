@@ -408,7 +408,7 @@ public:
 		if (!slh) {
 			return sink->write_all(buf, len);
 		}
-		while (len > 0) {
+		while (len > 0 && buf) {
 			int got = KGL_MIN(len, buf->used);
 			auto msec = get_sleep_msec(got);
 			if (msec > 0) {

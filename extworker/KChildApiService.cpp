@@ -118,6 +118,9 @@ bool KChildApiService::initECB(EXTENSION_CONTROL_BLOCK* ecb)
 	ecb->lpszPathInfo = (char*)env.getEnv("PATH_INFO");
 	ecb->lpszPathTranslated = (char*)env.getEnv("PATH_TRANSLATED");
 	ecb->cbTotalBytes = env.contentLength;
+	if (env.getEnv(API_UNKNOWN_CONTENT_LENGTH) != NULL) {
+		ecb->cbTotalBytes = -1;
+	}
 	ecb->cbLeft = ecb->cbTotalBytes;
 	ecb->lpszContentType = (env.contentType ? env.contentType : (char*)"");
 	ecb->dwHttpStatusCode = STATUS_OK;

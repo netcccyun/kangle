@@ -67,3 +67,26 @@ func check_100_continue() {
 	check_100_continue_port(9999)
 	check_100_continue_port(9900)
 }
+
+func check_fastcgi_post() {
+	cn, err := net.Dial("tcp", "127.0.0.1:9999")
+	common.Assert("dial FastCGI Expect request", err == nil)
+	reader := bufio.NewReader(cn)
+	cn.SetDeadline(time.Now().Add(5 * time.Second))
+	_, _ = cn.Write([]byte("POST /fastcgi/expect HTTP/1.1\r\nHost: localhost\r\nContent-Length: 4\r\nExpect: 100-continue\r\nConnection: close\r\n\r\n"))
+	h, _, err := common.ReadHttpProtocol(reader, false)
+	common.Assert("FastCGI 100-continue response", err == nil && strings.EqualFold(h["http/1.1"], "100 continue"))
+	_, _ = cn.Write([]byte("body"))
+	h, _, err = common.ReadHttpProtocol(reader, true)
+	common.Assert("FastCGI Expect final response", err == nil && strings.EqualFold(h["http/1.1"], "200 ok"))
+	cn.Close()
+
+	cn, err = net.Dial("tcp", "127.0.0.1:9999")
+	common.Assert("dial FastCGI chunked request", err == nil)
+	defer cn.Close()
+	reader = bufio.NewReader(cn)
+	cn.SetDeadline(time.Now().Add(5 * time.Second))
+	_, _ = cn.Write([]byte("POST /fastcgi/chunked HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n4\r\nbody\r\n0\r\n\r\n"))
+	h, _, err = common.ReadHttpProtocol(reader, true)
+	common.Assert("FastCGI chunked response", err == nil && strings.EqualFold(h["http/1.1"], "200 ok"))
+}

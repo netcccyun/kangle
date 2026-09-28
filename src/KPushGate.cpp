@@ -192,6 +192,12 @@ static kgl_response_body_function dechunk_body_function = {
 	unsupport_sendfile,
 	dechunk_close
 };
+bool is_dechunk_body_end(const kgl_response_body* body) {
+	if (body->f != &dechunk_body_function || body->ctx == nullptr) {
+		return false;
+	}
+	return ((kgl_dechunk_body*)body->ctx)->engine.is_success();
+}
 bool new_dechunk_body(kgl_output_stream *out, kgl_response_body* down_gate) {
 	kgl_dechunk_body* gate = new kgl_dechunk_body;
 	pipe_response_body(gate, &dechunk_body_function, down_gate);

@@ -124,6 +124,9 @@ namespace kangle {
 		return s.str();
 	}
 	void del_request(void* data) {
+#ifdef RQ_LEAK_DEBUG
+		kconnection* c = (kconnection*)data;
+#endif
 		ip_lock.Lock();
 		total_connect--;
 #ifdef RQ_LEAK_DEBUG

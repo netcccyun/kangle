@@ -89,6 +89,7 @@ func CreateMainConfig(malloc_debug int) (err error) {
 	<server name='localhost_https' proto='http' host='127.0.0.1' port='9943sp' life_time='2' />
 	<server name='upstream' host='127.0.0.1' port='4411' proto='http' life_time='10'/>
 	<server name='stale_upstream' host='127.0.0.1' port='4414' proto='http' life_time='10'/>
+	<server name='chunk_upstream' host='127.0.0.1' port='4415' proto='http' life_time='10'/>
 	<server name='upstream_h2c' host='127.0.0.1' port='4411h' proto='http' life_time='10'/>
 	<server name='upstream_ssl' host='127.0.0.1' port='4412s' proto='http' life_time='10'/>	
 	<server name='upstream_h2' host='127.0.0.1' port='4412sp' proto='http' life_time='10'/>	

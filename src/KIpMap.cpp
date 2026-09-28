@@ -143,12 +143,18 @@ bool make_local_ip(ip_addr *addr,char *ips,int ips_len)
 }
 inline void get_ipv4_cidr_max_addr(uint32_t *min_addr,uint32_t *max_addr,int prefix)
 {
-	*min_addr &= ((uint32_t)~0 << (32 - prefix));
-	if (prefix<32) {
-		*max_addr = *min_addr | ((uint32_t)~0 >> prefix);
-	} else {
-		*max_addr = *min_addr;
+	//移位数>=32是未定义行为，/0和/32单独处理
+	if (prefix <= 0) {
+		*min_addr = 0;
+		*max_addr = (uint32_t)~0;
+		return;
 	}
+	if (prefix >= 32) {
+		*max_addr = *min_addr;
+		return;
+	}
+	*min_addr &= ((uint32_t)~0 << (32 - prefix));
+	*max_addr = *min_addr | ((uint32_t)~0 >> prefix);
 }
 bool build_cidr_addr(const char *addr,int prefix,ip_addr *min_addr,ip_addr *max_addr)
 {
@@ -156,18 +162,24 @@ bool build_cidr_addr(const char *addr,int prefix,ip_addr *min_addr,ip_addr *max_
 		return false;
 	}
 #ifndef KSOCKET_IPV6
+	if (prefix < 0 || prefix > 32) {
+		return false;
+	}
 	get_ipv4_cidr_max_addr(min_addr,max_addr,prefix);
 #else
 	max_addr->sin_family = min_addr->sin_family;
 	if (min_addr->sin_family==PF_INET) {		
+		if (prefix < 0 || prefix > 32) {
+			return false;
+		}
 		get_ipv4_cidr_max_addr(&min_addr->addr32[0],&max_addr->addr32[0],prefix);		
 	} else {
 		int i;
 		int a,b;
-		a = prefix/32;
-		if (a>4 || a<0) {
-			return 1;
+		if (prefix < 0 || prefix > 128) {
+			return false;
 		}
+		a = prefix/32;
 		for (i=0;i<a;i++) {
 			max_addr->addr32[i] = min_addr->addr32[i];
 		}

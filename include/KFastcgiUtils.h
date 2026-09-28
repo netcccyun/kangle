@@ -91,18 +91,23 @@ class KFastcgiStream : public KEnvInterface
 public:
 	KFastcgiStream(T* client, uint8_t data_type, bool extend = false)
 	{
+		//gcc 4.8不会应用匿名union成员的默认初始化,必须显式清零
+		flags = 0;
 		setStream(client);
 		this->extend = extend;
 		readBuf = NULL;
 		readHot = NULL;
+		readLeft = 0;
 		this->data_type = data_type;
 	}
 	KFastcgiStream(uint8_t data_type)
 	{
+		flags = 0;
 		client = NULL;
 		extend = false;
 		readBuf = NULL;
 		readHot = NULL;
+		readLeft = 0;
 		this->data_type = data_type;
 	}
 	bool beginRequest(bool keepAlive = false)

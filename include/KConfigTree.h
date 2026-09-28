@@ -205,6 +205,8 @@ namespace kconfig {
 	{
 	public:
 		KConfigFile(KConfigTree* ev, const kgl_ref_str_t* name, const kgl_ref_str_t* filename, KConfigFileSource source) {
+			//gcc 4.8不会应用匿名union成员的默认初始化,必须显式清零
+			flags = 0;
 			this->name = kstring_refs(name);
 			this->filename = kstring_refs(filename);
 			this->ev = ev;

@@ -85,6 +85,9 @@ func (b *base) Init() error {
 			<chain  action='server:stale_upstream' >
 				<acl_path>/stale_pool</acl_path>
 			</chain>
+			<chain  action='server:chunk_upstream' >
+				<acl_path>/chunk_keepalive</acl_path>
+			</chain>
 			<chain  action='server:upstream_h2' >
 				<acl_self_port >9801</acl_self_port>
 			</chain>
@@ -190,9 +193,12 @@ func init() {
 	s.AddCase("disk_cache", "磁盘缓存swap out/in", check_disk_cache)
 	s.AddCase("upstream_http_protocol", "测试上游http协议解析", check_upstream_http_protocol)
 	s.AddCase("stale_pool_retry", "复用连接被上游关闭后安全重试", check_stale_pool_retry)
+	s.AddCase("chunk_upstream_keepalive", "chunked上游响应后连接复用", check_chunk_upstream_keepalive)
+	s.AddCase("http10_upstream_keepalive", "HTTP/1.0上游连接复用语义", check_http10_upstream_keepalive)
 	s.AddCase("host_mark_proxy", "请求控制host标记选择反代源", check_host_mark_proxy)
 	s.AddCase("host_rewrite_https_vhost", "HTTPS host_rewrite后重新选择本地虚拟主机", check_host_rewrite_https_vhost)
 	s.AddCase("fastcgi", "fastcgi协议测试", check_fastcgi)
+	s.AddCase("fastcgi_post", "FastCGI转发Expect及chunked请求体", check_fastcgi_post)
 	s.AddCase("obs_fold", "obs_fold测试", check_obs_fold)
 	s.AddCase("100_continue", "100-continue测试", check_100_continue)
 	s.AddCase("sub_status", "sub_status", test_stub_status)

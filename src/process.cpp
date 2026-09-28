@@ -630,6 +630,7 @@ BOOL StartInteractiveClientProcess2 (
 	STARTUPINFO si;
 	BOOL bResult = FALSE;
 	int errorcode = 0;
+	ZeroMemory(&pi, sizeof(pi));
 	ZeroMemory(&si, sizeof(STARTUPINFO));
 	GetStartupInfo(&si);
 	si.cb= sizeof(STARTUPINFO);
@@ -708,8 +709,10 @@ BOOL StartInteractiveClientProcess2 (
 	if (!bResult) {
 		errorcode = GetLastError();
 		klog(KLOG_ERR,"CreateProcess error code=%d\n",errorcode);
+		hProcess = NULL;
+		return bResult;
 	}
-	if (pi.hThread != INVALID_HANDLE_VALUE) {
+	if (pi.hThread != NULL && pi.hThread != INVALID_HANDLE_VALUE) {
 		CloseHandle(pi.hThread);  
 	}
 	hProcess = pi.hProcess;
@@ -728,6 +731,7 @@ BOOL StartInteractiveClientProcess (
 	STARTUPINFO si;
 	BOOL bResult = FALSE;
 	int errorcode = 0;
+	ZeroMemory(&pi, sizeof(pi));
 	ZeroMemory(&si, sizeof(STARTUPINFO));
 	GetStartupInfo(&si);
 	si.cb= sizeof(STARTUPINFO);
@@ -819,7 +823,7 @@ BOOL StartInteractiveClientProcess (
 				OVERLAPPED ol;
 				memset(&ol,0,sizeof(ol));
 				ol.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
-				if(ol.hEvent != INVALID_HANDLE_VALUE){					
+				if(ol.hEvent != NULL){
 					if(ConnectNamedPipe(st->fd[0],&ol)==0){
 						int error = GetLastError();
 						if(error == ERROR_PIPE_CONNECTED){
@@ -843,7 +847,7 @@ BOOL StartInteractiveClientProcess (
 		errorcode = GetLastError();
 		klog(KLOG_ERR,"CreateProcess error code=%d\n",errorcode);	  
 	}	
-	if (pi.hThread != INVALID_HANDLE_VALUE){
+	if (pi.hThread != NULL && pi.hThread != INVALID_HANDLE_VALUE){
 		CloseHandle(pi.hThread);  
 	}
 	return bResult;

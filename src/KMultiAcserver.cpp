@@ -372,12 +372,22 @@ bool KMultiAcserver::addNode(KXmlAttribute& attr, char* self_ip) {
 		}
 		uint32_t min_ip = ntohl(min_addr.v4.sin_addr.s_addr);
 		uint32_t max_ip = ntohl(max_addr.v4.sin_addr.s_addr);
-		for (uint32_t ip = min_ip; ip <= max_ip; ip++) {
-			min_addr.v4.sin_addr.s_addr = htonl(ip);
+		if (min_ip > max_ip) {
+			return false;
+		}
+		//用64位计数，避免max_ip为255.255.255.255时回绕死循环
+		for (uint64_t ip = min_ip; ip <= max_ip; ip++) {
+			min_addr.v4.sin_addr.s_addr = htonl((uint32_t)ip);
 			char ips[MAXIPLEN];
 			ksocket_sockaddr_ip(&min_addr, ips, sizeof(ips));
 			//KSocket::make_ip(&min_addr, ips, MAXIPLEN);
-			attr.emplace("self_ip", ips);
+			//std::map::emplace不会覆盖已有的self_ip(原始的范围字符串)
+			auto it = attr.find("self_ip");
+			if (it != attr.end()) {
+				(*it).second = ips;
+			} else {
+				attr.emplace("self_ip", ips);
+			}
 			addNode(attr);
 		}
 		return true;

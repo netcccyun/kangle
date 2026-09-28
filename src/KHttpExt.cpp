@@ -178,11 +178,26 @@ BOOL WINAPI WriteClient(HCONN hConn, LPVOID Buffer, LPDWORD lpdwBytes,
 BOOL WINAPI ReadClient(HCONN hConn, LPVOID lpvBuffer, LPDWORD lpdwSize) {
 	KApiService *fo = (KApiService *) hConn;
 	assert(fo);
-	if (fo == NULL || fo->ecb.cbLeft <= 0) {
+	if (fo == NULL || fo->ecb.cbLeft == 0) {
 		return FALSE;
 	}
 	//	debug("try to readClient size=%d\n",*lpdwSize);
 	//int len = fo->tr.rq->sink->read((char *) lpvBuffer, *lpdwSize);
+	if (fo->ecb.cbLeft < 0) {
+		//长度未知(chunked),读到结束时返回TRUE且*lpdwSize=0
+		if (*lpdwSize == 0) {
+			return TRUE;
+		}
+		int len = fo->readClient((char*)lpvBuffer, (int)*lpdwSize);
+		if (len < 0) {
+			return FALSE;
+		}
+		if (len == 0) {
+			fo->ecb.cbLeft = 0;
+		}
+		*lpdwSize = len;
+		return TRUE;
+	}
 	INT64 read_len = KGL_MIN((INT64)*lpdwSize, fo->ecb.cbLeft);
 	int len = fo->readClient((char *)lpvBuffer, (int)read_len);
 	//	debug("success readClient size=%d\n",*lpdwSize);

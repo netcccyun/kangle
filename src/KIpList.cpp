@@ -84,12 +84,13 @@ void run_fw_cmd(const char *cmd,const char *ip)
 void KIpList::clearBlackList()
 {
 	lock.Lock();
-	wls.clear();
+	clearStatic();
 	while (head) {
 		end = head->next;
 		delete head;
 		head = end;
 	}
+	end = NULL;
 	lock.Unlock();
 }
 //得到黑名单

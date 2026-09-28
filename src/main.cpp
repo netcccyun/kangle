@@ -22,6 +22,7 @@
  *  Author: KangHongjiu <keengo99@gmail.com>
  */
 #include "global.h"
+#include <climits>
 #ifndef _WIN32
 #include <pthread.h>
 #include <pwd.h>
@@ -1131,7 +1132,11 @@ bool init_resource_limit(int numcpu) {
 	if (0 == getrlimit(RLIMIT_NOFILE, &rlim)) {
 		klog(KLOG_INFO, "open file limit [cur:%llu,max:%llu]\n",
 			(unsigned long long)rlim.rlim_cur, (unsigned long long)rlim.rlim_max);
-		open_file_limit = (int)rlim.rlim_cur;
+		if (rlim.rlim_cur == RLIM_INFINITY || rlim.rlim_cur > (rlim_t)INT_MAX) {
+			open_file_limit = INT_MAX;
+		} else {
+			open_file_limit = (int)rlim.rlim_cur;
+		}
 	} else {
 		klog(KLOG_ERR, "get max open file limit error [%d]\n", errno);
 	}

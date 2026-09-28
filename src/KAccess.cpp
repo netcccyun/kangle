@@ -333,7 +333,12 @@ bool KAccess::rename_table(const KString& from, const KString& to, KString& erro
 	KSafeTable target;
 	{
 		auto lock = read_lock();
-		target = tables.find(from)->second;
+		auto it = tables.find(from);
+		if (it == tables.end()) {
+			error = "table not found";
+			return false;
+		}
+		target = it->second;
 	}
 	std::vector<KAccess*> accesses;
 	{

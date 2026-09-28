@@ -92,9 +92,11 @@ static BOOL WINAPI apiServerSupportFunction(HCONN hConn, DWORD dwHSERequest,
 				bool result;
 				token = vh->createToken(result);
 				if (!result) {
+					vh->release();
 					return FALSE;
 				}
 #endif
+				vh->release();
 			}
 			KCmdEnv *env = NULL;			
 			if (command->env) {

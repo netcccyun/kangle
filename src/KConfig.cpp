@@ -352,7 +352,7 @@ static bool on_begin_parse(kconfig::KConfigFile* file, khttpd::KXmlNode* node) {
 			/* attach listen cert/key file modified notice */
 			KSslCertificate ssl_cert;
 			ssl_cert.parse_certificate(body->attributes);
-			ssl_cert.attach_modified_event(file, body->attributes, ""_CS);
+			ssl_cert.attach_modified_event(file, body->attributes, conf.path);
 		}
 	}
 	for (auto it = kconfig::find_first_child(node->get_first(), "ssl"_CS); it && it->value()->is_tag(_KS("ssl")); it = it->next()) {
@@ -361,7 +361,7 @@ static bool on_begin_parse(kconfig::KConfigFile* file, khttpd::KXmlNode* node) {
 			/* attach global ssl cert/key file modified notice */
 			KSslCertificate ssl_cert;
 			ssl_cert.parse_certificate(body->attributes);
-			ssl_cert.attach_modified_event(file, body->attributes, ""_CS);
+			ssl_cert.attach_modified_event(file, body->attributes, conf.path);
 		}
 	}
 #endif

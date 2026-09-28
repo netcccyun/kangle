@@ -75,6 +75,23 @@ bool KDiskCacheStream::Close(KHttpObject *obj)
 		return false;
 	}
 	obj->index.content_length = content_length;
+	//Open时只预留了文件头空间，swapin和重启加载都要校验文件头
+	uint32_t reserved_head_size = obj->index.head_size;
+	obj->index.head_size = 0;
+	int need_head_size = obj->GetHeaderSize(0);
+	obj->index.head_size = reserved_head_size;
+	if (need_head_size <= 0 || (uint32_t)need_head_size > reserved_head_size) {
+		//build_header不检查边界，文件头超出预留空间时不能写
+		return false;
+	}
+	int header_size = 0;
+	auto header = obj->build_aio_header(header_size, nullptr, 0);
+	if (!header || header_size != (int)obj->index.head_size) {
+		return false;
+	}
+	if (kfiber_file_seek(fp, seekBegin, 0) != 0 || !kfiber_file_write_full(fp, header.get(), &header_size)) {
+		return false;
+	}
 	kfiber_file_close(fp);
 	fp = NULL;
 	return true;
