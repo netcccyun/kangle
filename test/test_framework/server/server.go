@@ -149,6 +149,7 @@ func Start() {
 		}
 	}()
 	go startStalePoolOrigin()
+	go startHostMarkOrigin()
 	crt, err := tls.LoadX509KeyPair(fmt.Sprintf("%s/etc/server.crt", config.Cfg.BasePath), fmt.Sprintf("%s/etc/server.key", config.Cfg.BasePath))
 	if err != nil {
 		log.Fatalln(err.Error())

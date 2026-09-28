@@ -1,6 +1,7 @@
 package base_suite
 
 import (
+	"os"
 	"test_framework/config"
 	"test_framework/kangle"
 	"test_framework/server"
@@ -48,6 +49,16 @@ func (b *base) Init() error {
 		<table name='BEGIN'>			
 			<chain  action='continue' >
 				<mark_flag  x_cache='1' age='1' via='1'></mark_flag>
+			</chain>
+			<chain action='continue'>
+				<acl module='host' v='proxy-rewrite.test'/>
+				<acl module='self_ports' v='9988'/>
+				<mark module='host' host='127.0.0.2' port='0s' proxy='1' rewrite='1'/>
+			</chain>
+			<chain action='continue'>
+				<acl module='host' v='rewrite-source.test'/>
+				<acl module='self_ports' v='9988|9999'/>
+				<mark module='host_rewrite' reg_host='^rewrite-source\\.test$' host='rewrite-target.test' rewrite='1'/>
 			</chain>
 			<chain  action='return' >
 				<acl_path  path='/stub_status'></acl_path>
@@ -106,7 +117,16 @@ func (b *base) Init() error {
 		<host>` + config.GetLocalhost("apache") + `</host>
 		<host>` + config.GetLocalhost("apache2") + `</host>
 	</vh>
+	<vh name='rewrite_target' doc_root='www/rewrite-target' inherit='on' app='1'>
+		<host>rewrite-target.test</host>
+	</vh>
 	</config>`
+	if err := os.MkdirAll(config.Cfg.BasePath+"/www/rewrite-target", 0755); err != nil {
+		return err
+	}
+	if err := kangle.CreateFile(config.Cfg.BasePath+"/www/rewrite-target/index.html", "host-rewrite-target"); err != nil {
+		return err
+	}
 	kangle.CreateExtConfig("10", "<!--# start 10 -->\r\n<config></config>")
 	kangle.CreateExtConfig("100", "<!--# start 100 -->\r\n<config></config>")
 	return kangle.CreateExtConfig(CONFIG_FILE_NAME, str)
@@ -170,6 +190,8 @@ func init() {
 	s.AddCase("disk_cache", "磁盘缓存swap out/in", check_disk_cache)
 	s.AddCase("upstream_http_protocol", "测试上游http协议解析", check_upstream_http_protocol)
 	s.AddCase("stale_pool_retry", "复用连接被上游关闭后安全重试", check_stale_pool_retry)
+	s.AddCase("host_mark_proxy", "请求控制host标记选择反代源", check_host_mark_proxy)
+	s.AddCase("host_rewrite_https_vhost", "HTTPS host_rewrite后重新选择本地虚拟主机", check_host_rewrite_https_vhost)
 	s.AddCase("fastcgi", "fastcgi协议测试", check_fastcgi)
 	s.AddCase("obs_fold", "obs_fold测试", check_obs_fold)
 	s.AddCase("100_continue", "100-continue测试", check_100_continue)

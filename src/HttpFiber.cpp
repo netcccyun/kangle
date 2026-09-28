@@ -142,7 +142,20 @@ query_vh_result query_virtual(KHttpRequest* rq, const char* hostname, int len, i
 #ifdef KSOCKET_SSL
 	void* sni = rq->sink->get_sni();
 	if (sni) {
-		vh_result = kgl_use_ssl_sni(sni, &svh);
+		if (KBIT_TEST(rq->sink->data.raw_url.flags, KGL_URL_REWRITED)
+			&& rq->sink->data.raw_url.host
+			&& hostname
+			&& strcasecmp(rq->sink->data.raw_url.host, hostname) != 0) {
+			/*
+			 * SNI is resolved during the TLS handshake, before request access
+			 * rules run.  A host_rewrite rule without proxying must therefore
+			 * perform a fresh lookup using the rewritten HTTP host.
+			 */
+			kgl_free_ssl_sni(sni);
+			vh_result = conf.gvm->queryVirtualHost((KVirtualHostContainer*)rq->sink->get_server_opaque(), &svh, hostname, len);
+		} else {
+			vh_result = kgl_use_ssl_sni(sni, &svh);
+		}
 	} else
 #endif
 		vh_result = conf.gvm->queryVirtualHost((KVirtualHostContainer*)rq->sink->get_server_opaque(), &svh, hostname, len);

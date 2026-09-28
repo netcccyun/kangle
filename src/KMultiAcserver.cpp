@@ -209,7 +209,12 @@ static KUpstream* connect_result(KHttpRequest* rq, KSockPoolHelper* sa, int cook
 		rq->response_header(_KS("Set-Cookie"), b.buf(), b.size());
 	}
 	rq->ctx.upstream_sign = sa->sign;
-	KUpstream* us = sa->get_upstream(rq->get_upstream_flags(), rq->sink->data.raw_url.host);
+	const char* sni_host = rq->sink->data.raw_url.host;
+	if (!KBIT_TEST(rq->ctx.filter_flags, RF_PROXY_RAW_URL)
+		&& KBIT_TEST(rq->sink->data.raw_url.flags, KGL_URL_REWRITED)) {
+		sni_host = rq->sink->data.url->host;
+	}
+	KUpstream* us = sa->get_upstream(rq->get_upstream_flags(), sni_host);
 	sa->release();
 	return us;
 }
