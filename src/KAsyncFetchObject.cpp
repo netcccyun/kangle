@@ -10,6 +10,7 @@
 #include "KHttp2.h"
 #include "KHttpServer.h"
 #include "KHttp2Upstream.h"
+#include "KHttpKeyValue.h"
 #include "HttpFiber.h"
 #ifdef ENABLE_BIG_OBJECT
 #include "KBigObjectContext.h"
@@ -177,6 +178,12 @@ KGL_RESULT KAsyncFetchObject::InternalProcess(KHttpRequest* rq, kfiber** post_fi
 		//fastcgi must meet END_REQUEST
 		return read_body_end(rq, ret);
 	}
+	if (ret == KGL_ESOCKET_BROKEN && !client->IsNew() && kgl_is_safe_method(rq->sink->data.meth)) {
+		// The peer may close an idle keep-alive connection while it is in the
+		// pool.  If no response bytes were received, replaying a safe request on
+		// a fresh connection is preferable to exposing that normal race as a 504.
+		return KGL_ECAN_RETRY_SOCKET_BROKEN;
+	}
 	if (ret != KGL_OK) {
 		return upstream_is_error(rq, STATUS_GATEWAY_TIMEOUT, "cann't read protocol header");
 	}
@@ -276,6 +283,7 @@ KGL_RESULT KAsyncFetchObject::ReadBody(KHttpRequest* rq) {
 }
 KGL_RESULT KAsyncFetchObject::ReadHeader(KHttpRequest* rq, kfiber** post_fiber) {
 	InitUpstreamBuffer();
+	bool received_data = false;
 #if defined(WORK_MODEL_TCP) || defined(HTTP_PROXY)
 	//tcp pipe line
 	if (KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE) && !client->IsMultiStream()) {
@@ -295,8 +303,9 @@ KGL_RESULT KAsyncFetchObject::ReadHeader(KHttpRequest* rq, kfiber** post_fiber) 
 		char* buf = (char*)getUpstreamBuffer(&len);
 		int got = client->read(buf, len);
 		if (got <= 0) {
-			return KGL_ESOCKET_BROKEN;
+			return received_data ? KGL_EDATA_FORMAT : KGL_ESOCKET_BROKEN;
 		}
+		received_data = true;
 		ks_write_success(&us_buffer, got);
 		char* data = us_buffer.buf;
 		char* end = data + us_buffer.used;

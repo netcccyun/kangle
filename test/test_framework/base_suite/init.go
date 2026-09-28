@@ -71,6 +71,9 @@ func (b *base) Init() error {
 			<chain  action='server:upstream_ssl' >
 				<acl_path>/upstream/ssl/*</acl_path>
 			</chain>
+			<chain  action='server:stale_upstream' >
+				<acl_path>/stale_pool</acl_path>
+			</chain>
 			<chain  action='server:upstream_h2' >
 				<acl_self_port >9801</acl_self_port>
 			</chain>
@@ -166,6 +169,7 @@ func init() {
 	s.AddCase("broken_no_cache", "连接中断不能缓存", check_broken_no_cache)
 	s.AddCase("disk_cache", "磁盘缓存swap out/in", check_disk_cache)
 	s.AddCase("upstream_http_protocol", "测试上游http协议解析", check_upstream_http_protocol)
+	s.AddCase("stale_pool_retry", "复用连接被上游关闭后安全重试", check_stale_pool_retry)
 	s.AddCase("fastcgi", "fastcgi协议测试", check_fastcgi)
 	s.AddCase("obs_fold", "obs_fold测试", check_obs_fold)
 	s.AddCase("100_continue", "100-continue测试", check_100_continue)

@@ -1290,6 +1290,12 @@ function serializeDocument($doc)
     $doc->encoding = 'UTF-8';
     $doc->formatOutput = true;
     $xml = $doc->saveXML();
+    // Kangle extension files use a leading <!--#start N--> directive to
+    // control load order. DOMDocument::saveXML() prepends an XML declaration,
+    // which hides that directive from Kangle and makes the file fall back to
+    // the default priority. Kangle configuration is UTF-8 without requiring a
+    // declaration, so remove only the declaration generated at the beginning.
+    $xml = preg_replace('/\A(?:\xEF\xBB\xBF)?\s*<\?xml\b[^>]*\?>\s*/i', '', $xml, 1);
     return rtrim($xml) . "\n";
 }
 

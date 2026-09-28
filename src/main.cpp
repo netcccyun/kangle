@@ -1115,9 +1115,12 @@ bool init_resource_limit(int numcpu) {
 		open_file_limited = 65536;
 	}
 	if (0 == getrlimit(RLIMIT_NOFILE, &rlim)) {
-		if (rlim.rlim_max < open_file_limited) {
-			rlim.rlim_cur = open_file_limited;
-			rlim.rlim_max = open_file_limited;
+		rlim_t target = (rlim_t)open_file_limited;
+		if (rlim.rlim_max != RLIM_INFINITY && target > rlim.rlim_max) {
+			target = rlim.rlim_max;
+		}
+		if (rlim.rlim_cur < target) {
+			rlim.rlim_cur = target;
 			int ret = setrlimit(RLIMIT_NOFILE, &rlim);
 			if (ret != 0) {
 				klog(KLOG_ERR, "set open file limit error [%d]\n", errno);
@@ -1126,8 +1129,9 @@ bool init_resource_limit(int numcpu) {
 		}
 	}
 	if (0 == getrlimit(RLIMIT_NOFILE, &rlim)) {
-		klog(KLOG_ERR, "max open file limit [cur:%d,max:%d]\n", rlim.rlim_cur, rlim.rlim_max);
-		open_file_limit = rlim.rlim_max;
+		klog(KLOG_INFO, "open file limit [cur:%llu,max:%llu]\n",
+			(unsigned long long)rlim.rlim_cur, (unsigned long long)rlim.rlim_max);
+		open_file_limit = (int)rlim.rlim_cur;
 	} else {
 		klog(KLOG_ERR, "get max open file limit error [%d]\n", errno);
 	}

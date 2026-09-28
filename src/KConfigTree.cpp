@@ -700,7 +700,7 @@ namespace kconfig {
 		ev.type = ev_type;
 
 		if (ev_type != EvNone) {
-			klog(KLOG_NOTICE, "notice %s%s%s  [%d] ev_tree=[%p] xml=[%p]\n",
+			klog(KLOG_DEBUG, "config event %s%s%s [%d] ev_tree=[%p] xml=[%p]\n",
 				xml->key.tag->data,
 				xml->key.vary ? "@" : "",
 				xml->key.vary ? xml->key.vary->data : "",
@@ -1225,7 +1225,7 @@ namespace kconfig {
 			KConfigScanInfoProvider provider;
 			load_config_file(name, &filename, &provider);
 			for (auto&& info : provider.prepare_files) {
-				klog(KLOG_ERR, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
+				klog(KLOG_INFO, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
 				info.second.cfg->update(info.second.body);
 			}
 			return true;
@@ -1269,7 +1269,7 @@ namespace kconfig {
 		}
 		auto apply_prepare_files = [&provider]() {
 			for (auto&& info : provider.prepare_files) {
-				klog(KLOG_ERR, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
+				klog(KLOG_INFO, "load config file [%s] index=[%d]\n", info.second.cfg->get_filename()->data, info.first);
 				info.second.cfg->update(info.second.body);
 			}
 			provider.prepare_files.clear();

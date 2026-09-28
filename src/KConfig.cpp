@@ -616,7 +616,7 @@ void load_lang() {
 		KString configFile = conf.path + "/webadmin";
 #endif
 		configFile += "/lang.xml";
-		klog(KLOG_NOTICE, "load config file [%s]\n", configFile.c_str());
+		klog(KLOG_INFO, "load config file [%s]\n", configFile.c_str());
 		klang.load(configFile.c_str());
 	} catch (KXmlException& e) {
 		fprintf(stderr, "%s\n", e.what());
