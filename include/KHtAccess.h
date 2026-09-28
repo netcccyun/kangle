@@ -99,8 +99,14 @@ struct _KApacheHtaccessContext
 		for (int i = 0; i < 2; ++i) {
 			access[i] = new KAccess(false, i);
 		}
-		ev.add(_KS("request"), access[REQUEST]);
-		ev.add(_KS("response"), access[RESPONSE]);
+		// EvRemove releases the listener, so the tree needs its own reference
+		// in addition to the one held by this context.
+		if (ev.add(_KS("request"), access[REQUEST])) {
+			access[REQUEST]->add_ref();
+		}
+		if (ev.add(_KS("response"), access[RESPONSE])) {
+			access[RESPONSE]->add_ref();
+		}
 		KString str(filename);
 		kgl_ref_str_t* prefix_str = kstring_from(prefix);
 		file = new kconfig::KConfigFile(&ev, prefix_str, str.data(), kconfig::KConfigFileSource::Htaccess);
@@ -111,13 +117,21 @@ struct _KApacheHtaccessContext
 			file->clear();
 			file->release();
 		}
+		// Empty or failed loads may never create a request/response XML node,
+		// so clear() does not necessarily send EvRemove to both listeners.
+		auto request_access = static_cast<KAccess*>(ev.remove(_KS("request")));
+		if (request_access) {
+			request_access->release();
+		}
+		auto response_access = static_cast<KAccess*>(ev.remove(_KS("response")));
+		if (response_access) {
+			response_access->release();
+		}
 		for (int i = 0; i < 2; ++i) {
 			if (access[i]) {
 				access[i]->release();
 			}
 		}
-		ev.remove(_KS("request"));
-		ev.remove(_KS("response"));
 		assert(ev.empty());
 	}
 };

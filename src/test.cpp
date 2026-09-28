@@ -126,11 +126,44 @@ void test_container() {
 	*/
 }
 void test_htaccess() {
-	//static const char *file = "/home/keengo/httpd.conf";
-	//KHtAccess htaccess;
-	//KFileName file;
-	//file.setName("/","/home/keengo/");
-	//printf("result=%d\n",htaccess.load("/","/home/keengo/"));
+	const char* configs[] = {
+		nullptr, // No successful load, hence no EvRemove callbacks.
+		"<config/>",
+		"<config><request action='allow'/></config>",
+		"<config><response action='allow'/></config>",
+		"<config><request action='allow'/><response action='allow'/></config>"
+	};
+	for (auto config : configs) {
+		for (bool clear_first : { false, true }) {
+			for (bool hold_access : { false, true }) {
+				KSafeAccess held[2];
+				{
+					_KApacheHtaccessContext ctx("unused-htaccess-test", "");
+					if (hold_access) {
+						for (int i = 0; i < 2; ++i) {
+							held[i].reset(ctx.access[i]->add_ref());
+						}
+					}
+					if (config) {
+						kgl_auto_cstr xml(xstrdup(config));
+						auto nodes = kconfig::parse_xml(xml.get());
+						assert(nodes);
+						ctx.file->update(std::move(nodes));
+					}
+					if (clear_first) {
+						ctx.file->clear();
+					}
+				}
+				// Context/tree cleanup must preserve independently held references.
+				if (hold_access) {
+					for (int i = 0; i < 2; ++i) {
+						assert(held[i]->get_type() == i);
+						assert(!held[i]->isGlobal());
+					}
+				}
+			}
+		}
+	}
 }
 void test_file(const char* path) {
 #if 0
