@@ -429,6 +429,10 @@ public:
 			//有content-length，又未读完
 			result = KGL_ESOCKET_BROKEN;
 		}
+		if (result < KGL_OK) {
+			//Do not finish a truncated/malformed upstream body as a successful chunked response.
+			sink->shutdown();
+		}
 		ctx.body = { 0 };
 		return result;
 	}

@@ -20,6 +20,8 @@ func (b *base) Init() error {
 	server.Handle("/chunk_trailer", HandleChunkUpstreamTrailer)
 	server.Handle("/chunk_trailer_1", HandleHttp1ChunkUpstreamTrailer)
 	server.Handle("/obs_fold", handle_obs_fold)
+	server.Handle("/hardening_upload", handle_hardening_upload)
+	server.Handle("/hardening_origin", handle_hardening_origin)
 	server.Handle("/chunk", HandleChunkUpstream)
 	server.Handle("/split_response", HandleSplitResponse)
 	server.Handle("/chunk_post", HandleChunkPost)
@@ -210,5 +212,9 @@ func init() {
 	s.AddCase("config_server", "config server changed", check_config_server)
 	s.AddCase("http2_ping_ack", "HTTP/2 PING ACK 回显载荷", check_http2_ping_ack)
 	s.AddCase("http2_ping_flood", "HTTP/2 PING 只发不读应断开且服务仍存活", check_http2_ping_flood)
+	s.AddCase("http2_invalid_request", "HTTP/2 非法请求头只重置stream且服务仍存活", check_http2_invalid_request)
+	s.AddCase("http2_unread_body", "响应完成时重置未读请求体以及分片trailer生命周期", check_http2_unread_body)
+	s.AddCase("http1_request_smuggling", "HTTP/1 chunk长度溢出、头名空白、超长trailer要拒绝", check_http1_request_smuggling)
+	s.AddCase("http1_trailer_limits", "请求和上游trailer的长度和条数限制", check_http1_trailer_limits)
 	s.AddCase("bug", "bug", check_bug)
 }

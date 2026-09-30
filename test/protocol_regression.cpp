@@ -1,0 +1,130 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <assert.h>
+#include <stdio.h>
+#include <string>
+#include <vector>
+#include "KDechunkEngine.h"
+#include "KHttpParser.h"
+#include "KStringBuf.h"
+#include "KXml.h"
+#include "KXmlDocument.h"
+
+static KDechunkResult decode(const std::string& input) {
+    KDechunkEngine engine;
+    const char* hot = input.data();
+    const char* end = hot + input.size();
+    for (;;) {
+        const char* piece = NULL;
+        int len = KHTTPD_MAX_CHUNK_SIZE;
+        KDechunkResult result = engine.dechunk(&hot, end, &piece, &len);
+        if (result != KDechunkResult::Success && result != KDechunkResult::Trailer) {
+            return result;
+        }
+    }
+}
+
+static void check_dechunk_limits() {
+    assert(decode("100000000\r\n") == KDechunkResult::Failed);
+    assert(decode("20000000\r\n") == KDechunkResult::Failed);
+    assert(decode("1fffffff\r\n") == KDechunkResult::Continue);
+    assert(decode("1\r\nx\r\n0\r\nX-Test: ok\r\n\r\n") == KDechunkResult::End);
+    assert(decode("0\r\nX-Test: " + std::string(16385, 'a') + "\r\n\r\n") == KDechunkResult::Failed);
+    assert(decode("0\r\n" + std::string(16385, 'a')) == KDechunkResult::Failed);
+    std::string trailers;
+    for (int i = 0; i < KHTTPD_MAX_TRAILER_COUNT; ++i) {
+        trailers += "X-Test: ok\r\n";
+    }
+    assert(decode("0\r\n" + trailers + "\r\n") == KDechunkResult::End);
+    assert(decode("0\r\n" + trailers + "X-Test: extra\r\n\r\n") == KDechunkResult::Failed);
+}
+
+static void check_header_names() {
+    const char* invalid[] = {"Transfer-Encoding ", "Transfer-Encoding\t", "x/name", ""};
+    for (const char* name : invalid) {
+        std::string input = std::string(name) + ": chunked";
+        std::vector<char> buffer(input.begin(), input.end());
+        buffer.push_back(0);
+        khttp_parser parser = {};
+        khttp_parse_result rs = {};
+        assert(khttp_parse_header(&parser, buffer.data(), buffer.data() + input.size(), &rs) == kgl_parse_success);
+        assert(rs.bad_name);
+    }
+    char embedded_nul[] = "Transfer\0-Encoding: chunked";
+    khttp_parser parser = {};
+    khttp_parse_result rs = {};
+    assert(khttp_parse_header(&parser, embedded_nul, embedded_nul + sizeof(embedded_nul) - 1, &rs) == kgl_parse_success);
+    assert(rs.bad_name);
+}
+
+static void check_fragmented_fold() {
+    std::string input = "GET / HTTP/1.1\r\nX-Test: first";
+    for (int i = 0; i < 1000; ++i) {
+        input += "\r\n next";
+    }
+    input += "\r\nHost: localhost\r\n\r\n";
+    std::vector<char> buffer(input.begin(), input.end());
+    buffer.push_back(0);
+    char* hot = buffer.data();
+    khttp_parser parser = {};
+    int headers = 0;
+    for (size_t length = 1; length <= input.size(); ++length) {
+        for (;;) {
+            khttp_parse_result rs = {};
+            kgl_parse_result result = khttp_parse(&parser, &hot, buffer.data() + length, &rs);
+            assert(result != kgl_parse_error);
+            if (result == kgl_parse_success) {
+                assert(!rs.bad_name);
+                ++headers;
+                if (headers == 2) {
+                    assert(rs.attr_len == 6 && std::string(rs.attr) == "X-Test");
+                    assert(rs.val_len == 5 + 1000 * 7);
+                    assert(memchr(rs.val, '\r', rs.val_len) == NULL);
+                    assert(memchr(rs.val, '\n', rs.val_len) == NULL);
+                }
+                continue;
+            }
+            break;
+        }
+    }
+    assert(headers == 3 && parser.finished && parser.header_len == (int)input.size());
+}
+
+static void check_xml() {
+    using namespace khttpd;
+    for (const char* text : {"<tag>]]>&amp;&", "plain &amp; &"}) {
+        KXmlDocument document;
+        char xml[] = "<config><item/></config>";
+        KSafeXmlNode root = document.parse(xml);
+        assert(root);
+        root->find_child("item")->get_first()->set_text(text);
+        KStringBuf output;
+        assert(root->write(&output) == KGL_OK);
+        std::string serialized(output.c_str());
+        KXmlDocument again;
+        KSafeXmlNode result = again.parse(&serialized[0]);
+        assert(result && result->find_child("item")->get_first()->get_text() == KString(text));
+        KXmlKey key("item", 4);
+        KSafeXmlNode extra(new KXmlNode(&key));
+        assert(root->get_first()->add(extra.get(), 1000));
+        assert(root->find_child("item")->get_body_count() == 2);
+    }
+    std::string deep;
+    for (int i = 0; i < KXML_MAX_DEPTH + 2; ++i) deep += "<n>";
+    for (int i = 0; i < KXML_MAX_DEPTH + 2; ++i) deep += "</n>";
+    KXmlDocument document;
+    assert(!document.parse(&deep[0]));
+    KXmlDocument malformed;
+    char xml[] = "<config><!--";
+    assert(!malformed.parse(xml));
+}
+
+int main() {
+    check_dechunk_limits();
+    check_header_names();
+    check_fragmented_fold();
+    check_xml();
+    puts("protocol regression tests passed");
+    return 0;
+}

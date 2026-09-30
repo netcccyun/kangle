@@ -607,7 +607,9 @@ KGL_RESULT KAsyncFetchObject::PushHeader(KHttpRequest* rq, const char* attr, int
 		if (data) {
 			data += 8;
 			//确保有效，减掉2秒生存时间
-			pop_header.keep_alive_time_out = kgl_atoi((u_char*)data, end - data) - 2;
+			int keep_alive_time_out = kgl_atoi((u_char*)data, end - data);
+			//0 means use the default life_time in gcSocket.
+			pop_header.keep_alive_time_out = keep_alive_time_out > 2 ? keep_alive_time_out - 2 : -1;
 		}
 		return KGL_OK;
 	}
