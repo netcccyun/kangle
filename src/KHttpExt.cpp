@@ -38,18 +38,21 @@ HANDLE api_child_token = NULL;
 #endif
 KGL_RESULT set_variable(void* lpvBuffe, LPDWORD lpdwSize, const char* val, bool unicode)
 {
+	if (lpdwSize == NULL) {
+#ifdef _WIN32
+		SetLastError(ERROR_INVALID_PARAMETER);
+#else
+		SetLastError(EINVAL);
+#endif
+		return KGL_EINVALID_PARAMETER;
+	}
 	char* buffer = (char*)lpvBuffe;
 	if (val == NULL) {
-		*lpdwSize = 1;
-		if (buffer) {
-			buffer[0] = 0;
+		DWORD need_size = (unicode ? 2 : 1);
+		if (buffer && *lpdwSize >= need_size) {
+			memset(buffer, 0, need_size);
 		}
-		if (unicode) {
-			if (buffer) {
-				buffer[1] = '\0';
-			}
-			*lpdwSize += 1;
-		}
+		*lpdwSize = need_size;
 		SetLastError(ERROR_NO_DATA);
 		return KGL_ENO_DATA;
 	}
@@ -57,12 +60,25 @@ KGL_RESULT set_variable(void* lpvBuffe, LPDWORD lpdwSize, const char* val, bool 
 	unsigned len = (unsigned)strlen(val);
 #ifdef _WIN32
 	if (unicode) {
-		len = MultiByteToWideChar(CP_ACP, 0, val, len, (LPWSTR)lpvBuffe, *lpdwSize / 2);
-		if (buffer) {
-			buffer[2 * len] = '\0';
-			buffer[2 * len + 1] = '\0';
+		int wlen = 0;
+		if (len > 0) {
+			wlen = MultiByteToWideChar(CP_ACP, 0, val, len, NULL, 0);
+			if (wlen == 0) {
+				return KGL_EINVALID_PARAMETER;
+			}
 		}
-		*lpdwSize = (len + 1) * 2;
+		DWORD need_size = (DWORD)(wlen + 1) * 2;
+		if (buffer == NULL || *lpdwSize < need_size) {
+			*lpdwSize = need_size;
+			SetLastError(ERROR_INSUFFICIENT_BUFFER);
+			return KGL_EINSUFFICIENT_BUFFER;
+		}
+		if (wlen > 0) {
+			MultiByteToWideChar(CP_ACP, 0, val, len, (LPWSTR)lpvBuffe, wlen);
+		}
+		buffer[2 * wlen] = '\0';
+		buffer[2 * wlen + 1] = '\0';
+		*lpdwSize = need_size;
 	} else {
 #endif
 		if (*lpdwSize > len || buffer == NULL) {
@@ -104,9 +120,11 @@ BOOL WINAPI GetServerVariable(HCONN hConn, LPSTR lpszVariableName,LPVOID lpvBuff
 		lpszVariableName += 8;
 	}
 	if (strcasecmp(lpszVariableName, "CACHE_URL") == 0) {
-		s << "http://" << fo->env.getEnv("SERVER_NAME") << ":"
-				<< fo->env.getEnv("SERVER_PORT") << fo->env.getEnv(
-				"SCRIPT_NAME");
+		const char* server_name = fo->env.getEnv("SERVER_NAME");
+		const char* server_port = fo->env.getEnv("SERVER_PORT");
+		const char* script_name = fo->env.getEnv("SCRIPT_NAME");
+		s << "http://" << (server_name ? server_name : "") << ":"
+				<< (server_port ? server_port : "") << (script_name ? script_name : "");
 		result = setVariable(lpvBuffer, lpdwSize, s.c_str(), unicode);
 		goto done;
 	}
@@ -234,10 +252,15 @@ BOOL WINAPI ServerSupportFunction(HCONN hConn, DWORD dwHSERequest,LPVOID lpvBuff
 		HSE_SEND_HEADER_EX_INFO *info = (HSE_SEND_HEADER_EX_INFO *) lpvBuffer;
 		//debug("info.status=%s\n",info->pszStatus);
 		if (info->cchStatus > 0) {
-			fo->setStatusCode(info->pszStatus, info->cchStatus);
+			if (!fo->setStatusCode(info->pszStatus, info->cchStatus)) {
+				return FALSE;
+			}
 		}
 		if (info->cchHeader > 0) {
-			fo->addHeader(info->pszHeader, info->cchHeader);
+			KGL_RESULT result = fo->addHeader(info->pszHeader, info->cchHeader);
+			if (result != KGL_OK && result != KGL_NO_BODY) {
+				return FALSE;
+			}
 		}
 		//debug("header = [%s]\n",info->pszHeader);
 		return true;
@@ -294,7 +317,10 @@ BOOL WINAPI ServerSupportFunction(HCONN hConn, DWORD dwHSERequest,LPVOID lpvBuff
 	}
 	if (dwHSERequest == HSE_REQ_UTF8_TO_LOCALE) {
 		const char *buffer = (const char *) lpvBuffer;
-		lpdwSize = (LPDWORD) utf82charset(buffer, strlen(buffer), "UNICODE");
+		char *result = utf82charset(buffer, strlen(buffer), "UNICODE");
+		if (result) {
+			free(result);
+		}
 		return TRUE;
 	}
 	switch(dwHSERequest) {

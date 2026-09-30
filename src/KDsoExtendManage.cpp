@@ -36,13 +36,26 @@ bool KDsoExtendManage::add(const KXmlAttribute &attribute)
 		klog(KLOG_NOTICE, "ignore legacy filter dso entry; filters are built in\n");
 		return true;
 	}
+	{
+		KLocker locker(&lock);
+		if (dsos.find(attribute("name")) != dsos.end()) {
+			klog(KLOG_ERR, "dso extend name [%s] is duplicate\n", attribute("name"));
+			return false;
+		}
+	}
 	KDsoExtend *dso = new KDsoExtend(attribute["name"].c_str());
 	if (!dso->load(attribute("filename"),attribute)) {
+		if (dso->init_called) {
+			/* hooks registered by the module may still refer to it, keep it loaded. */
+			klog(KLOG_ERR, "dso extend [%s] init failed, it will be keeped in memory\n", dso->GetName());
+			return false;
+		}
 		delete dso;
 		return false;
 	}
 	if (!add(dso)) {
-		delete dso;
+		dso->shutdown();
+		klog(KLOG_ERR, "dso extend [%s] add failed, it will be keeped in memory\n", dso->GetName());
 		return false;
 	}
 	klog(KLOG_NOTICE, "load dso extend name [%s] file [%s] successfully\n", dso->GetName(), dso->GetFileName());

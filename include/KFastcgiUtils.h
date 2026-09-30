@@ -283,6 +283,31 @@ public:
 		}
 		goto read_header;
 	}
+	/* keep a received data package (malloced), it will be returned by read() later. */
+	void push_read_data(char* buf, int len)
+	{
+		if (len <= 0) {
+			xfree(buf);
+			return;
+		}
+		if (readBuf == NULL || readLeft <= 0) {
+			if (readBuf) {
+				xfree(readBuf);
+			}
+			readBuf = buf;
+			readHot = buf;
+			readLeft = len;
+			return;
+		}
+		char* nb = (char*)xmalloc(readLeft + len);
+		kgl_memcpy(nb, readHot, readLeft);
+		kgl_memcpy(nb + readLeft, buf, len);
+		xfree(readBuf);
+		xfree(buf);
+		readBuf = nb;
+		readHot = nb;
+		readLeft += len;
+	}
 	int read(char* buf, int len)
 	{
 		if (len < 0 || (len > 0 && buf == NULL)) {

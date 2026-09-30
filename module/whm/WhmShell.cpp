@@ -113,6 +113,7 @@ int WhmShell::call(const char *callName,const char *eventType,WhmContext *contex
 	initContext(sc,context);
 	if (!async) {
 		run(sc);
+		sc->closed = true;
 		int ret = result(sc,context);
 		delete sc;
 		return ret;
@@ -154,8 +155,6 @@ void WhmShell::run(WhmShellContext *sc)
 		p->run(sc);
 		p = p->next;
 	}
-	//set the shellcontext is closed
-	sc->closed = true;
 }
 bool WhmShell::startElement(KXmlContext *context)
 {
@@ -236,14 +235,16 @@ void WhmShell::endContext(WhmShellContext *sc)
 		sc->prev = end;
 		end = sc;
 	}
+	//mark closed only after it is in the end queue, result() may remove it at once.
+	sc->closed = true;
 	lock.Unlock();
 }
 void WhmShell::addContext(WhmShellContext *sc)
 {
 	lock.Lock();	
 	context.insert(std::pair<KString,WhmShellContext *>(sc->session,sc));
-	lock.Unlock();
 	sc->addRef();
+	lock.Unlock();
 }
 WhmShellContext *WhmShell::refsContext(KString session)
 {
@@ -262,24 +263,25 @@ bool WhmShell::removeContext(WhmShellContext *sc)
 	bool result = false;
 	lock.Lock();
 	assert(sc != merge_context);
-	if (sc==head) {
-		head = head->next;
-	}
-	if (sc==end) {
-		end = end->prev;
-	}
-	if (sc->next){
-		sc->next->prev = sc->prev;
-	}
-	if (sc->prev){
-		sc->prev->next = sc->next;
-	}
 	std::map<KString,WhmShellContext *>::iterator it;
 	it = context.find(sc->session);
-	if (it!=context.end()) {
-		assert(sc==(*it).second);
-		(*it).second->release();
+	if (it!=context.end() && sc==(*it).second) {
+		if (sc==head) {
+			head = head->next;
+		}
+		if (sc==end) {
+			end = end->prev;
+		}
+		if (sc->next){
+			sc->next->prev = sc->prev;
+		}
+		if (sc->prev){
+			sc->prev->next = sc->next;
+		}
+		sc->prev = NULL;
+		sc->next = NULL;
 		context.erase(it);
+		sc->release();
 		result = true;
 	}
 	lock.Unlock();

@@ -108,7 +108,7 @@ static BOOL whmServerSupportFunction(void* param, int request, void* buffer, int
 	return FALSE;
 }
 static const char* whmGetSystemEnv(const char* name) {
-	static KString value;
+	static thread_local KString value;
 	const char* value2 = getSystemEnv(name);
 	if (value2) {
 		return value2;

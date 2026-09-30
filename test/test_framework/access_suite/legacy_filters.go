@@ -1,12 +1,16 @@
 package access_suite
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync/atomic"
 	"test_framework/common"
 	"test_framework/config"
+
+	"golang.org/x/net/http2"
 )
 
 var guestCacheHits int32
@@ -87,7 +91,23 @@ func check_legacy_filters() {
 	common.AssertSame(atomic.LoadInt32(&guestCacheHits), int32(1))
 
 	common.Getx("/filters/content-deny", host, nil, func(resp *http.Response, err error) {
+		// A matched response-body deny may close HTTP/1 or reset HTTP/2 before
+		// sending headers. This is intentional; never dereference a nil response.
+		if err != nil {
+			var streamErr http2.StreamError
+			common.Assert("content deny closes or resets the response", errors.Is(err, io.EOF) ||
+				(errors.As(err, &streamErr) && (streamErr.Code == http2.ErrCodeInternal || streamErr.Code == http2.ErrCodeCancel)))
+			return
+		}
+		common.Assert("content deny response exists", resp != nil)
+		if resp != nil {
+			common.AssertSame(common.Read(resp), "")
+		}
+	})
+	common.Getx("/builtin-filter/param?allowed=yes", host, nil, func(resp *http.Response, err error) {
 		common.AssertSame(err, nil)
-		common.AssertSame(common.Read(resp), "")
+		if resp != nil {
+			common.AssertSame(common.Read(resp), "builtin-filter-ok")
+		}
 	})
 }

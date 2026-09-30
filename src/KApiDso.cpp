@@ -99,6 +99,7 @@ bool KApiDso::init() {
 	if (GetExtensionVersion(&info) == FALSE) {
 		klog(KLOG_ERR, "call GetExtensionVersion return failed %s %d\n", path.c_str(), GetLastError());
 		unload();
+		state = STATE_LOAD_FAILED;
 		return false;
 	}
 	snprintf(apiInfo, sizeof(apiInfo), "%d.%d", HIWORD(info.dwExtensionVersion), LOWORD(info.dwExtensionVersion));
@@ -134,16 +135,22 @@ bool KApiDso::load() {
 	if (GetExtensionVersion == NULL) {
 		debug("cann't find GetExtensionVersion function\n");
 		unload();
+		state = STATE_LOAD_FAILED;
 		return false;
 	}
-	HttpExtensionProc = (HttpExtensionProcf)GetProcAddress(handle,
+	HttpExtensionProcf proc = (HttpExtensionProcf)GetProcAddress(handle,
 		"HttpExtensionProc");
-	if (HttpExtensionProc == NULL) {
+	if (proc == NULL) {
 		debug("cann't find HttpExtensionProc function\n");
 		unload();
+		state = STATE_LOAD_FAILED;
 		return false;
 	}
 	TerminateExtension = (TerminateExtensionf)GetProcAddress(handle,
 		"TerminateExtension");
-	return init();
+	if (!init()) {
+		return false;
+	}
+	HttpExtensionProc = proc;
+	return true;
 }

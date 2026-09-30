@@ -459,7 +459,11 @@ char* KMultiPartInputFilter::parse_body(int* len, bool& all) {
 		if (all) {
 			return NULL;
 		}
-		max = mb->bytes_in_buffer;
+		//keep the tail, it may be the beginning of a boundary split by reads.
+		max = mb->bytes_in_buffer - mb->boundary_next_len;
+		if (max <= 0) {
+			return NULL;
+		}
 	}
 	*len = max;
 	if (*len >= 0 && (bound || *len > 0)) {

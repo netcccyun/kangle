@@ -45,6 +45,9 @@ public:
 					} else {
 						rq->sink->data.header = h->next;
 					}
+					if (rq->sink->data.last == h) {
+						rq->sink->data.last = prev;
+					}
 					if (rq->sink->data.client_ip) {
 						free(rq->sink->data.client_ip);
 						rq->sink->data.client_ip = NULL;

@@ -49,6 +49,9 @@ public:
 							rq->sink->data.header = next;
 						}
 					}
+					if (!obj && rq->sink->data.last == h) {
+						rq->sink->data.last = last;
+					}
 					xfree_header(h);
 					h = next;
 					result = KF_STATUS_REQ_TRUE;

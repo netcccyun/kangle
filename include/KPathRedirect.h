@@ -53,11 +53,13 @@ public:
 			s << "*"_CS;
 			return;
 		}
+		bool first = true;
 		for (int i = 1; i < MAX_METHOD; i++) {
 			if (meths[i]) {
-				if (!s.empty()) {
+				if (!first) {
 					s << ",";
 				}
+				first = false;
 				s << KHttpKeyValue::get_method(i)->data;
 			}
 		}

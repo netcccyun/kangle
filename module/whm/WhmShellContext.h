@@ -4,6 +4,7 @@
 * whm shell的上下文
 */
 #include <string>
+#include <atomic>
 #include <map>
 #include "KCountable.h"
 #include "KVirtualHost.h"
@@ -139,7 +140,7 @@ public:
 	KString session;
 	//is async model
 	bool async;
-	bool closed;
+	std::atomic<bool> closed;
 	KMutex lock;
 	time_t closedTime;
 	//end context queue,timeout will auto remove

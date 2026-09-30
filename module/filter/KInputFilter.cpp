@@ -6,6 +6,7 @@
 #include "KUrlParser.h"
 #include "filter.h"
 #include "kmalloc.h"
+#include "KHttpLib.h"
 static int64_t input_filter_get_left(kgl_request_body_ctx* ctx)
 {
 	KInputFilterContext* if_ctx = (KInputFilterContext*)ctx;
@@ -33,7 +34,7 @@ static kgl_request_body_function input_body_function = {
 };
 void parseUrlParam(char* buf, int len, char** name, int* name_len, char** value, int* value_len)
 {
-	char* eq = strchr(buf, '=');
+	char* eq = (char*)memchr(buf, '=', len);
 	*name_len = len;
 	if (eq) {
 		*eq = '\0';
@@ -43,6 +44,7 @@ void parseUrlParam(char* buf, int len, char** name, int* name_len, char** value,
 		*value = eq;
 	} else {
 		*value = NULL;
+		*value_len = 0;
 	}
 	*name_len = url_decode(buf, *name_len, NULL, true);
 	*name = buf;
@@ -69,19 +71,28 @@ bool KParamInputFilter::match(KInputFilterContext* rq, const char* str, int len,
 	if (last_buf) {
 		int new_len = last_buf_len + len;
 		buf = (char*)malloc(new_len + 1);
-		kgl_memcpy(buf, last_buf, last_buf_len);
-		kgl_memcpy(buf + last_buf_len, str, len);
+		if (buf) {
+			kgl_memcpy(buf, last_buf, last_buf_len);
+			kgl_memcpy(buf + last_buf_len, str, len);
+		}
 		len = new_len;
 		free(last_buf);
 		last_buf = NULL;
 	} else {
 		buf = (char*)malloc(len + 1);
-		kgl_memcpy(buf, str, len);
+		if (buf) {
+			kgl_memcpy(buf, str, len);
+		}
 	}
-	buf[len] = '\0';
+	if (buf == NULL) {
+		last_buf_len = 0;
+		return false;
+	}
+	char* end = buf + len;
+	*end = '\0';
 	char* hot = buf;
 	for (;;) {
-		char* p = strchr(hot, '&');
+		char* p = (char*)memchr(hot, '&', end - hot);
 		if (p == NULL) {
 			break;
 		}
@@ -92,13 +103,20 @@ bool KParamInputFilter::match(KInputFilterContext* rq, const char* str, int len,
 		}
 		hot = p + 1;
 	}
-	last_buf_len = (int)strlen(hot);
+	last_buf_len = (int)(end - hot);
 	if (isLast) {
 		auto ret = match_param_item(hot, last_buf_len);
 		free(buf);
+		last_buf_len = 0;
 		return ret;
 	}
-	last_buf = strdup(hot);
+	last_buf = (char*)malloc(last_buf_len + 1);
+	if (last_buf) {
+		kgl_memcpy(last_buf, hot, last_buf_len);
+		last_buf[last_buf_len] = '\0';
+	} else {
+		last_buf_len = 0;
+	}
 	free(buf);
 	return false;
 }
@@ -165,9 +183,19 @@ KInputFilter* KInputFilterContext::get_filter(KREQUEST rq, kgl_access_context* c
 	if (filter) {
 		return filter;
 	}
-	char content_type[256] = { 0 };
-	DWORD size = sizeof(content_type);
-	if (ctx->f->get_variable(rq, KGL_VAR_CONTENT_TYPE, NULL, content_type, &size) != KGL_OK) {
+	char content_type_buf[256] = { 0 };
+	char* content_type = content_type_buf;
+	DWORD size = sizeof(content_type_buf);
+	KGL_RESULT result = ctx->f->get_variable(rq, KGL_VAR_CONTENT_TYPE, NULL, content_type, &size);
+	kgl_auto_cstr big_content_type;
+	if (result == KGL_EINSUFFICIENT_BUFFER && size > sizeof(content_type_buf) && size < 65536) {
+		big_content_type.reset((char*)malloc(size));
+		if (big_content_type) {
+			content_type = big_content_type.get();
+			result = ctx->f->get_variable(rq, KGL_VAR_CONTENT_TYPE, NULL, content_type, &size);
+		}
+	}
+	if (result != KGL_OK) {
 		filter = new KInputFilter;
 		return filter;
 	}

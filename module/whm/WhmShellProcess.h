@@ -103,6 +103,9 @@ public:
 		if(stderr_file){
 			process->stderr_file = strdup(stderr_file);
 		}
+		if(curdir){
+			process->curdir = strdup(curdir);
+		}
 		process->runAsUser = runAsUser;
 		WhmShellCommand *cmd = command;
 		while (cmd) {

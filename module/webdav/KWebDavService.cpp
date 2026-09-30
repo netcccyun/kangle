@@ -34,6 +34,30 @@ static const char* xml_supported_lock ="\n<D:supportedlock></D:supportedlock>";
 KResourceMaker* rsMaker = new KFSResourceMaker;
 KDavLockManager lockManager;
 using namespace std;
+static bool decode_destination_path(char* destination) {
+	char* path = strstr(destination, "://");
+	if (path) {
+		path = strchr(path + 3, '/');
+		if (path == NULL) {
+			return false;
+		}
+	} else {
+		path = destination;
+	}
+	char* end = strpbrk(path, "?#");
+	if (end) {
+		*end = '\0';
+	}
+	int len = (int)strlen(path);
+	if (len > 0) {
+		len = url_decode(path, len, NULL, false);
+		if (memchr(path, '\0', len) != NULL) {
+			return false;
+		}
+		path[len] = '\0';
+	}
+	return true;
+}
 static bool same_resource_path(const char* left, const char* right) {
 	if (left == NULL || right == NULL) {
 		return false;
@@ -126,6 +150,9 @@ bool KWebDavService::doCopy() {
 		return send(STATUS_BAD_REQUEST);
 	}
 	std::string destination_url(destination, len);
+	if (!decode_destination_path(destination)) {
+		return send(STATUS_BAD_REQUEST);
+	}
 
 	DWORD destination_len = sizeof(destination);
 	if (provider->pECB->ServerSupportFunction(provider->pECB->ConnID, HSE_REQ_MAP_URL_TO_PATH, destination, &destination_len, NULL) == FALSE) {
@@ -612,6 +639,9 @@ bool KWebDavService::doMove() {
 		return send(STATUS_BAD_REQUEST);
 	}
 	std::string destination_url(destination, len);
+	if (!decode_destination_path(destination)) {
+		return send(STATUS_BAD_REQUEST);
+	}
 	DWORD destination_len = sizeof(destination);
 	if (provider->pECB->ServerSupportFunction(provider->pECB->ConnID, HSE_REQ_MAP_URL_TO_PATH, destination, &destination_len, NULL) == FALSE) {
 		return send(STATUS_BAD_REQUEST);

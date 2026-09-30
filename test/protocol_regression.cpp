@@ -16,6 +16,39 @@
 #include "KHttpField.h"
 #include "KFileName.h"
 #include "KHttpLib.h"
+#include "KHttpHeaderManager.h"
+
+static void check_header_tail() {
+    KHttpHeaderManager headers = {};
+    assert(headers.add_header("A", 1, "1", 1));
+    assert(headers.add_header("B", 1, "2", 1));
+    assert(headers.add_header("C", 1, "3", 1));
+    KHttpHeader* removed = headers.remove("B", 1);
+    assert(removed && removed->next == NULL);
+    xfree_header(removed);
+    assert(headers.add_header("D", 1, "4", 1));
+    removed = headers.remove("D", 1);
+    assert(removed && removed->next == NULL);
+    xfree_header(removed);
+    assert(headers.add_header("E", 1, "5", 1));
+    assert(headers.remove("missing", 7) == NULL);
+    const char* names[] = {"A", "C", "E"};
+    KHttpHeader* h = headers.get_header();
+    for (const char* name : names) {
+        assert(h && kgl_is_attr(h, name, 1));
+        h = h->next;
+    }
+    assert(!h);
+    for (const char* name : names) {
+        removed = headers.remove(name, 1);
+        assert(removed && removed->next == NULL);
+        xfree_header(removed);
+    }
+    assert(headers.get_header() == NULL);
+    assert(headers.add_header("Z", 1, "6", 1));
+    assert(headers.get_header() && !headers.get_header()->next);
+    free_header_list(headers.steal_header());
+}
 
 static void check_node_recovery() {
     const time_t saved_time = kgl_current_sec;
@@ -186,6 +219,7 @@ static void check_xml() {
 }
 
 int main() {
+    check_header_tail();
     check_node_recovery();
     check_fields_and_dates();
     check_cache_flush_failure();

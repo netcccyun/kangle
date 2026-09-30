@@ -71,7 +71,10 @@ KGL_RESULT KApiFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_out
 	this->in = in;
 	this->out = out;
 	KGL_RESULT result = KGL_OK;
-	if (dso->HttpExtensionProc) {
+	if (dso->HttpExtensionProc == NULL) {
+		return out->f->error(out->ctx, STATUS_SERVER_ERROR, _KS("api is not loaded"));
+	}
+	{
 		assert(rq);
 		if (brd->rd->is_disable()) {
 			return out->f->error(out->ctx, STATUS_SERVER_ERROR, _KS("extend is disable"));
@@ -105,7 +108,7 @@ KGL_RESULT KApiFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_out
 	}
 	if (!headSended && result == KGL_OK) {
 		headSended = true;
-		result = out->f->write_header_finish(out->ctx, -1, &body);
+		result = out->f->write_header_finish(out->ctx, push_parser.GetContentLength(), &body);
 	}
 	if (body.ctx) {
 		assert(result != KGL_NO_BODY);
@@ -144,6 +147,9 @@ bool KApiFetchObject::initECB(EXTENSION_CONTROL_BLOCK* ecb) {
 	return true;
 }
 bool KApiFetchObject::setStatusCode(const char* status, int len) {
+	if (headSended) {
+		return false;
+	}
 	out->f->write_status(out->ctx, (uint16_t)atoi(status));
 	return true;
 }
@@ -155,6 +161,9 @@ KGL_RESULT KApiFetchObject::map_url_path(const char* url, LPVOID file, LPDWORD f
 	return set_variable(file, file_len, filename.get());
 }
 KGL_RESULT KApiFetchObject::addHeader(const char* attr, int len) {
+	if (headSended) {
+		return KGL_EHAS_SEND_HEADER;
+	}
 	if (len == 0) {
 		len = (int)strlen(attr);
 	}
@@ -166,9 +175,18 @@ KGL_RESULT KApiFetchObject::addHeader(const char* attr, int len) {
 	case kgl_parse_finished:
 	{
 		headSended = true;
-		auto result = out->f->write_header_finish(out->ctx, -1, &body);
+		auto result = out->f->write_header_finish(out->ctx, push_parser.GetContentLength(), &body);
 		if (result == KGL_NO_BODY) {
 			no_body = true;
+		}
+		if (result != KGL_OK) {
+			return result;
+		}
+		//data after the empty line is body.
+		int body_len = 0;
+		const char* body_data = push_parser.GetBody(&body_len);
+		if (body_len > 0 && body.ctx) {
+			result = body.f->write(body.ctx, body_data, body_len);
 		}
 		return result;
 	}
@@ -180,7 +198,7 @@ KGL_RESULT KApiFetchObject::addHeader(const char* attr, int len) {
 int KApiFetchObject::writeClient(const char* str, int len) {
 	if (!headSended) {
 		headSended = true;
-		auto result = out->f->write_header_finish(out->ctx, -1, &body);
+		auto result = out->f->write_header_finish(out->ctx, push_parser.GetContentLength(), &body);
 		if (result == KGL_NO_BODY) {
 			no_body = true;
 		}

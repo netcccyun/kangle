@@ -59,12 +59,13 @@ void restart_child_process(pid_t pid)
 	if (program_quit) {
 		return;
 	}
-	if (!::createProcess(&ls, NULL, argv, NULL, RDSTD_INPUT)) {
+	processLock.Lock();
+	if (program_quit || !::createProcess(&ls, NULL, argv, NULL, RDSTD_INPUT)) {
+		processLock.Unlock();
 		debug("cann't create process\n");
 		return;
 	}
 	pid = ls.process.stealPid();
-	processLock.Lock();
 	processes.insert(pair<pid_t, time_t>(pid, time(NULL)));
 	processLock.Unlock();
 	return;
@@ -74,10 +75,17 @@ void restart_child_process(pid_t pid)
 bool watch_group_process(HANDLE* ev, int watch_count)
 {
 	DWORD ret = WaitForMultipleObjects(watch_count, ev, FALSE, 1000);
-	if (ret == WAIT_TIMEOUT || ret == WAIT_FAILED) {
+	if (ret == WAIT_FAILED) {
+		Sleep(1000);
+		return false;
+	}
+	if (ret == WAIT_TIMEOUT) {
 		return false;
 	}
 	int index = ret - WAIT_OBJECT_0;
+	if (index < 0 || index >= watch_count) {
+		return false;
+	}
 	debug("index=%d,handle=%p exsit,now restart it\n", index, ev[index]);
 	restart_child_process(ev[index]);
 	return true;
@@ -87,9 +95,18 @@ void step_watch_process()
 	int watch_count = MAXIMUM_WAIT_OBJECTS;
 	HANDLE ev[MAXIMUM_WAIT_OBJECTS];
 	int i = 0;
-	std::map<pid_t, time_t>::iterator it;
-	for (it = processes.begin(); it != processes.end(); it++) {
-		ev[i++] = (*it).first;
+	std::vector<pid_t> pids;
+	processLock.Lock();
+	for (auto it = processes.begin(); it != processes.end(); it++) {
+		pids.push_back((*it).first);
+	}
+	processLock.Unlock();
+	if (pids.empty()) {
+		Sleep(1000);
+		return;
+	}
+	for (auto&& pid : pids) {
+		ev[i++] = pid;
 		if (i >= watch_count) {
 			if (watch_group_process(ev, i)) {
 				return;
@@ -380,11 +397,13 @@ void seperate_work_model()
 	//sleep(1);
 	watch_process(NULL);
 #else
-	void childExsit();
-	for (;;) {
+	bool childExsit();
+	while (!program_quit) {
 		childExsit();
 		sleep(1);
 	}
+	void killallProcess();
+	killallProcess();
 #endif
 }
 bool cmd_create_process(KWStream* st, FCGI_Header* header, bool unix_socket)
@@ -415,11 +434,14 @@ bool cmd_create_process(KWStream* st, FCGI_Header* header, bool unix_socket)
 #endif
 	argv++;
 	for (int i = 0; i < header->id; i++) {
+		processLock.Lock();
 		if (!::createProcess(&ls, NULL, argv, NULL, RDSTD_INPUT)) {
+			processLock.Unlock();
 			goto done;
 		}
 		pid_t pid = ls.process.stealPid();
 		processes.insert(pair<pid_t, time_t>(pid, time(NULL)));
+		processLock.Unlock();
 	}
 	result = true;
 #ifdef _WIN32

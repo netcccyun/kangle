@@ -114,23 +114,8 @@ kgl_parse_result KFastcgiFetchObject::parse_unknow_header(KHttpRequest* rq, char
 			fwrite("\n", 1, 1, stderr);
 			break;
 		case API_CHILD_MAP_PATH:
-		{
-
-			char* url = (char*)rq->alloc_request_memory(packet_length + 1);
-			kgl_memcpy(url, piece, packet_length);
-			url[packet_length] = '\0';
-			kgl_auto_cstr filename = rq->map_url_path(url, this->brd);
-			int len = 0;
-			if (filename) {
-				len = (int)strlen(filename.get());
-			}
-			//printf("try write map_path_result filename=[%s].\n",filename?filename:"");
-			KFastcgiStream<KUpstream> fbuf(client,FCGI_STDIN);
-			if (!fbuf.write_data(API_CHILD_MAP_PATH_RESULT, filename.get(), len)) {
-				klog(KLOG_ERR, "write map_path_result failed.\n");
-			}
+			on_map_path(rq, piece, packet_length);
 			break;
-		}
 		case FCGI_ABORT_REQUEST:
 		case FCGI_END_REQUEST:
 			return kgl_parse_error;
@@ -221,12 +206,30 @@ KGL_RESULT KFastcgiFetchObject::ParseBody(KHttpRequest* rq, char** pos, char* en
 			//assert all data are drained
 			assert(piece == *pos);
 			break;
+		case API_CHILD_MAP_PATH:
+			on_map_path(rq, piece, (int)(*pos - piece));
+			break;
 		default:
 			klog(KLOG_ERR, "recv unknow fastcgi type=[%d]\n", fcgi_header_type);
 			break;
 		}
 	}
 	return KGL_OK;
+}
+void KFastcgiFetchObject::on_map_path(KHttpRequest* rq, char* piece, int packet_length)
+{
+	char* url = (char*)rq->alloc_request_memory(packet_length + 1);
+	kgl_memcpy(url, piece, packet_length);
+	url[packet_length] = '\0';
+	kgl_auto_cstr filename = rq->map_url_path(url, this->brd);
+	int len = 0;
+	if (filename) {
+		len = (int)strlen(filename.get());
+	}
+	KFastcgiStream<KUpstream> fbuf(client, FCGI_STDIN);
+	if (!fbuf.write_data(API_CHILD_MAP_PATH_RESULT, filename.get(), len)) {
+		klog(KLOG_ERR, "write map_path_result failed.\n");
+	}
 }
 void KFastcgiFetchObject::appendPostEnd()
 {
@@ -298,7 +301,7 @@ char* KFastcgiFetchObject::parse_fcgi_header(char** str, char* end, bool full)
 			return *str;
 		}
 		uint16_t content_length = ntohs(header->contentLength);
-		if (header->type == FCGI_END_REQUEST) {
+		if (header->type == FCGI_END_REQUEST || header->type == API_CHILD_MAP_PATH) {
 			full = true;
 		}
 		if (full &&  packet_length < content_length + header->paddingLength) {

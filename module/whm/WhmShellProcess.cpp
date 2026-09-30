@@ -1,4 +1,6 @@
+#include <string>
 #include "WhmShellProcess.h"
+#include "kthread.h"
 static int write_pipe(PIPE_T fd,const char *buf,int len)
 {		//{{ent
 #ifdef _WIN32
@@ -31,6 +33,31 @@ static int read_pipe(PIPE_T fd,char *buf,int len) {
 //{{ent
 #endif
 //}}
+}
+struct whm_stdin_writer
+{
+	PIPE_T fd;
+	std::string data;
+};
+static void write_stdin_data(whm_stdin_writer* w)
+{
+	const char* hot = w->data.c_str();
+	int left = (int)w->data.size();
+	while (left > 0) {
+		int got = write_pipe(w->fd, hot, left);
+		if (got <= 0) {
+			break;
+		}
+		hot += got;
+		left -= got;
+	}
+	ClosePipe(w->fd);
+	delete w;
+}
+static KTHREAD_FUNCTION write_stdin_thread(void* param)
+{
+	write_stdin_data((whm_stdin_writer*)param);
+	KTHREAD_RETURN;
 }
 bool WhmShellProcess::run(WhmShellContext *sc)
 {
@@ -113,6 +140,15 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 				if (c!=command) {
 					ClosePipe(in);
 				}
+				pp[READ_PIPE] = INVALIDE_PIPE;
+				pp[WRITE_PIPE] = INVALIDE_PIPE;
+				sc->last_error = 127;
+				result = false;
+				for (int j = 0; arg[j]; ++j) {
+					free(arg[j]);
+				}
+				delete[] arg;
+				delete env;
 				break;
 			}
 			out = pp[WRITE_PIPE];
@@ -151,6 +187,12 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 		}	
 		c = c->next;
 	}
+	for (int i = 0; i < 2; i++) {
+		if (pp[i] != INVALIDE_PIPE) {
+			ClosePipe(pp[i]);
+			pp[i] = INVALIDE_PIPE;
+		}
+	}
 	//关闭输入，输出父进程无用的管道端
 	if (kflike(hstdin)) {
 		ClosePipe(hstdin);
@@ -158,19 +200,30 @@ bool WhmShellProcess::run(WhmShellContext *sc)
 	ClosePipe(big_stdout_pipe[WRITE_PIPE]);
 	//处理输入
 	if (big_stdin_pipe_created) {
+		whm_stdin_writer* w = NULL;
 		if (result) {
 			//创建成功才写入数据
+			w = new whm_stdin_writer;
+			w->fd = big_stdin_pipe[WRITE_PIPE];
 			kbuf *buf = sc->in_buffer.getHead();
 			while (buf && buf->data) {
-				if (write_pipe(big_stdin_pipe[WRITE_PIPE],buf->data,buf->used)!=buf->used) {
-					break;
-				}
+				w->data.append(buf->data, buf->used);
 				buf = buf->next;
 			}
 		}
 		//清理输入数据和管道资源
 		sc->in_buffer.destroy();
-		ClosePipe(big_stdin_pipe[WRITE_PIPE]);
+		if (w) {
+			//write stdin in other thread, the child may block on writing stdout.
+			if (!kthread_pool_start(write_stdin_thread, w)) {
+				ClosePipe(w->fd);
+				delete w;
+				sc->last_error = 127;
+				result = false;
+			}
+		} else {
+			ClosePipe(big_stdin_pipe[WRITE_PIPE]);
+		}
 	}
 	//处理输出
 	if (result && (hstdout==INVALIDE_PIPE || hstderr==INVALIDE_PIPE)) {

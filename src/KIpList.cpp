@@ -41,6 +41,7 @@ kev_result run_fw_call_back(void *data,int msec)
 				if (len<=0) {
 					break;
 				}
+				tbuf[len] = '\0';
 				klog(KLOG_ERR,"%s\n",tbuf);
 			}
 	#ifdef _WIN32

@@ -491,6 +491,13 @@ bool KVirtualHostManage::removeVirtualHost(kconfig::KConfigTree* ct, KVirtualHos
 #endif
 	bool result = internalRemoveVirtualHost(ct, vh);
 	InternalUnBindVirtualHost(vh);
+#ifdef ENABLE_USER_ACCESS
+	if (result && !vh->user_access.empty() && vh->user_access != "-") {
+		KStringBuf s;
+		vh->get_access_file(s);
+		kconfig::remove_config_file(s.str().data());
+	}
+#endif
 	return result;
 }
 bool KVirtualHostManage::internalAddVirtualHost(kconfig::KConfigTree* ct, KVirtualHost* vh, KVirtualHost* ov) {
@@ -509,11 +516,17 @@ bool KVirtualHostManage::internalAddVirtualHost(kconfig::KConfigTree* ct, KVirtu
 }
 void KVirtualHostManage::UnBindGlobalVirtualHost(kserver* server) {
 	for (auto it = avh.begin(); it != avh.end(); it++) {
+		if (!(*it).second->binds.empty()) {
+			continue;
+		}
 		kgl_vhc_remove_global_vh(get_vh_container(server), (*it).second);
 	}
 }
 void KVirtualHostManage::BindGlobalVirtualHost(kserver* server) {
 	for (auto it = avh.begin(); it != avh.end(); it++) {
+		if (!(*it).second->binds.empty()) {
+			continue;
+		}
 		kgl_vhc_add_global_vh(get_vh_container(server), (*it).second);
 	}
 }

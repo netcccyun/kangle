@@ -228,6 +228,7 @@ bool KDsoExtend::load(const char* filename, const KXmlAttribute& attribute) {
 	version.chan = &chan_function;
 	version.pool = &pool_function;
 	version.cn = this;
+	init_called = true;
 	if (!kgl_dso_init(&version)) {
 		klog(KLOG_ERR, "cann't load dso extend [%s] kgl_dso_init return false\n", name);
 		return false;

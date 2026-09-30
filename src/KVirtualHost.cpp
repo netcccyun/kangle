@@ -562,7 +562,10 @@ bool KVirtualHost::caculateNeedKillProcess(KVirtualHost* ov) {
 	if (doc_root != ov->doc_root) {
 		return true;
 	}
-	if (envs.size() > ov->envs.size()) {
+	if (user != ov->user || group != ov->group) {
+		return true;
+	}
+	if (envs.size() != ov->envs.size()) {
 		return true;
 	}
 	//check env change
@@ -589,8 +592,10 @@ KString KVirtualHost::getApp(KHttpRequest* rq) {
 	return apps[index];
 }
 void KVirtualHost::setApp(int app) {
-	if (app <= 0 || app > 512) {
+	if (app <= 0) {
 		app = 1;
+	} else if (app > 255) {
+		app = 255;
 	}
 	apps.clear();
 	this->app = (uint8_t)app;

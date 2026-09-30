@@ -245,18 +245,16 @@ bool KDynamicListen::AddGlobal(KListenHost *lh)
 }
 kserver *KDynamicListen::RefsServer(u_short port)
 {
-	KListenKey key;
-	key.port = port;
-	int result = 0;
-	krb_node *node = rbtree_find2(&listens, &key, listen_key_cmp, &result);
-	if (node == NULL) {
-		return NULL;
-	}
-	KListen *listen = (KListen *)node->data;
-	if (listen->key->port == port) {
-		kserver *server = listen->server;
-		kserver_refs(server);
-		return server;
+	for (krb_node* node = rb_first(&listens.root); node != NULL; node = rb_next(node)) {
+		KListen* listen = (KListen*)node->data;
+		if (listen->key->port == port) {
+			kserver* server = listen->server;
+			kserver_refs(server);
+			return server;
+		}
+		if (listen->key->port > port) {
+			break;
+		}
 	}
 	return NULL;
 }

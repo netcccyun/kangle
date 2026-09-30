@@ -34,6 +34,7 @@ protected:
 	KGL_RESULT ParseBody(KHttpRequest* rq, char** data, char* end) override;
 private:
 	void appendPostEnd();
+	void on_map_path(KHttpRequest* rq, char* piece, int packet_length);
 	//return NULL for need more data
 	char *parse_fcgi_header(char** str, char* end, bool full);
 	//body_len = 0时表示读head
