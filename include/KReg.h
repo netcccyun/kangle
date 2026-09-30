@@ -98,7 +98,7 @@ public:
 	}
 	static char *getSubString(const char *str, KGL_OVECTOR_SIZE*ovector,int ovector_count,int index)
 	{
-		if (index> ovector_count) {
+		if (index < 0 || index >= ovector_count) {
 			return NULL;
 		}
 		int start = index*2;

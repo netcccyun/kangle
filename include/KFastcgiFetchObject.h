@@ -23,6 +23,12 @@ protected:
 	{
 		return !pop_header.recved_end_request;
 	}
+	void expectDone(KHttpRequest* rq) override
+	{
+		if (pop_header.recved_end_request) {
+			KAsyncFetchObject::expectDone(rq);
+		}
+	}
 	KGL_RESULT read_body_end(KHttpRequest* rq, KGL_RESULT result) override;
 	kgl_parse_result parse_unknow_header(KHttpRequest* rq, char** data, char* end) override;
 	KGL_RESULT ParseBody(KHttpRequest* rq, char** data, char* end) override;

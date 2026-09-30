@@ -95,7 +95,7 @@ void init_vh_data(vh_data* vd, khttpd::KXmlNodeBody* body) {
 	vd->ctx = (kgl_config_body*)body;
 }
 static const char* getSystemEnv(void* param, const char* name) {
-	static KString value;
+	static thread_local KString value;
 	const char* value2 = getSystemEnv(name);
 	if (value2) {
 		return value2;

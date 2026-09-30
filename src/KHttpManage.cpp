@@ -1192,7 +1192,8 @@ char* KHttpManage::parsePostFile(int& len, KString& fileName) {
 				return NULL;
 			}
 
-			sscanf(org_file, "%*[^f]filename=\"%[^\"]\"", filename);
+			filename[0] = '\0';
+			sscanf(org_file, "%*[^f]filename=\"%255[^\"]\"", filename);
 			no_dir = strrchr(filename, '\\');
 			if (no_dir == NULL) {
 				no_dir = strrchr(filename, '/');

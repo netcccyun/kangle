@@ -177,7 +177,11 @@ KGL_RESULT KFastcgiFetchObject::read_body_end(KHttpRequest* rq, KGL_RESULT resul
 	if (!checkContinueReadBody(rq)) {
 		return result;
 	}
-	KAsyncFetchObject::ReadBody(rq);
+	KGL_RESULT parsed = KAsyncFetchObject::ReadBody(rq);
+	if (parsed != KGL_OK) {
+		pop_header.keep_alive_time_out = -1;
+		return parsed;
+	}
 	return result;
 }
 KGL_RESULT KFastcgiFetchObject::ParseBody(KHttpRequest* rq, char** pos, char* end)
@@ -203,8 +207,8 @@ KGL_RESULT KFastcgiFetchObject::ParseBody(KHttpRequest* rq, char** pos, char* en
 		//printf("fcgi_header_type=[%d]\n", fcgi_header_type);
 		switch (fcgi_header_type) {
 		case FCGI_END_REQUEST:
-			expectDone(rq);
 			pop_header.recved_end_request = 1;
+			expectDone(rq);
 			break;
 		case FCGI_ABORT_REQUEST:
 			pop_header.recved_end_request = 1;

@@ -278,17 +278,18 @@ bool name2uid(const char *name, int &uid, int &gid) {
 	if (name == NULL) {
 		return false;
 	}
-	if (name[0] == '#') {
-		uid = atoi(name + 1);
-		return true;
-	}
-	if (isdigit((unsigned char) *name)) {
-		uid = atoi(name);
-		return true;
-	}
 	char buf[512];
 	struct passwd pwd;
 	struct passwd *result;
+	if (name[0] == '#' || isdigit((unsigned char) *name)) {
+		uid = atoi(name[0] == '#' ? name + 1 : name);
+		if (getpwuid_r((uid_t)uid, &pwd, buf, sizeof(buf), &result) == 0 && result != NULL) {
+			gid = result->pw_gid;
+		} else {
+			gid = uid;
+		}
+		return true;
+	}
 	if (getpwnam_r(name, &pwd, buf, sizeof(buf), &result) != 0) {
 		return false;
 	}
@@ -386,10 +387,7 @@ pid_t createProcess(Token_t token,const char *cmd,KCmdEnv *envs,const char *curd
 	}
 	if (pid == 0) {
 		signal(SIGTERM, SIG_DFL);
-		if (token && my_uid == 0) {
-			setgid(token[1]);
-			setuid(token[0]);
-		}
+		child_drop_privilege(token);
 		char *buf = strdup(cmd);
 		std::vector<char *> args;
 		explode_cmd(buf,args);
@@ -404,7 +402,7 @@ pid_t createProcess(Token_t token,const char *cmd,KCmdEnv *envs,const char *curd
 
 		KFile file[3];
 		if (!open_process_std(std,file)) {
-			exit(127);
+			_exit(127);
 		}
 		if (std->hstdin>0) {
 			close(0);
@@ -435,7 +433,7 @@ pid_t createProcess(Token_t token,const char *cmd,KCmdEnv *envs,const char *curd
 		fprintf(stderr, "run cmd[%s] error=%d %s\n", args[0], errno, strerror(
 			errno));
 		debug("child end\n");
-		exit(127);
+		_exit(127);
 	}
 	//{{ent	
 #endif

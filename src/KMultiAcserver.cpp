@@ -257,7 +257,7 @@ KUpstream* KMultiAcserver::GetUpstream(KHttpRequest* rq) {
 	if (!vnodes.empty()) {
 		uint16_t index = getNodeIndex(rq, &set_cookie_stick);
 		sockHelper = vnodes[index];
-		if (sockHelper->is_enabled()) {
+		if (sockHelper->is_available()) {
 			//the node is active
 			sockHelper->addRef();
 			lock.Unlock();
@@ -290,6 +290,14 @@ KUpstream* KMultiAcserver::GetUpstream(KHttpRequest* rq) {
 		lock.Unlock();
 		return connect_result(rq, fast_node, 0);
 	}
+	// Disabled backup nodes need the same timed recovery probe as primaries.
+	for (auto bnode : bnodes) {
+		if (bnode->is_available()) {
+			bnode->addRef();
+			lock.Unlock();
+			return connect_result(rq, bnode, 0);
+		}
+	}
 #ifdef ENABLE_MSERVER_ICP
 	if (icp) {
 		//use icp
@@ -313,30 +321,16 @@ KUpstream* KMultiAcserver::GetUpstream(KHttpRequest* rq) {
 }
 
 KSockPoolHelper* KMultiAcserver::nextActiveNode(KSockPoolHelper* node, unsigned short& index) {
-	KSockPoolHelper* helper = node;
+	//walk vnodes (backup nodes are not in vnodes), so index always points to the returned node.
+	size_t count = vnodes.size();
 	bool use_next = (index & 1) > 0;
-	while (helper) {
-		if (!helper->disable_flag) {
+	for (size_t i = 1; i < count; i++) {
+		size_t pos = use_next ? (index + i) % count : (index + count - i) % count;
+		KSockPoolHelper* helper = vnodes[pos];
+		if (helper != node && helper->is_available()) {
+			index = (unsigned short)pos;
 			return helper;
 		}
-		KSockPoolHelper* n = (use_next) ? helper->next : helper->prev;
-		if (use_next) {
-			if (index >= vnodes.size() - 1) {
-				index = 0;
-			} else {
-				index++;
-			}
-		} else {
-			if (index == 0) {
-				index = (unsigned short)vnodes.size() - 1;
-			} else {
-				index--;
-			}
-		}
-		if (n == node) {
-			return NULL;
-		}
-		helper = n;
 	}
 	return NULL;
 }

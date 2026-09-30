@@ -186,20 +186,26 @@ KGL_RESULT send_error2(KHttpRequest* rq, int code, const char* reason) {
 		if (fp) {
 			INT64 len = kfiber_file_size(fp);
 			len = KGL_MIN(len, 32768);
-			kbuf* buf = new_pool_kbuf_align(rq->sink->pool, int(len));
-			int used = kfiber_file_read(fp, buf->data, (int)len);
-			buf->used = used;
-			if (used > 2) {
-				char* p = (char*)memchr(buf->data, '~', used - 2);
-				if (p != NULL) {
-					char tmp[5];
-					snprintf(tmp, 4, "%03d", code);
-					kgl_memcpy(p, tmp, 3);
-				}
+			int used = 0;
+			kbuf* buf = NULL;
+			if (len > 0) {
+				buf = new_pool_kbuf_align(rq->sink->pool, int(len));
+				used = kfiber_file_read(fp, buf->data, (int)len);
 			}
-			s.Append(buf);
 			kfiber_file_close(fp);
-			return send_http2(rq, NULL, code, &s);
+			if (used > 0) {
+				buf->used = used;
+				if (used > 2) {
+					char* p = (char*)memchr(buf->data, '~', used - 2);
+					if (p != NULL) {
+						char tmp[5];
+						snprintf(tmp, 4, "%03d", code);
+						kgl_memcpy(p, tmp, 3);
+					}
+				}
+				s.Append(buf);
+				return send_http2(rq, NULL, code, &s);
+			}
 		}
 	}
 	s << "<html>\n<head>\n";

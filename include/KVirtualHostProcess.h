@@ -95,6 +95,7 @@ public:
 			ksocket_unix_addr(unix_path.c_str(), &un_addr);
 			SOCKET fd = ksocket_half_connect((sockaddr_i*)&un_addr, NULL, 0);
 			if (!ksocket_opened(fd)) {
+				health(NULL, HealthStatus::Err);
 				return NULL;
 			}
 			kconnection* cn = kconnection_new(&addr);
@@ -103,7 +104,7 @@ public:
 				return NULL;
 			}
 			cn->st.fd = fd;
-			return new_upstream(cn);
+			return bind_upstream(cn);
 		}
 #endif
 		kconnection* cn = kfiber_net_open(&addr);
@@ -111,10 +112,17 @@ public:
 			return NULL;
 		}
 		if (kfiber_net_connect(cn, NULL, 0) == 0) {
-			return new_upstream(cn);
+			return bind_upstream(cn);
 		}
 		kfiber_net_close(cn);
+		health(NULL, HealthStatus::Err);
 		return NULL;
+	}
+	KUpstream* bind_upstream(kconnection* cn)
+	{
+		KUpstream* us = new_upstream(cn);
+		bind(us);
+		return us;
 	}
 	virtual KUpstream* PowerResult(KHttpRequest* rq, KPipeStream* st) = 0;
 	KPipeStream* Power(KHttpRequest* rq, KExtendProgram* rd);

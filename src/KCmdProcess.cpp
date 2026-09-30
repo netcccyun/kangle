@@ -346,7 +346,7 @@ bool KMPCmdProcess::canDestroy(time_t nowTime)
 		if (st == freeProcessList) {
 			break;
 		}
-		if (nowTime < idleTime + st->lastActive) {
+		if (idleTime <= 0 || nowTime < idleTime + st->lastActive) {
 			break;
 		}
 		klist_remove(st);

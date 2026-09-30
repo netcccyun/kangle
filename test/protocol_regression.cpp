@@ -5,11 +5,69 @@
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <atomic>
+#include <thread>
 #include "KDechunkEngine.h"
 #include "KHttpParser.h"
 #include "KStringBuf.h"
 #include "KXml.h"
 #include "KXmlDocument.h"
+#include "KSockPoolHelper.h"
+#include "KHttpField.h"
+#include "KFileName.h"
+#include "KHttpLib.h"
+
+static void check_node_recovery() {
+    const time_t saved_time = kgl_current_sec;
+    kgl_current_sec = 1000;
+    KSockPoolHelper node;
+    node.setErrorTryTime(1, 5);
+    node.health(NULL, HealthStatus::Err);
+    assert(!node.is_enabled() && !node.is_available());
+    kgl_current_sec = 1005;
+    std::atomic<int> probes(0);
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 32; ++i) {
+        threads.emplace_back([&]() { if (node.is_available()) ++probes; });
+    }
+    for (auto& thread : threads) thread.join();
+    assert(probes == 1 && !node.is_enabled());
+    node.health(NULL, HealthStatus::Success);
+    assert(node.is_enabled() && node.is_available());
+    kgl_current_sec = saved_time;
+}
+
+static void check_fields_and_dates() {
+    char input[] = "bare ; next = value, third=last";
+    http_field_t field;
+    char* next = field.parse(input, ';');
+    assert(std::string(field.attr) == "bare" && field.val == NULL);
+    field.parse(next, ';');
+    assert(std::string(field.attr) == "next" && std::string(field.val) == "value");
+    KHttpHeader* header = new_http_know_header(kgl_header_content_type, "", 0);
+    assert(header && header->val_len == 0);
+    free_header_list(header);
+    char date[32];
+    memset(date, 'x', sizeof(date));
+    mk1123time(0, date, 30);
+    assert(std::string(date) == "Thu, 01 Jan 1970 00:00:00 GMT" && date[30] == 'x');
+    mk1123time(0, date, 1);
+    assert(date[0] == '\0');
+}
+
+static void check_cache_flush_failure() {
+#ifdef __linux__
+    KBufferFile file;
+    assert(file.open("/dev/full", fileWrite));
+    int len;
+    char* buffer = file.get_buffer(&len);
+    memset(buffer, 0, len);
+    // write_success flushes implicitly and has no result parameter.
+    file.write_success(len);
+    assert(file.write("x", 1) == -1);
+    assert(!file.close());
+#endif
+}
 
 static KDechunkResult decode(const std::string& input) {
     KDechunkEngine engine;
@@ -38,6 +96,13 @@ static void check_dechunk_limits() {
     }
     assert(decode("0\r\n" + trailers + "\r\n") == KDechunkResult::End);
     assert(decode("0\r\n" + trailers + "X-Test: extra\r\n\r\n") == KDechunkResult::Failed);
+    assert(decode("zz\r\nabc") == KDechunkResult::Failed);
+    assert(decode("\r\n") == KDechunkResult::Failed);
+    assert(decode("\n") == KDechunkResult::Failed);
+    assert(decode("1\r\nx\r\n;ext\r\n") == KDechunkResult::Failed);
+    assert(decode("1;ext=1\r\nx\r\n0\r\n\r\n") == KDechunkResult::End);
+    assert(decode("0\r\nX\r\n") == KDechunkResult::Continue);
+    assert(decode("0\r\nX\r\n\r\n") == KDechunkResult::End);
 }
 
 static void check_header_names() {
@@ -121,6 +186,9 @@ static void check_xml() {
 }
 
 int main() {
+    check_node_recovery();
+    check_fields_and_dates();
+    check_cache_flush_failure();
     check_dechunk_limits();
     check_header_names();
     check_fragmented_fold();

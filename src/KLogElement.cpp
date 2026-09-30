@@ -44,13 +44,16 @@ KLogElement::KLogElement() {
 	logs_day = 0;
 	logs_size = 0;
 	log_handle = true;
+#ifndef _WIN32
+	uid = 0;
+	gid = 0;
+#endif
 }
 
 KLogElement::~KLogElement() {
 	close();
 }
 bool KLogElement::open() {
-	assert(!fp.opened());
 	if (path.empty()) {
 		return false;
 	}
@@ -59,7 +62,7 @@ bool KLogElement::open() {
 		return true;
 	}
 	if (fp.opened()) {
-		return false;
+		return true;
 	}
 	log_file_size = 0;
 #ifdef ENABLE_PIPE_LOG
@@ -201,4 +204,10 @@ void KLogElement::setPath(KString path) {
 	}
 	close();
 	lock.Unlock();
+}
+bool KLogElement::open_locked() {
+	lock.Lock();
+	bool result = open();
+	lock.Unlock();
+	return result;
 }

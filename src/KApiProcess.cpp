@@ -52,7 +52,7 @@ KUpstream* KApiProcess::PowerResult(KHttpRequest* rq, KPipeStream* st2)
 	stLock.Unlock();
 	kconnection* cn = try_connect(&addr);
 	if (cn != NULL) {
-		return new_upstream(cn);
+		return bind_upstream(cn);
 	}
 	return NULL;
 }

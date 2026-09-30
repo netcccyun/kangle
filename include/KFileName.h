@@ -328,17 +328,22 @@ public:
 	}
 	void init()
 	{
+		write_failed = false;
 		total_write = 0;
 		hot = buffer;
 		buffer_left = KGL_MAX_BUFFER_FILE_SIZE;
 	}
-	void close()
+	bool close()
 	{
-		this->flush();
+		bool result = this->flush();
 		KFile::close();
+		return result;
 	}
 	int write(const char *buf, int len)
 	{
+		if (write_failed) {
+			return -1;
+		}
 		int orig_len = len;
 		while (len > 0) {
 			int write_len = KGL_MIN(len, buffer_left);
@@ -370,16 +375,18 @@ public:
 private:
 	bool flush()
 	{
-		if (!this->opened()) {
+		if (!this->opened() || write_failed) {
 			return false;
 		}
 		int len = (int)(hot - buffer);
 		bool result = KFile::write(buffer, len) == len;
+		write_failed = !result;
 		hot = buffer;
 		buffer_left = KGL_MAX_BUFFER_FILE_SIZE;
 		return result;
 	}
 	INT64 total_write;
+	bool write_failed;
 	int buffer_left;
 	char *buffer;
 	char *hot;

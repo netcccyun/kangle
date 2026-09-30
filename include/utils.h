@@ -88,6 +88,12 @@ void addCurrentEnv(KCmdEnv *env);
 创建一个进程外工作，并等待完成
 */
 bool startProcessWork(Token_t token, char * args[], KCmdEnv *envs);
+#ifndef _WIN32
+/*
+在fork后的子进程中切换到token指定的用户，失败则直接退出子进程
+*/
+void child_drop_privilege(Token_t token);
+#endif
 /*
 创建一个进程.
 rdstd = 0 使用namedPipe

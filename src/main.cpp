@@ -26,6 +26,7 @@
 #ifndef _WIN32
 #include <pthread.h>
 #include <pwd.h>
+#include <grp.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <getopt.h>
@@ -618,22 +619,31 @@ void set_user() {
 		bool result = name2uid(conf.run_user.c_str(), uid, gid);
 		if (!result) {
 			klog(KLOG_ERR, "cann't find run_as user [%s]\n", conf.run_user.c_str());
+			exit(127);
 		}
 		if (result && !conf.run_group.empty()) {
 			result = name2gid(conf.run_group.c_str(), gid);
 			if (!result) {
 				klog(KLOG_ERR, "cann't find run_as group [%s]\n", conf.run_group.c_str());
+				exit(127);
 			}
 		}
 		if (result) {
 			if (chown(conf.tmppath.c_str(), uid, gid)!=0) {
 				klog(KLOG_ERR,"cann't chown tmp path [%s]\n",conf.tmppath.c_str());
 			}
+			gid_t groups_gid = (gid_t)gid;
+			if (getuid() == 0 && setgroups(1, &groups_gid) != 0) {
+				klog(KLOG_ERR, "setgroups to [%d] error\n", gid);
+				exit(127);
+			}
 			if (setgid(gid)!=0) {
 				klog(KLOG_ERR,"setgid to [%d] error\n",gid);
+				exit(127);
 			}
 			if (setuid(uid)!=0) {
 				klog(KLOG_ERR,"setuid to [%d] error\n",uid);
+				exit(127);
 			}
 		}
 

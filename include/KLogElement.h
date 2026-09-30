@@ -96,6 +96,7 @@ public:
 		lock.Unlock();
 	}
 	bool open();
+	bool open_locked();
 	inline void checkSizeRotate() {
 		if (rotate_size > 0 && log_file_size >= rotate_size) {
 			rotateLog();

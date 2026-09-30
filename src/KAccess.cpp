@@ -1367,6 +1367,7 @@ bool KAccess::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent*
 			if (!body) {
 				return false;
 			}
+			auto locker = write_lock();
 			named_model->get_module()->parse_config(body);
 			return true;
 		}

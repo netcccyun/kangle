@@ -400,7 +400,7 @@ bool KExtendProgram::postLoad(KExtendProgramString* ds) {
 bool KExtendProgram::parse_config(const khttpd::KXmlNode* xml) {
 	auto& attr = xml->attributes();
 	life_time = attr.get_int("life_time");
-	idleTime = attr.get_int("idle_time");
+	idleTime = attr.get_int("idle_time", EXTENDPROGRAM_DEFAULT_IDLETIME);
 	maxRequest = attr.get_int("max_request");
 	//maxConnect = attr.get_int("max_connect");
 	max_error_count = attr.get_int("max_error_count");

@@ -78,6 +78,7 @@ KGL_RESULT KAjpFetchObject::buildHead(KHttpRequest* rq)
 {
 	assert(buffer == NULL);
 	buffer = new KSocketBuffer(AJP_BUFF_SIZE);
+	pop_header.proto = Proto_ajp;
 	char tmpbuff[50];
 	KHttpObject* obj = rq->ctx.obj;
 	KBIT_SET(obj->index.flags, ANSW_LOCAL_SERVER);
@@ -261,8 +262,11 @@ KGL_RESULT KAjpFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end)
 		//printf("type=[%d]\n",type);
 		switch (type) {
 		case JK_AJP13_END_RESPONSE:
-			ReadBodyEnd(rq);
-			break;
+			if (!ReadBodyEnd(rq, &msg) || *data != end) {
+				rq->ctx.upstream_connection_keep_alive = 0;
+				return KGL_EDATA_FORMAT;
+			}
+			return KGL_OK;
 		case JK_AJP13_SEND_BODY_CHUNK: {
 			if (!msg.getShort(&chunk_length)) {
 				return KGL_EDATA_FORMAT;
@@ -272,6 +276,10 @@ KGL_RESULT KAjpFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end)
 			}
 			//printf("chunk_length=[%d]\n",chunk_length);
 			chunk_data = msg.getBytes();
+			if (body.ctx == nullptr) {
+				//no body response (HEAD/204/304...)
+				break;
+			}
 			KGL_RESULT ret = PushBody(rq, &body, chunk_data, chunk_length);
 			if (KGL_OK != ret) {
 				return ret;
@@ -307,7 +315,6 @@ kgl_parse_result KAjpFetchObject::parse_unknow_header(KHttpRequest* rq, char** d
 			//printf("parse_finished *len=[%d]\n",*len);
 			return kgl_parse_finished;
 		case JK_AJP13_END_RESPONSE:
-			ReadBodyEnd(rq);
 			return kgl_parse_finished;
 		case JK_AJP13_GET_BODY_CHUNK:
 			if (*data == end) {
@@ -383,7 +390,9 @@ unsigned char KAjpFetchObject::parseMessage(KHttpRequest* rq, KHttpObject* obj, 
 		}
 		break;
 	case JK_AJP13_END_RESPONSE:
-		ReadBodyEnd(rq);
+		if (!ReadBodyEnd(rq, msg)) {
+			return JK_AJP13_ERROR;
+		}
 		break;
 	}
 	return type;

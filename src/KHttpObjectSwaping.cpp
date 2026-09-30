@@ -210,6 +210,10 @@ void KHttpObjectSwaping::notice(KHttpObject* obj, KHttpObjectBody* data, swap_in
 	assert(obj->data->i.type == SWAPING_OBJECT);
 	KHttpObjectBody* osData = obj->data;
 	assert(osData && osData->os == this);
+	if (result != swap_in_success && data) {
+		delete data;
+		data = NULL;
+	}
 	KMutex* lock = obj->getLock();
 	lock->Lock();
 	obj->data = data;

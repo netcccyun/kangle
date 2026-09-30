@@ -481,7 +481,7 @@ void KRewriteMarkEx::getString(const char *prefix, const char *str,KHttpRequest 
 				continue;
 			}
 			if (isdigit(*hot) && s1) {
-				char *ss = s1->getString(atoi(hot));
+				char *ss = s1->getString(*hot - '0');
 				if (ss) {
 					*s << ss;
 				}
@@ -506,7 +506,7 @@ void KRewriteMarkEx::getString(const char *prefix, const char *str,KHttpRequest 
 				continue;
 			}
 			if (isdigit(*hot) && s2) {
-				char *ss = s2->getString(atoi(hot));
+				char *ss = s2->getString(*hot - '0');
 				if (ss) {
 					*s << ss;
 				}

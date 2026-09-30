@@ -531,7 +531,7 @@ kgl_satisfy_status KSharedBigObject::can_satisfy(kgl_request_range* range, KHttp
 	}
 	if (range->to >= 0) {
 		// Check whether the requested end is already cached.
-		if (block->file_block.to >= range->to) {
+		if (block->file_block.to > range->to) {
 			status = kgl_satisfy_all;
 		}
 	}

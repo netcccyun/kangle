@@ -94,7 +94,7 @@ int klog_start() {
 #endif
 		log_file += "/server.log";
 		errorLogger.setPath(log_file.c_str());
-		if (!errorLogger.open()) {
+		if (!errorLogger.open_locked()) {
 			fprintf(stderr, "cann't open log file (server.log) for write\n");
 			errorLogger.place = LOG_PRINT;
 		}
@@ -113,7 +113,7 @@ int klog_start() {
 		}
 		logpath+=conf.access_log;
 		accessLogger.setPath(logpath);
-		if (!accessLogger.open()) {
+		if (!accessLogger.open_locked()) {
 			fprintf(stderr, "cann't open log file for write\n");
 			accessLogger.place = LOG_PRINT;
 		}

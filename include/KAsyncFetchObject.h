@@ -20,8 +20,10 @@ struct kgl_pop_header {
 	uint16_t no_body:1;
 	uint16_t recved_end_request : 1;
 	uint16_t is_100_continue : 1;
+	uint16_t is_interim_response : 1;
 	uint16_t upstream_is_chunk : 1;
 	uint16_t post_is_chunk : 1;
+	uint16_t interim_count : 4;
 	int keep_alive_time_out;
 };
 /**

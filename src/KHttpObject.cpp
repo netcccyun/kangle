@@ -286,16 +286,17 @@ void KHttpObject::unlinkDiskFile()
 #endif
 		auto name = get_filename();
 		int ret = unlink(name.get());
-		auto url = this->uk.url->getUrl();
-		assert(url);
-		if (url) {
-			klog(KLOG_INFO, "unlink disk cache obj=[%p %x] url=[%s] file=[%s] ret=[%d] errno=[%d]\n",
-				this,
-				this->index.flags,
-				url.get(),
-				name.get(),
-				ret,
-				errno);
+		if (this->uk.url) {
+			auto url = this->uk.url->getUrl();
+			if (url) {
+				klog(KLOG_INFO, "unlink disk cache obj=[%p %x] url=[%s] file=[%s] ret=[%d] errno=[%d]\n",
+					this,
+					this->index.flags,
+					url.get(),
+					name.get(),
+					ret,
+					errno);
+			}
 		}
 #ifdef ENABLE_BIG_OBJECT_206
 		if (KBIT_TEST(index.flags, FLAG_BIG_OBJECT_PROGRESS)) {
@@ -489,14 +490,23 @@ bool KHttpObject::swapout(KBufferFile* file, bool fast_model)
 		}
 		tmp = tmp->next;
 	}
+	if (!file->close()) {
+		klog(KLOG_ERR, "cann't flush cache to disk file=[%s].\n", filename.get());
+		unlink(filename.get());
+		return false;
+	}
 	cache.getHash(h)->IncDiskObjectSize(this);
 #ifdef ENABLE_DB_DISK_INDEX
 	if (dci) {
 		dci->start(ci_add, this);
 	}
 #endif
+	return true;
 swap_out_success:
-	file->close();
+	if (!file->close()) {
+		klog(KLOG_ERR, "cann't flush cache head to disk file=[%s].\n", filename.get());
+		return false;
+	}
 	return true;
 swap_out_failed:
 	if (file->opened()) {

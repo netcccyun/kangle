@@ -428,7 +428,7 @@ KGL_RESULT handle_error(KHttpRequest* rq, int code, const char* msg) {
 	const char* errorPage = errorPage2.c_str();
 	if (strncasecmp(errorPage, "http://", 7) == 0 || strncasecmp(errorPage, "https://", 8) == 0) {
 		KStringBuf s;
-		s << errorPage << "?" << obj->data->i.status_code << "," << rq->getInfo();
+		s << errorPage << "?" << code << "," << rq->getInfo();
 		push_redirect_header(rq, s.c_str(), (int)s.size(), STATUS_FOUND);
 		//rq->response_content_length(0);
 		rq->start_response_body(0);
@@ -478,7 +478,15 @@ KGL_RESULT handle_error(KHttpRequest* rq, int code, const char* msg) {
 			fo = new KStaticFetchObject;
 		}
 		rq->append_source(fo);
-		return process_request(rq);
+		kgl_input_stream in;
+		kgl_output_stream out;
+		new_default_stream(rq, &in, &out);
+		defer(in.f->body.close(in.body_ctx); out.f->close(out.ctx));
+		KGL_RESULT result = fo->Open(rq, &in, &out);
+		if (result == KGL_NO_BODY) {
+			return process_upstream_no_body(rq, &in, &out);
+		}
+		return result;
 	}
 	return send_error2(rq, code, msg);
 }

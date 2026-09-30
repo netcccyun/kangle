@@ -95,9 +95,6 @@ void KBaseVirtualHost::clear() {
 	redirects.clear();
 	indexFiles.clear();
 	errorPages.clear();
-	for (auto it2 = aliass.begin(); it2 != aliass.end(); it2++) {
-		(*it2)->release();
-	}
 	aliass.clear();
 	for (auto it3 = pathRedirects.begin(); it3 != pathRedirects.end(); it3++) {
 		(*it3)->release();
@@ -438,7 +435,7 @@ bool KBaseVirtualHost::addRedirect(bool file_ext, const KString& value, KRedirec
 #ifdef ENABLE_UPSTREAM_PARAM
 		nrd->parseParams(params);
 #endif
-		redirects.insert(pair<char*, KBaseRedirect*>(xstrdup(value.c_str()), nrd));
+		redirects.insert(std::make_pair(value, nrd));
 	} else {
 		KPathRedirect* pr = new KPathRedirect(value.c_str(), rd);
 		pr->allowMethod.setMethod(allowMethod.c_str());
@@ -763,9 +760,6 @@ bool KBaseVirtualHost::on_config_event(kconfig::KConfigTree* tree, kconfig::KCon
 		}
 		if (xml->is_tag(_KS("alias"))) {
 			auto locker = this->get_locker();
-			for (auto it = aliass.begin(); it != aliass.end(); ++it) {
-				(*it)->release();
-			}
 			aliass.clear();
 			return true;
 		}

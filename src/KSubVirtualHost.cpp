@@ -109,11 +109,15 @@ bool KSubVirtualHost::set_ssl_info(const char* crt, const char* key, bool ssl_fr
 		certfile = conf.path + (crt + 1);
 	} else if (!isAbsolutePath(crt)) {
 		certfile = vh->doc_root + crt;
+	} else {
+		certfile = crt;
 	}
 	if (*key == '-') {
 		keyfile = conf.path + (key + 1);
 	} else if (!isAbsolutePath(key)) {
 		keyfile = vh->doc_root + key;
+	} else {
+		keyfile = key;
 	}
 	if (ssl_ctx) {
 		kgl_release_ssl_ctx(ssl_ctx);

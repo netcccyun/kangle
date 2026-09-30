@@ -342,6 +342,7 @@ void KAuthMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 	lock.Lock();
 	cryptType = parseCryptType(attribute["crypt_type"].c_str());
 	lastModified = 0;
+	lastLoad = 0;
 	auth_type = KHttpAuth::parseType(attribute["auth_type"].c_str());
 	file_sign = (attribute["file_sign"]=="1");
 	if(realm){

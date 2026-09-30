@@ -43,12 +43,16 @@ public:
 			if (isspace((unsigned char)*hot)) {
 				*hot = '\0';
 				hot++;
-				char *p = strchr(hot,'=');
-				if (p) {
-					hot = (p+1);
-					haveval = true;
-					break;
+				while (*hot && isspace((unsigned char)*hot)) {
+					hot++;
 				}
+				if (*hot == '=') {
+					hot++;
+					haveval = true;
+				} else if ((u_char)*hot == split) {
+					hot++;
+				}
+				break;
 			}
 			hot++;
 		}

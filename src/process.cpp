@@ -29,7 +29,21 @@
 #include "extern.h"
 volatile int quit_program_flag = PROGRAM_NO_QUIT;
 #ifndef _WIN32
+#include <grp.h>
 int my_uid = -1;
+void child_drop_privilege(Token_t token)
+{
+	if (token == NULL || geteuid() != 0) {
+		return;
+	}
+	gid_t gid = (gid_t)token[1];
+	if (setgroups(1, &gid) != 0 || setgid(gid) != 0 || setuid((uid_t)token[0]) != 0) {
+		// Only async-signal-safe operations are allowed after a multithreaded fork.
+		static const char message[] = "cann't drop child privileges\n";
+		(void)write(STDERR_FILENO, message, sizeof(message) - 1);
+		_exit(127);
+	}
+}
 #endif
 static bool open_std_file(const char *filename,KFile *file)
 {
@@ -1517,10 +1531,7 @@ bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *curdir,PIPE_
 	}	
 	if (pid == 0) {
 		signal(SIGTERM, SIG_DFL);
-		if (token && my_uid == 0) {
-			setgid(token[1]);
-			setuid(token[0]);
-		}
+		child_drop_privilege(token);
 #if 0
 		if (conf.program.size() == 0) {
 			debug("api_child_start failed\n");
@@ -1560,7 +1571,7 @@ bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *curdir,PIPE_
 		fprintf(stderr, "run cmd[%s] error=%d %s\n", args[0], errno, strerror(
 			errno));
 		debug("child end\n");
-		exit(127);	
+		_exit(127);
 	}
 	//{{ent
 #endif
@@ -1617,10 +1628,7 @@ bool createProcess(KPipeStream *st, Token_t token, char * args[],KCmdEnv *envs, 
 	}
 	if (c_pid == 0) {
 		signal(SIGTERM, SIG_DFL);
-		if (token && my_uid == 0) {
-			setgid(token[1]);
-			setuid(token[0]);
-		}
+		child_drop_privilege(token);
 #if 0
 		if (conf.program.size() == 0) {
 			debug("api_child_start failed\n");
@@ -1664,7 +1672,7 @@ bool createProcess(KPipeStream *st, Token_t token, char * args[],KCmdEnv *envs, 
 		fprintf(stderr, "run cmd[%s] error=%d %s\n", args[0], errno, strerror(
 			errno));
 		debug("child end\n");
-		exit(0);
+		_exit(127);
 	}
 	//{{ent
 #endif

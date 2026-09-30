@@ -196,7 +196,8 @@ KGL_RESULT KAsyncFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_o
 	this->in = in;
 	this->out = out;
 	KGL_RESULT result = InternalProcess(rq, &post_fiber);
-	if (result == KGL_ECAN_RETRY_SOCKET_BROKEN && !client->IsNew() && !rq->ctx.read_huped) {
+	if (result == KGL_ECAN_RETRY_SOCKET_BROKEN && !client->IsNew() && !rq->ctx.read_huped &&
+		(!KBIT_TEST(rq->sink->data.flags, RQ_HAS_READ_POST) || rq->ctx.request_body_replayable)) {
 		/** only pooled upstream and can_retry_socket_broken error and not read_huped happen
 		* then retry use a new upstream(not pool upstream).
 		*/
@@ -460,6 +461,23 @@ void KAsyncFetchObject::create_post_fiber(KHttpRequest* rq, kfiber** post_fiber)
 	}
 }
 KGL_RESULT KAsyncFetchObject::on_read_head_success(KHttpRequest* rq, kfiber** post_fiber) {
+	if (pop_header.is_interim_response && pop_header.proto == Proto_http) {
+		// Only 100 permits sending an Expect body; 102/103 must keep waiting.
+		if (++pop_header.interim_count > 8) {
+			return KGL_EDATA_FORMAT;
+		}
+		bool send_post = pop_header.is_100_continue &&
+			KBIT_TEST(rq->sink->data.flags, RQ_HAVE_EXPECT) && *post_fiber == nullptr;
+		pop_header.is_interim_response = 0;
+		pop_header.is_100_continue = 0;
+		if (send_post) {
+			KGL_RESULT ret = ProcessPost(rq);
+			if (ret != KGL_END) {
+				return ret;
+			}
+		}
+		return ReadHeader(rq, post_fiber);
+	}
 #ifdef HTTP_PROXY
 	if (rq->sink->data.meth == METH_CONNECT) {
 		KBIT_SET(rq->sink->data.flags, RQ_CONNECTION_UPGRADE);
@@ -507,14 +525,16 @@ KGL_RESULT KAsyncFetchObject::PushHeaderFinished(KHttpRequest* rq) {
 	if (result != KGL_OK) {
 		return result;
 	}
-	if (pop_header.upstream_is_chunk) {
+	if (pop_header.upstream_is_chunk && body.ctx) {
 		new_dechunk_body(out, &body);
 	}
 	return KGL_OK;
 }
 void KAsyncFetchObject::PushStatus(KHttpRequest* rq, int status_code) {
-	if (status_code == 100) {
-		pop_header.is_100_continue = 1;
+	if (status_code == 100 ||
+		(pop_header.proto == Proto_http && status_code > 100 && status_code < 200 && status_code != 101)) {
+		pop_header.is_100_continue = status_code == 100;
+		pop_header.is_interim_response = 1;
 		return;
 	}
 	pop_header.status_send = 1;
@@ -563,6 +583,10 @@ KGL_RESULT KAsyncFetchObject::PushHeader(KHttpRequest* rq, const char* attr, int
 			PushStatus(rq, status_code);
 			return KGL_OK;
 		}
+	}
+	if (pop_header.is_interim_response && pop_header.proto == Proto_http) {
+		//headers of interim response are not forwarded.
+		return KGL_OK;
 	}
 	if (pop_header.proto == Proto_spdy && *attr == ':') {
 		attr++;
@@ -663,7 +687,11 @@ KGL_RESULT KAsyncFetchObject::ParseBody(KHttpRequest* rq, char** data, char* end
 	fwrite(*data, 1, len, stdout);
 	printf("\n");
 #endif
-	assert(body.ctx);
+	if (body.ctx == nullptr) {
+		//no body response (HEAD/204/304...), discard the upstream body.
+		(*data) += len;
+		return KGL_OK;
+	}
 	KGL_RESULT result = PushBody(rq, &body, *data, (int)len);
 	(*data) += len;
 	return result;

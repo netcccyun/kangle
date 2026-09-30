@@ -52,8 +52,11 @@ inline int cmpn_url_key(KUrlKey *a, KUrlKey *b,int len)
 inline void update_obj_vary_key(KHttpObject *obj, const char *key)
 {
 	do {
+		KMutex *lock = obj->getLock();
+		lock->Lock();
 		obj->Dead();
 		update_url_vary_key(&obj->uk, key);
+		lock->Unlock();
 		obj = obj->next;
 	} while (obj);
 }
@@ -93,6 +96,13 @@ public:
 		} else {
 			krb_node *node = NULL;
 			find(&uk, nodes.rb_node,&node);
+			while (node) {
+				krb_node *prev = rb_prev(node);
+				if (prev == NULL || ((KHttpObject *)prev->data)->uk.url->cmp(url) != 0) {
+					break;
+				}
+				node = prev;
+			}
 			while (node) {
 				count += purgeObject((KHttpObject *)node->data, handle, param);
 				node = rb_next(node);

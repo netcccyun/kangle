@@ -74,7 +74,7 @@ KHttpRequest *kgl_create_simulate_request(kgl_async_http *ctx)
 	}
 
 	if (ctx->host) {
-		ss->host = strdup(ctx->host);
+		ss->host = ctx->host;
 	}
 	ss->arg = ctx->arg;
 	ss->port = ctx->port;
@@ -297,8 +297,8 @@ int kgl_async_download(const char *url, const char *file, int *status)
 	char tmp_buf[42];
 	KHttpHeader *header = nullptr;	
 	if (ret == 0) {
-		mk1123time(buf.st_mtime, tmp_buf, 41);
-		header = new_http_header(_KS("If-Modified-Since"), tmp_buf, 41);
+		char* end = make_http_time(buf.st_mtime, tmp_buf, sizeof(tmp_buf));
+		header = new_http_header(_KS("If-Modified-Since"), tmp_buf, (int)(end - tmp_buf));
 		ctx.rh = header;
 	}
 	ctx.arg = &download_ctx;

@@ -28,12 +28,35 @@ struct KApacheConfigFileInclude
 int apache_config_include_handle(const char* file, void* param)
 {
 	KApacheConfigFileInclude* include = (KApacheConfigFileInclude*)param;
-	if (include->file.match(file, (int)strlen(file), 0)) {
+	if (include->file.match(file, (int)strlen(file), 0) > 0) {
 		std::stringstream s;
 		s << include->dir << PATH_SPLIT_CHAR << file;
 		include->configer->load(s.str().c_str());
 	}
 	return 0;
+}
+static std::string glob_to_regex(const char* glob)
+{
+	std::string reg = "^";
+	for (const char* p = glob; *p; p++) {
+		switch (*p) {
+		case '*':
+			reg += ".*";
+			break;
+		case '?':
+			reg += '.';
+			break;
+		case '.': case '^': case '$': case '+': case '(': case ')':
+		case '[': case ']': case '{': case '}': case '|': case '\\':
+			reg += '\\';
+			reg += *p;
+			break;
+		default:
+			reg += *p;
+		}
+	}
+	reg += '$';
+	return reg;
 }
 using namespace std;
 /*
@@ -206,7 +229,10 @@ bool KApacheConfig::process(const char* cmd, std::vector<char*>& item)
 #ifdef _WIN32
 				nc = KGL_PCRE_CASELESS;
 #endif
-				include.file.setModel(e + 1, nc);
+				if (!include.file.setModel(glob_to_regex(e + 1).c_str(), nc)) {
+					free(path);
+					return true;
+				}
 				*e = '\0';
 				include.dir = path;
 				include.configer = this;

@@ -10,6 +10,10 @@
 #include <map>
 #include <sstream>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h>
+#include <grp.h>
+#endif
  //#include "KApiRedirect.h"
 #include "KStream.h"
 #include "KFastcgiUtils.h"
@@ -168,8 +172,11 @@ static bool api_child_setuid(KStream* st, char* msg,
 	memset(&header, 0, sizeof(header));
 	api_child_t_uidgid* body = (api_child_t_uidgid*)msg;
 	//	bool result = true;
-	if (body->gid > 0 && setgid(body->gid) != 0) {
-		header.id |= 2;
+	if (body->gid > 0) {
+		gid_t gid = (gid_t)body->gid;
+		if ((getuid() == 0 && setgroups(1, &gid) != 0) || setgid(gid) != 0) {
+			header.id |= 2;
+		}
 	}
 	if (body->uid > 0 && setuid(body->uid) != 0) {
 		header.id |= 1;

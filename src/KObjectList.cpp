@@ -247,6 +247,8 @@ void KObjectList::swapout_result(KTempHttpObject *thead,int gc_used_msec,bool re
 	cache.clean_blocked = (gc_used_msec > (GC_SLEEP_MSEC + 5000));
 #ifdef ENABLE_DISK_CACHE
 	if (result) {
+		KMutex* hash_lock = &cache.objHash[obj->h].lock;
+		hash_lock->Lock();
 		lock = obj->getLock();
 		lock->Lock();
 		KBIT_SET(obj->index.flags, FLAG_IN_DISK);
@@ -259,6 +261,7 @@ void KObjectList::swapout_result(KTempHttpObject *thead,int gc_used_msec,bool re
 			obj->data = NULL;
 		}
 		lock->Unlock();
+		hash_lock->Unlock();
 		cache.unlock();
 		delete thead;
 		return;
