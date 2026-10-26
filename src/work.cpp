@@ -58,6 +58,7 @@
 #include "KHttpBasicAuth.h"
 #include "KSSLSniContext.h"
 #include "KBigObjectContext.h"
+#include "KHttpLib.h"
 #include "KAcserverManager.h"
 #include "KHttpUpstream.h"
 #include "KDefer.h"
@@ -454,6 +455,35 @@ KGL_RESULT stageHttpManageLogin(KHttpRequest* rq) {
 		"The default admin user is admin, password is kangle</body></html>";
 	return send_auth2(rq, &buffer);
 }
+/* Browsers resend cached admin credentials on any request to the admin port,
+ * so a page on another site could run admin actions (all plain GET links)
+ * through an image, link or form. Refuse what a browser marks as cross-site.
+ * Scripts and API clients send none of these headers and are not affected. */
+static bool is_cross_site_manage_request(KHttpRequest* rq) {
+	kgl_str_t value;
+	if (rq->get_http_value(_KS("Sec-Fetch-Site"), &value)) {
+		return kgl_mem_case_same(value.data, value.len, _KS("cross-site"));
+	}
+	/* older browsers: compare the host of Origin, else of Referer */
+	if (!rq->get_http_value(_KS("Origin"), &value) && !rq->get_http_value(_KS("Referer"), &value)) {
+		return false;
+	}
+	const char* host = rq->sink->data.raw_url.host;
+	std::string text(value.data, value.len);
+	if (text.compare(0, 7, "http://") != 0 && text.compare(0, 8, "https://") != 0) {
+		/* "null" and other opaque origins */
+		return true;
+	}
+	/* Origin has no path, whereas parse_url expects one. */
+	if (text.find('/', text.find("://") + 3) == std::string::npos) {
+		text += '/';
+	}
+	KUrl from(false);
+	if (host == NULL || !parse_url(text.c_str(), &from) || from.host == NULL) {
+		return true;
+	}
+	return strcasecmp(from.host, host) != 0;
+}
 KGL_RESULT stageHttpManage(KHttpRequest* rq) {
 
 	conf.admin_lock.Lock();
@@ -467,6 +497,10 @@ KGL_RESULT stageHttpManage(KHttpRequest* rq) {
 	conf.admin_lock.Unlock();
 	char ips[MAXIPLEN];
 	rq->sink->get_peer_ip(ips, sizeof(ips));
+	if (is_cross_site_manage_request(rq)) {
+		klog(KLOG_WARNING, "[ADMIN_CROSS_SITE] %s %s\n", ips, rq->sink->data.raw_url.path);
+		return send_error2(rq, STATUS_FORBIDEN, "cross-site request to the admin port refused");
+	}
 	klog(KLOG_NOTICE, "[ADMIN_SUCCESS]%s %s%s%s\n",
 		ips, rq->sink->data.raw_url.path,
 		(rq->sink->data.raw_url.param ? "?" : ""), (rq->sink->data.raw_url.param ? rq->sink->data.raw_url.param : ""));

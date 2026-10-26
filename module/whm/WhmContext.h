@@ -179,6 +179,9 @@ public:
 	KServiceProvider* getProvider() {
 		return provider;
 	}
+	/* The call came in on the admin port, so calls without scope='public'
+	 * may run. */
+	bool trusted = false;
 	bool buildVh();
 	void buildVh(KVirtualHost* vh) override;
 	void setStatus(const char* statusMsg = NULL) override {

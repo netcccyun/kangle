@@ -6,6 +6,11 @@
  */
 #include <sstream>
 #include <string>
+#include <atomic>
+#include <sys/stat.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include "KWebDavService.h"
 #include "KDavLock.h"
 #include "KHttpKeyValue.h"
@@ -245,11 +250,27 @@ bool KWebDavService::doPut() {
 	}
 	int64_t content_length = provider->getContentLength();
 	bool unknown_length = content_length < 0;
-	KResource* old_rs = rsMaker->bindResource(provider->getFileName(), provider->getRequestUri());
-	bool existed = old_rs != NULL;
-	delete old_rs;
-
-	KResource* rs = rsMaker->makeFile(provider->getFileName(),provider->getRequestUri());
+	const char* file_name = provider->getFileName();
+	struct stat old_st;
+	bool existed = stat(file_name, &old_st) == 0;
+	KResource* rs = NULL;
+	std::string tmp_name;
+	if (existed && S_ISREG(old_st.st_mode)) {
+		/* Write next to the file and rename over it once the body is
+		 * complete, so a broken upload leaves the old content in place. */
+		static std::atomic<unsigned> seq{ 0 };
+		std::stringstream s;
+		s << file_name << ".kangle-put-" << getpid() << "-" << seq++;
+		tmp_name = s.str();
+		rs = rsMaker->makeFile(tmp_name.c_str(), provider->getRequestUri());
+		if (rs == NULL) {
+			/* no write access to the directory: write in place as before */
+			tmp_name.clear();
+		}
+	}
+	if (rs == NULL) {
+		rs = rsMaker->makeFile(file_name, provider->getRequestUri());
+	}
 	if (rs == NULL) {
 		return send(STATUS_FORBIDEN);
 	}
@@ -278,8 +299,18 @@ bool KWebDavService::doPut() {
 			break;
 		}
 	}
-	if (!result && !existed) {
-		rs->close();
+	rs->close();
+	if (!tmp_name.empty()) {
+		if (result) {
+#ifndef _WIN32
+			chmod(tmp_name.c_str(), old_st.st_mode & 07777);
+#endif
+			result = rs->rename(file_name);
+		}
+		if (!result) {
+			rs->remove();
+		}
+	} else if (!result && !existed) {
 		rs->remove();
 	}
 	delete rs;

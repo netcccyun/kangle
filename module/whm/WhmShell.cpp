@@ -52,7 +52,8 @@ void WhmShell::initContext(WhmShellContext *sc,WhmContext *context)
 {	
 	sc->shell = this;
 	sc->async = async;
-	sc->attribute = context->getUrlValue()->attribute;	
+	sc->trusted = context->trusted;
+	sc->attribute = context->getUrlValue()->attribute;
 	sc->bindVirtualHost(context->getVh());
 	KStringBuf s;
 	s << this->name << ":" << (int64_t)time(NULL) << "_" << (int64_t)sc << "_" << index++;

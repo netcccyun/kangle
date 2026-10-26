@@ -228,6 +228,8 @@ kangle 支持内存缓存、可选磁盘缓存和大对象分片缓存。
 
 不要在生产配置中保留示例密码，也不要用 `*` 放开管理来源。
 
+浏览器标记为跨站的请求（`Sec-Fetch-Site: cross-site`，旧浏览器则看 `Origin`/`Referer` 的主机名）会被管理端口拒绝，防止其他网站借用浏览器缓存的管理员凭据执行管理操作。脚本和 API 客户端不发送这些头，不受影响。
+
 ### `log`
 
 | 属性 | 说明 |
@@ -342,6 +344,8 @@ TLS 后缀还可使用 `端口s/协议/cipher-list` 指定该上游专用的 TLS
 ```
 
 常用属性为 `name`、`file`、`type`、`life_time`、`idle_time`、`max_request`、`max_error_count`；也支持 `<env>`、`<pre_event>`、`<post_event>`。普通动态库使用多线程模式；进程模式属于兼容/高级用法。
+
+whm 包（`.whm` 文件）中的调用默认只能从管理端口执行；在普通虚拟主机上映射 `api:whm` 时，只有标记了 `scope='public'` 的调用会运行，其余返回 access denied。
 
 ### `dso_extend`
 

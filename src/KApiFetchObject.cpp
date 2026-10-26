@@ -110,6 +110,10 @@ KGL_RESULT KApiFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_out
 		}
 #endif
 		make_http_env(rq, in, brd, rq->file, &env, chrooted);
+		if (KBIT_TEST(rq->GetWorkModel(), WORK_MODEL_MANAGE)) {
+			/* whm runs calls without scope='public' only for the admin port */
+			env.addEnv("KANGLE_MANAGE", "1");
+		}
 		result = start();
 		api->end_call();
 	}

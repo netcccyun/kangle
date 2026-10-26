@@ -70,6 +70,45 @@ void get_url_info(KSink* rq, KStringBuf& s) {
 	return;
 }
 
+/* The /connection page puts these values in single-quoted JS strings and then
+ * into innerHTML. They come from clients (url, referer, replaced client ip),
+ * so HTML-encode them and escape what is special in a JS string. */
+static void write_js_html(KWStream& s, const char* str) {
+	if (str == NULL) {
+		return;
+	}
+	for (; *str; str++) {
+		unsigned char c = (unsigned char)*str;
+		switch (c) {
+		case '&':
+			s << "&amp;";
+			break;
+		case '<':
+			s << "&lt;";
+			break;
+		case '>':
+			s << "&gt;";
+			break;
+		case '"':
+			s << "&quot;";
+			break;
+		case '\'':
+			s << "&#39;";
+			break;
+		case '\\':
+			s << "\\\\";
+			break;
+		default:
+			if (c < 0x20 || c == 0x7f) {
+				char buf[8];
+				snprintf(buf, sizeof(buf), "\\x%02x", c);
+				s << buf;
+			} else {
+				s.write_all((const char*)&c, 1);
+			}
+		}
+	}
+}
 bool kgl_connection_iterator(void* arg, KSink* rq) {
 	KConnectionInfoContext* ctx = (KConnectionInfoContext*)arg;
 	if (conf.max_connect_info > 0 && ctx->total_count > (int)conf.max_connect_info) {
@@ -89,7 +128,8 @@ bool kgl_connection_iterator(void* arg, KSink* rq) {
 		ctx->s << "rq=" << (uint64_t)rq;
 		ctx->s << ",peer=" << ips << ":" << ksocket_addr_port(addr);
 	}
-	ctx->s << "','" << rq->get_client_ip();
+	ctx->s << "','";
+	write_js_html(ctx->s, rq->get_client_ip());
 	ctx->s << "','" << (kgl_current_sec - rq->data.begin_time_msec / 1000);
 	ctx->s << "','";
 	if (ctx->translate) {
@@ -103,9 +143,7 @@ bool kgl_connection_iterator(void* arg, KSink* rq) {
 	ctx->s << "','";
 	KStringBuf url;
 	get_url_info(rq, url);
-	if (url.size() > 0 && strchr(url.c_str(), '\'') == NULL) {
-		ctx->s << url.c_str();
-	}
+	write_js_html(ctx->s, url.c_str());
 	ctx->s << "','";
 	if (!ctx->translate) {
 		sockaddr_i self_addr;
@@ -117,7 +155,8 @@ bool kgl_connection_iterator(void* arg, KSink* rq) {
 	ctx->s << "','";
 	KHttpHeader* referer = rq->data.find(kgl_expand_string("Referer"));
 	if (referer) {
-		ctx->s << KXml::encode(referer->buf + referer->val_offset);
+		KString value(referer->buf + referer->val_offset, referer->val_len);
+		write_js_html(ctx->s, value.c_str());
 	}
 	ctx->s << "','";
 	switch (rq->data.http_version) {

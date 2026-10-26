@@ -140,6 +140,8 @@ public:
 	KString session;
 	//is async model
 	bool async;
+	/* started by an admin-port call; only the admin port may query it */
+	bool trusted = false;
 	std::atomic<bool> closed;
 	KMutex lock;
 	time_t closedTime;
