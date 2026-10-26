@@ -821,7 +821,7 @@ bool KAcserverManager::macserver_node(KXmlAttribute& attribute, KString& err_msg
 void KAcserverManager::unloadAllApi() {
 	std::map<KString, KApiRedirect*>::iterator it3;
 	for (it3 = apis.begin(); it3 != apis.end(); it3++) {
-		(*it3).second->dso.unload();
+		(*it3).second->unload();
 	}
 }
 std::vector<KString> KAcserverManager::getAllTarget() {

@@ -68,7 +68,12 @@ public:
 		user = NULL;
 		realm = NULL;
 		auth_header = AUTH_HEADER_AUTO;
+		stale_nonce = false;
 	}
+	/* Set when the credentials were right but the Digest nonce was expired or
+	 * not issued to this client; the next challenge then says stale=true so
+	 * the browser retries without asking the user again. */
+	bool stale_nonce;
 	virtual ~KHttpAuth();
 	static int parseType(const char *type);
 	static const char *buildType(int type);

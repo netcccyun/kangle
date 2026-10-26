@@ -14,8 +14,14 @@
 #include "api_child.h"
 
 KApiFetchObject::KApiFetchObject(KApiRedirect* rd) :KRedirectSource(0), KApiService(&rd->dso) {
+	api = rd;
 	rq = NULL;
 	token = NULL;
+#ifndef _WIN32
+	/* getToken() hands this out when the request has no virtual host. */
+	id[0] = (int)getuid();
+	id[1] = (int)getgid();
+#endif
 	push_parser.parser.first_same = 1;
 }
 
@@ -71,13 +77,13 @@ KGL_RESULT KApiFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_out
 	this->in = in;
 	this->out = out;
 	KGL_RESULT result = KGL_OK;
-	if (dso->HttpExtensionProc == NULL) {
-		return out->f->error(out->ctx, STATUS_SERVER_ERROR, _KS("api is not loaded"));
-	}
 	{
 		assert(rq);
 		if (brd->rd->is_disable()) {
 			return out->f->error(out->ctx, STATUS_SERVER_ERROR, _KS("extend is disable"));
+		}
+		if (!api->begin_call()) {
+			return out->f->error(out->ctx, STATUS_SERVER_ERROR, _KS("api is not loaded"));
 		}
 		KBIT_SET(obj->index.flags, ANSW_LOCAL_SERVER);
 		if (rq->auth) {
@@ -105,6 +111,7 @@ KGL_RESULT KApiFetchObject::Open(KHttpRequest* rq, kgl_input_stream* in, kgl_out
 #endif
 		make_http_env(rq, in, brd, rq->file, &env, chrooted);
 		result = start();
+		api->end_call();
 	}
 	if (!headSended && result == KGL_OK) {
 		headSended = true;

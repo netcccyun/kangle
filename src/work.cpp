@@ -427,7 +427,9 @@ void log_access(KHttpRequest* rq) {
 }
 
 KGL_RESULT stageHttpManageLogin(KHttpRequest* rq) {
+	bool stale = false;
 	if (rq->auth) {
+		stale = rq->auth->stale_nonce;
 		delete rq->auth;
 		rq->auth = NULL;
 	}
@@ -435,6 +437,7 @@ KGL_RESULT stageHttpManageLogin(KHttpRequest* rq) {
 	if (conf.auth_type == AUTH_DIGEST) {
 		KHttpDigestAuth* auth = new KHttpDigestAuth();
 		auth->init(rq, PROGRAM_NAME);
+		auth->set_stale(stale);
 		rq->auth = auth;
 	} else
 #endif

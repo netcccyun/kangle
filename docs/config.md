@@ -325,7 +325,7 @@ TLS 后缀还可使用 `端口s/协议/cipher-list` 指定该上游专用的 TLS
 | `worker` | `mp` 模式工作进程数；非正数时按直连 stdin 模式处理。 |
 | `life_time` | 上游连接复用时间。 |
 | `idle_time` | 进程空闲退出时间。 |
-| `max_request` | 单进程最大请求数。 |
+| `max_request` | `mp` 模式下单个进程最多处理的请求数，达到后由 kangle 结束该进程，下一个请求启动新进程。未设置时，若 `<env>` 中 `PHP_FCGI_MAX_REQUESTS` 大于 0 则取该值。 |
 | `max_error_count` | 最大容错次数。 |
 | `chuser` | 是否按虚拟主机用户启动，除明确写 `0` 外默认开启。 |
 | `sig` | Unix 上关闭进程所用信号，默认 `SIGKILL`。 |

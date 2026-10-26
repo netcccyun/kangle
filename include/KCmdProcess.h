@@ -121,6 +121,7 @@ public:
 	KSingleListenPipeStream()
 	{
 		lastActive = kgl_current_sec;
+		requests = 0;
 	}
 	~KSingleListenPipeStream()
 	{
@@ -181,6 +182,8 @@ private:
 	sockaddr_i addr;
 #endif
 	time_t lastActive;
+	/* requests handed to this process */
+	unsigned requests;
 	KSingleListenPipeStream *next;
 	KSingleListenPipeStream *prev;
 };

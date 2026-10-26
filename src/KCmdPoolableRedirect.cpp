@@ -51,7 +51,18 @@ bool KCmdPoolableRedirect::parse_config(const khttpd::KXmlNode* node) {
 	}
 	pm.param = attr["param"];
 	setWorkType(attr("type"), true);
-	return KExtendProgram::parse_config(node);
+	bool result = KExtendProgram::parse_config(node);
+	if (maxRequest == 0) {
+		/* PHP-CGI exits after this many requests; retire it at the same point. */
+		auto it = envs.find("PHP_FCGI_MAX_REQUESTS");
+		if (it != envs.end()) {
+			int php_max = atoi((*it).second.c_str());
+			if (php_max > 0) {
+				maxRequest = (unsigned)php_max;
+			}
+		}
+	}
+	return result;
 }
 bool KCmdPoolableRedirect::Exec(KVirtualHost* vh, KListenPipeStream* st,bool isSameRunning)
 {

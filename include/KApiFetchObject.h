@@ -40,6 +40,7 @@ public:
 	KHttpRequest *rq;
 	KHttpPushParser push_parser;
 private:
+	KApiRedirect* api;
 	kgl_input_stream* in;
 	kgl_output_stream* out;
 	kgl_response_body body = { 0 };

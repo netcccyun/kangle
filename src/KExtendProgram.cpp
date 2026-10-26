@@ -181,7 +181,7 @@ bool KExtendProgramConfig::handle(KExtendProgramString* ds) {
 		ds->addEnv("src_dir", dir.get());
 	}
 	if (file.get_file_size() > 4194304) {
-		klog(KLOG_ERR, "file [%s] is too big(size=%d) max is 4M\n", dst.c_str());
+		klog(KLOG_ERR, "file [%s] is too big(size=%lld) max is 4M\n", src_file_name.get(), (long long)file.get_file_size());
 		goto done;
 	}
 	dst_file_name = ds->parseString(dst.c_str());
@@ -210,7 +210,7 @@ bool KExtendProgramConfig::handle(KExtendProgramString* ds) {
 	src_buf = kgl_auto_cstr((char*)xmalloc((int)file.get_file_size() + 1));
 	len = src_fp.read(src_buf.get(), (int)file.get_file_size());
 	if (len != file.get_file_size()) {
-		klog(KLOG_ERR, "cann't read complete src file [%s] readed=[%d],fileSize=[%d]\n", file.getName(), len, file.get_file_size());
+		klog(KLOG_ERR, "cann't read complete src file [%s] readed=[%d],fileSize=[%lld]\n", file.getName(), len, (long long)file.get_file_size());
 		goto done;
 	}
 	if (!dst_fp.open(dst_tmp.c_str(), fileWrite)) {

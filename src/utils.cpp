@@ -386,7 +386,7 @@ pid_t createProcess(Token_t token,const char *cmd,KCmdEnv *envs,const char *curd
 		return -1;
 	}
 	if (pid == 0) {
-		signal(SIGTERM, SIG_DFL);
+		child_reset_signals();
 		child_drop_privilege(token);
 		char *buf = strdup(cmd);
 		std::vector<char *> args;

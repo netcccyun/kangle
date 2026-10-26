@@ -1387,7 +1387,13 @@ bool checkManageLogin(KHttpRequest* rq) {
 	}
 	if (conf.admin_user == rq->auth->getUser()
 		&& rq->auth->verify(rq, conf.admin_passwd.c_str(), conf.passwd_crypt)) {
-		return true;
+		/* A Digest response only proves the password for the nonce and uri it
+		 * names. Without this check one captured header could be replayed
+		 * forever, from anywhere, against any admin url. */
+		if (rq->auth->verifySession(rq)) {
+			return true;
+		}
+		rq->auth->stale_nonce = true;
 	}
 	return false;
 }

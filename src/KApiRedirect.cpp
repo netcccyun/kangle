@@ -188,11 +188,15 @@ bool KApiRedirect::load(const KString &file)
 #endif
 bool KApiRedirect::parse_config(const khttpd::KXmlNode* node) {
 	auto& attr = node->attributes();
-	auto type = attr("type",nullptr);
-	if (type!=nullptr) {
-		this->type = KApiRedirect::getTypeValue(type);
+	{
+		/* load() reads these under the same lock from request threads. */
+		KLocker locker(&lock);
+		auto type = attr("type", nullptr);
+		if (type != nullptr) {
+			this->type = KApiRedirect::getTypeValue(type);
+		}
+		this->setFile(attr["file"]);
 	}
-	this->setFile(attr["file"]);
 	return KExtendProgram::parse_config(node);
 }
 bool KApiRedirect::load()
@@ -245,12 +249,28 @@ KRedirectSource*KApiRedirect::makeFetchObject(KHttpRequest *rq, KFileName *file)
 	if (type == WORK_TYPE_MP || type == WORK_TYPE_SP) {
 		return new KApiFastcgiFetchObject();
 	}
-	lock.Lock();
+	return new KApiFetchObject(this);
+}
+bool KApiRedirect::begin_call()
+{
+	KLocker locker(&lock);
 	if (dso.state == STATE_LOAD_UNKNOW) {
 		load();
 	}
-	lock.Unlock();
-	return new KApiFetchObject(this);
+	if (dso.HttpExtensionProc == NULL) {
+		return false;
+	}
+	active_calls++;
+	return true;
+}
+void KApiRedirect::end_call()
+{
+	KLocker locker(&lock);
+	kassert(active_calls > 0);
+	if (--active_calls == 0 && unload_pending) {
+		unload_pending = false;
+		dso.unload();
+	}
 }
 bool KApiRedirect::createProcess(KVirtualHost *vh, KPipeStream *st) {
 	char *argv[2] = { (char *) conf.extworker.c_str(),NULL };
@@ -276,6 +296,12 @@ KUpstream* KApiRedirect::GetUpstream(KHttpRequest* rq)
 }
 bool KApiRedirect::unload() {
 	KLocker locker(&lock);
+	if (active_calls > 0) {
+		/* Unloading now would unmap code that running calls return into.
+		 * Until the last one ends, new calls keep using the loaded module. */
+		unload_pending = true;
+		return true;
+	}
 	dso.unload();
 	return true;
 }

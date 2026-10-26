@@ -133,6 +133,7 @@ KUpstream *KMPCmdProcess::PowerResult(KHttpRequest *rq, KPipeStream* st2)
 	if (cn != NULL) {
 		KUpstream *us = new_upstream(cn);
 		st->bind(us);
+		st->requests++;
 		return us;
 	}
 	st->killChild();
@@ -146,7 +147,9 @@ KUpstream* KMPCmdProcess::get_connection(KHttpRequest* rq, KSingleListenPipeStre
 	if (socket == NULL) {
 		sp->killChild();
 		gcProcess(sp);
+		return NULL;
 	}
+	sp->requests++;
 	return socket;
 }
 
@@ -222,6 +225,12 @@ KPipeStream *KMPCmdProcess::PowerThread(KVirtualHost* vh, KExtendProgram* erd)
 }
 void KMPCmdProcess::gcProcess(KSingleListenPipeStream *st)
 {
+	if (max_request > 0 && st->requests >= max_request && !st->process.isKilled()) {
+		/* The program exits by itself after this many requests (PHP_FCGI_MAX_REQUESTS).
+		 * Reusing it would connect the next request to a listener that is about
+		 * to close, and that request would fail with 504. */
+		st->killChild();
+	}
 	bool isKilled = st->process.isKilled();
 	stLock.Lock();
 	klist_remove(st);

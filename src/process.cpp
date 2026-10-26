@@ -30,6 +30,13 @@
 volatile int quit_program_flag = PROGRAM_NO_QUIT;
 #ifndef _WIN32
 #include <grp.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdint.h>
+#include <unistd.h>
+#ifdef LINUX
+#include <sys/syscall.h>
+#endif
 int my_uid = -1;
 void child_drop_privilege(Token_t token)
 {
@@ -43,6 +50,26 @@ void child_drop_privilege(Token_t token)
 		(void)write(STDERR_FILENO, message, sizeof(message) - 1);
 		_exit(127);
 	}
+}
+void child_reset_signals()
+{
+	/* kangle ignores SIGPIPE and SIGCHLD, and ignored signals survive execve().
+	 * A child that inherits an ignored SIGCHLD gets ECHILD from waitpid(), so
+	 * PHP exec()/proc_close() lose the exit code. sigaction and sigprocmask are
+	 * async-signal-safe, so this is fine after a multithreaded fork. */
+	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_DFL;
+	sigemptyset(&sa.sa_mask);
+	for (int sig = 1; sig < NSIG; sig++) {
+		if (sig == SIGKILL || sig == SIGSTOP) {
+			continue;
+		}
+		sigaction(sig, &sa, NULL);
+	}
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigprocmask(SIG_SETMASK, &mask, NULL);
 }
 #endif
 static bool open_std_file(const char *filename,KFile *file)
@@ -1463,16 +1490,71 @@ LONG WINAPI CustomUnhandledExceptionFilter(PEXCEPTION_POINTERS pExInfo)
 }
 #endif
 //}}
-void closeAllFile(int start_fd) {
+#ifdef LINUX
+struct kgl_linux_dirent64 {
+	uint64_t d_ino;
+	int64_t d_off;
+	unsigned short d_reclen;
+	unsigned char d_type;
+	char d_name[1];
+};
+/* Close only the descriptors that are open. Runs between fork and exec, so it
+ * uses raw syscalls and a stack buffer instead of opendir()/malloc(). */
+static bool close_open_fds(int start_fd, int keep1, int keep2)
+{
+	int dir = (int)syscall(SYS_openat, AT_FDCWD, "/proc/self/fd", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+	if (dir < 0) {
+		return false;
+	}
+	char buf[4096];
+	for (;;) {
+		long n = syscall(SYS_getdents64, dir, buf, sizeof(buf));
+		if (n <= 0) {
+			break;
+		}
+		for (long pos = 0; pos < n;) {
+			struct kgl_linux_dirent64* d = (struct kgl_linux_dirent64*)(buf + pos);
+			pos += d->d_reclen;
+			const char* p = d->d_name;
+			if (*p < '0' || *p > '9') {
+				continue;
+			}
+			int fd = 0;
+			while (*p >= '0' && *p <= '9') {
+				fd = fd * 10 + (*p - '0');
+				p++;
+			}
+			if (fd >= start_fd && fd != dir && fd != keep1 && fd != keep2) {
+				::close(fd);
+			}
+		}
+	}
+	::close(dir);
+	return true;
+}
+#endif
+void close_fds_from(int start_fd, int keep1, int keep2) {
 #ifndef _WIN32
+#ifdef LINUX
+	/* RLIMIT_NOFILE is 65536 per CPU, so the loop below costs every child
+	 * hundreds of thousands of close() calls. */
+	if (close_open_fds(start_fd, keep1, keep2)) {
+		return;
+	}
+#endif
 	int max_fd = sysconf(_SC_OPEN_MAX);
 	if (max_fd == -1) {
 		max_fd = 2048;
 	}
 	for (int i = start_fd; i < max_fd; i++) {
-		::close(i);
+		if (i != keep1 && i != keep2) {
+			::close(i);
+		}
 	}
 #endif
+}
+void closeAllFile(int start_fd) {
+	close_fds_from(start_fd, -1, -1);
 }
 void append_cmd_arg(KStringBuf &s , const char *arg)
 {
@@ -1530,7 +1612,7 @@ bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *curdir,PIPE_
 		return false;
 	}	
 	if (pid == 0) {
-		signal(SIGTERM, SIG_DFL);
+		child_reset_signals();
 		child_drop_privilege(token);
 #if 0
 		if (conf.program.size() == 0) {
@@ -1627,7 +1709,7 @@ bool createProcess(KPipeStream *st, Token_t token, char * args[],KCmdEnv *envs, 
 		st->process.bind(c_pid);
 	}
 	if (c_pid == 0) {
-		signal(SIGTERM, SIG_DFL);
+		child_reset_signals();
 		child_drop_privilege(token);
 #if 0
 		if (conf.program.size() == 0) {

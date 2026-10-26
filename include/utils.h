@@ -93,6 +93,8 @@ bool startProcessWork(Token_t token, char * args[], KCmdEnv *envs);
 在fork后的子进程中切换到token指定的用户，失败则直接退出子进程
 */
 void child_drop_privilege(Token_t token);
+/* Give a forked child default signal dispositions and an empty signal mask. */
+void child_reset_signals();
 #endif
 /*
 创建一个进程.
@@ -343,4 +345,6 @@ BOOL StartInteractiveClientProcess2 (
 //}}
 bool open_process_std(kgl_process_std *std,KFile *file);
 void closeAllFile(int start_fd);
+/* Close every descriptor >= start_fd except keep1 and keep2 (pass -1 for none). */
+void close_fds_from(int start_fd, int keep1, int keep2);
 #endif

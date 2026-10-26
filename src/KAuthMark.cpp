@@ -165,6 +165,7 @@ uint32_t KAuthMark::process(KHttpRequest* rq, KHttpObject* obj, KSafeSource& fo)
 #ifdef ENABLE_DIGEST_AUTH
 		KHttpDigestAuth *auth = new KHttpDigestAuth();
 		auth->init(rq,realm?realm:PROGRAM_NAME);
+		auth->set_stale(rq->auth && rq->auth->stale_nonce);
 		fo.reset(new KAuthSource(auth));
 #endif
 	}
@@ -179,9 +180,7 @@ bool KAuthMark::checkLogin(KHttpRequest *rq) {
 	if (rq->auth->getType() != auth_type) {
 		return false;
 	}
-	if (!rq->auth->verifySession(rq)) {
-		return false;
-	}
+	bool session_ok = rq->auth->verifySession(rq);
 	bool result = false;
 	lock.Lock();
 	auto it = users.find(rq->auth->getUser());
@@ -192,6 +191,10 @@ bool KAuthMark::checkLogin(KHttpRequest *rq) {
 		result = rq->auth->verify(rq, (*it).second.c_str(), cryptType);
 	}
 	lock.Unlock();
+	if (!session_ok) {
+		rq->auth->stale_nonce = result;
+		return false;
+	}
 	return result;
 }
 bool KAuthMark::loadAuthFile(KString&path) {
