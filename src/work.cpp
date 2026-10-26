@@ -460,6 +460,13 @@ KGL_RESULT stageHttpManageLogin(KHttpRequest* rq) {
  * through an image, link or form. Refuse what a browser marks as cross-site.
  * Scripts and API clients send none of these headers and are not affected. */
 static bool is_cross_site_manage_request(KHttpRequest* rq) {
+	/* The homepage is only a frameset and changes nothing. Panels link to it
+	 * (Easypanel's "enter kangle console"), also from https to http, which a
+	 * browser calls cross-site. The frames it loads are same-origin. */
+	if (rq->sink->data.meth == METH_GET && rq->sink->data.url->path != NULL &&
+		strcmp(rq->sink->data.url->path, "/") == 0) {
+		return false;
+	}
 	kgl_str_t value;
 	if (rq->get_http_value(_KS("Sec-Fetch-Site"), &value)) {
 		return kgl_mem_case_same(value.data, value.len, _KS("cross-site"));
