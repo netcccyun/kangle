@@ -52,7 +52,10 @@ public:
 		return;
 	}
 	void parse(kgl_access_parse_config* parse_ctx) {
-		max_count = (int)parse_ctx->body->get_int(parse_ctx->cn,"max_count");
+		/* without max_count, get_int gives 0 and every request with a
+		 * parameter was refused; keep the default instead */
+		const char* v = parse_ctx->body->get_value(parse_ctx->cn, "max_count");
+		max_count = (v && *v) ? atoi(v) : 1000;
 		get = !!parse_ctx->body->get_int(parse_ctx->cn, "get");
 		post = !!parse_ctx->body->get_int(parse_ctx->cn, "post");
 	}

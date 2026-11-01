@@ -86,9 +86,9 @@ ACL 是条件匹配模块，Mark 是命中规则时执行的处理模块。它�
 | `path` | 请求/响应 | `path`、`raw` | 精确匹配路径；末尾 `*` 表示前缀匹配。路径未以 `/` 开头时会自动补 `/`。 |
 | `reg_path` | 请求/响应 | `path`、`raw`、`nc` | 正则匹配路径。 |
 | `reg_param` | 请求/响应 | `param`、`raw`、`nc` | 正则匹配整个查询字符串。 |
-| `host` | 请求/响应 | `v`、`split`、`icase` | 精确匹配一个或多个 Host。默认忽略大小写。 |
+| `host` | 请求/响应 | `v`、`split`、`icase` | 精确匹配一个或多个 Host。默认忽略大小写。主机名末尾的 `.` 不参与比较，与虚拟主机查找一致（`example.com.` 按 `example.com` 匹配）。 |
 | `wide_host` | 请求/响应 | `v` | 匹配普通域名或 `*.example.com` 形式的泛域名。`*.example.com` 不包含根域 `example.com`。 |
-| `map_host` | 请求/响应 | `file` | 从文件加载主机映射，适合较大的域名集合。 |
+| `map_host` | 请求/响应 | `file` | 从文件加载主机映射，适合较大的域名集合。与 `host` 一样忽略主机名末尾的 `.`。 |
 | `meth` | 请求/响应 | `meth` | 匹配 HTTP 方法，多个方法按模块支持的列表格式填写。 |
 | `dst_port` | 请求/响应 | `port` | 匹配 URL 中的目标端口。 |
 | `referer` | 请求 | `host`、`referer` | 按域名/泛域名列表匹配 Referer 主机；`referer="EqHost"` 匹配与当前请求相同的主机名。 |
@@ -195,7 +195,7 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | `host` | 请求 | `host`、`port`、`life_time`、`reg_host`、`rewrite`、`proxy` | 改写 Host/目标主机；这是 Mark，与同名 Host ACL 含义不同。 |
 | `host_rewrite` | 请求 | 模块的主机重写配置 | 重写主机名。 |
 | `host_alias` | 请求 | `map` | 应用主机别名映射。 |
-| `replace_ip` | 请求 | `ip`、`header`、`sign` | 替换请求使用的客户端 IP。 |
+| `replace_ip` | 请求 | `header`、`val` | 用请求头 `header` 的值（默认 `X-Real-Ip`）替换客户端 IP；`val` 是可选的正则，取第一个捕获组。值是逗号分隔的列表时取最后一项（离 kangle 最近的代理加入的地址），可带空格或 IPv6 的 `[]`。不是合法 IP 地址的值会被忽略，继续使用连接的 IP。`header` 留空时使用 PROXY protocol 提供的地址。 |
 | `parent` | 请求 | `val`、`self_ip` | 设置父级/上游相关地址。 |
 | `multi_server` | 请求 | `nodes` | 动态选择多节点服务。 |
 | `port_map` | 请求 | `host`、`port`、`param` | 四层端口映射；TCP 工作模式构建可用。 |
@@ -205,11 +205,12 @@ Header 正则可以写在 `val` 属性或元素文本中：
 `rewritex` 示例：
 
 ```xml
-<mark module='rewritex' path='^/old/(.*)$' dst='/new/$1'
-      nc='0' qsa='1' internal='1'/>
+<mark module='rewritex'>
+    <rule path='^/old/(.*)$' dst='/new/$1' nc='0' qsa='1' internal='1'/>
+</mark>
 ```
 
-`qsa='1'` 保留并追加原查询参数；外部重定向应设置合适的 `code`，内部重写使用 `internal='1'`。复杂 Apache 风格规则使用 `rewrite` 模块及其子项，建议由管理界面生成后再维护 XML。
+规则写在 `<rule>` 子元素上，`<mark>` 本身只接受 `prefix`、`rewrite_base`。`qsa='1'` 保留并追加原查询参数；外部重定向应设置合适的 `code`，内部重写使用 `internal='1'`。`$1` 等捕获来自解码后的路径；生成的跳转地址（`Location`）和回源请求行中的空格、控制字符会按 `%XX` 编码发送，其他响应头和回源请求头中的 CR/LF 会替换为空格，不会被拆成多个头。复杂 Apache 风格规则使用 `rewrite` 模块及其子项，建议由管理界面生成后再维护 XML。
 
 ### Header、参数和 Cookie
 
@@ -221,9 +222,9 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | `add_response_header` | 请求 | `attr`、`val` | 在请求阶段预先添加响应 Header。 |
 | `remove_param` | 请求 | `params`、`raw`、`nc` | 从查询参数中删除指定项。 |
 | `cookie` | 响应 | `cookie`、`http_only`、`secure` | 修改响应 Cookie 的 HttpOnly/Secure 属性。 |
-| `param` | 请求 | 模块的参数过滤配置 | 使用内置请求体过滤器检查 GET/POST 参数。 |
-| `param_count` | 请求 | 模块的计数配置 | 使用内置请求体过滤器限制参数数量。 |
-| `post_file` | 请求 | 模块的上传文件配置 | 使用内置 multipart 过滤器检查上传文件。 |
+| `param` | 请求 | `name`、`value`、`icase`、`get`、`post`、`charset` | 使用内置请求体过滤器检查 GET/POST 参数。`name`/`value` 是正则；`get`、`post` 需写 `1` 才检查对应位置。支持 `application/x-www-form-urlencoded` 和 `multipart/form-data` 请求体；multipart 最后一段缺少结束分界线时仍会检查；单个分段的头部超过 64KB 时直接拒绝。 |
+| `param_count` | 请求 | `max_count`、`get`、`post` | 使用内置请求体过滤器限制参数数量，超过 `max_count`（默认 1000）时命中。 |
+| `post_file` | 请求 | `filename`、`icase` | 用正则 `filename` 检查 multipart 上传的文件名。 |
 
 Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小写的正则，留空删除全部同名字段，以 `!` 开头则删除“不匹配后续正则”的值。`replace_header@val` 是正则，`replace` 可引用捕获结果；该模块只处理遇到的第一个同名字段。
 

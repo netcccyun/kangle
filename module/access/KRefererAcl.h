@@ -46,7 +46,9 @@ public:
 			if (!host && rq->sink->data.url) {
 				host = rq->sink->data.url->host;
 			}
-			return host && strcasecmp(referer->host, host) == 0;
+			KString b1, b2;
+			host = kgl_acl_host(host, b1);
+			return host && strcasecmp(kgl_acl_host(referer->host, b2), host) == 0;
 		}
 		return  (vhc->find(referer->host) != NULL);
 	}

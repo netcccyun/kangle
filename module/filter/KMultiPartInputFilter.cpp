@@ -64,13 +64,17 @@ static char* next_line(multipart_buffer* self) {
 
 	} else {	/* no LF found */
 
-		/* buffer isn't completely full, fail */
-		if (self->bytes_in_buffer < self->bufsize) {
+		/* The rest may be a boundary line split between reads: wait for
+		 * more data. Only a line longer than the boundary (plus CR) cannot
+		 * be one and is dropped. Taking every partial line as complete let
+		 * a client hide a boundary, and the part after it, by splitting
+		 * the line across two packets. */
+		if (self->bytes_in_buffer <= self->boundary_next_len) {
 			return NULL;
 		}
 		/* return entire buffer as a partial line */
-		line[self->bufsize] = 0;
-		self->buf_begin = line + self->bufsize;
+		line[self->bytes_in_buffer] = 0;
+		self->buf_begin = line + self->bytes_in_buffer;
 		self->bytes_in_buffer = 0;
 	}
 
@@ -293,7 +297,7 @@ bool KMultiPartInputFilter::match(KInputFilterContext* rq, const char* str, int 
 	while (!multipart_eof(mb, isLast)) {
 		if (mb->model == MULTIPART_BODY_MODEL) {
 			bool success;
-			if (match_body(success)) {
+			if (match_body(success, isLast)) {
 				return true;
 			}
 			if (!success) {
@@ -303,7 +307,7 @@ bool KMultiPartInputFilter::match(KInputFilterContext* rq, const char* str, int 
 		}
 		if (mb->model == MULTIPART_BOUNDARY_MODEL) {
 			if (!find_boundary(mb)) {
-				return JUMP_ALLOW;
+				return false;
 			}
 			mb->model = MULTIPART_HEAD_MODEL;
 			continue;
@@ -326,6 +330,11 @@ bool KMultiPartInputFilter::match(KInputFilterContext* rq, const char* str, int 
 			mb = NULL;
 			return false;
 		default:
+			/* Part headers are reparsed from the start on each read; no
+			 * real form sends this much, refuse instead of buffering it. */
+			if (mb->bytes_in_buffer > MULTIPART_MAX_HEAD) {
+				return true;
+			}
 			return false;
 		}
 		if ((cd = get_hdr_value(hm.header, _KS("Content-Disposition")))) {
@@ -417,11 +426,11 @@ bool KMultiPartInputFilter::match_file_content(const char* buf, int len) {
 	}
 	return false;
 }
-bool KMultiPartInputFilter::match_body(bool& success) {
+bool KMultiPartInputFilter::match_body(bool& success, bool isLast) {
 	mb->model = MULTIPART_BODY_MODEL;
 	int len;
 	bool all = !filename;
-	char* buf = parse_body(&len, all);
+	char* buf = parse_body(&len, all, isLast);
 	if (buf) {
 		success = true;
 			if (all) {
@@ -445,18 +454,33 @@ bool KMultiPartInputFilter::match_body(bool& success) {
 	}
 	return false;
 }
-char* KMultiPartInputFilter::parse_body(int* len, bool& all) {
+char* KMultiPartInputFilter::parse_body(int* len, bool& all, bool isLast) {
 	int max;
 	char* bound;
 	if (mb->bytes_in_buffer <= 0) {
 		return NULL;
 	}
-
-	if ((bound = (char*)kgl_memstr(mb->buf_begin, mb->bytes_in_buffer, mb->boundary_next, mb->boundary_next_len))) {
+	int skip = mb->searched;
+	if (skip < 0 || skip > mb->bytes_in_buffer) {
+		skip = 0;
+	}
+	if ((bound = (char*)kgl_memstr(mb->buf_begin + skip, mb->bytes_in_buffer - skip, mb->boundary_next, mb->boundary_next_len))) {
 		max = bound - mb->buf_begin;
+		all = true;
+	} else if (isLast) {
+		/* No closing boundary: PHP still takes the rest as this part's
+		 * value, so it must be checked too. */
+		max = mb->bytes_in_buffer;
 		all = true;
 	} else {
 		if (all) {
+			/* A field value is checked whole: wait for its boundary. Next
+			 * time search only new bytes, keeping enough of the old ones
+			 * for a boundary split between reads. */
+			mb->searched = mb->bytes_in_buffer - mb->boundary_next_len + 1;
+			if (mb->searched < 0) {
+				mb->searched = 0;
+			}
 			return NULL;
 		}
 		//keep the tail, it may be the beginning of a boundary split by reads.
@@ -482,6 +506,7 @@ char* KMultiPartInputFilter::parse_body(int* len, bool& all) {
 		}
 		mb->bytes_in_buffer -= consumed;
 		mb->buf_begin += consumed;
+		mb->searched = 0;
 		return buf;
 	}
 	return NULL;

@@ -10,6 +10,8 @@
 #define MULTIPART_BOUNDARY_MODEL 0
 #define MULTIPART_HEAD_MODEL     1
 #define MULTIPART_BODY_MODEL     2
+/* most bytes of an unfinished part header kept while waiting for its end */
+#define MULTIPART_MAX_HEAD       65536
 
 class multipart_buffer {
 public:
@@ -28,32 +30,35 @@ public:
 		}
 	}
 	bool add(const char* str, int len) {
-		if (len < 0 || bytes_in_buffer < 0 || len > INT_MAX - bytes_in_buffer) {
+		if (len < 0 || bytes_in_buffer < 0 || len > INT_MAX - 1 - bytes_in_buffer) {
 			return false;
 		}
-		if (buffer) {
-			int new_size = len + bytes_in_buffer;
-			char* t = (char*)malloc(new_size + 1);
+		/* Move the kept bytes to the front and grow by doubling. Copying
+		 * all kept data into a new buffer on every read made a long field
+		 * cost quadratic time. */
+		if (buffer && buf_begin != buffer) {
+			if (bytes_in_buffer > 0) {
+				memmove(buffer, buf_begin, bytes_in_buffer);
+			}
+			buf_begin = buffer;
+		}
+		int need = bytes_in_buffer + len + 1;
+		if (need > capacity) {
+			int size = capacity > 0 ? capacity : FILLUNIT;
+			while (size < need) {
+				size = (size > INT_MAX / 2) ? need : size * 2;
+			}
+			char* t = (char*)realloc(buffer, size);
 			if (t == NULL) {
 				return false;
 			}
-			kgl_memcpy(t, buf_begin, bytes_in_buffer);
-			kgl_memcpy(t + bytes_in_buffer, str, len);
-			t[new_size] = '\0';
-			free(buffer);
 			buffer = t;
-			bufsize = new_size;
-		} else {
-			bufsize = len;
-			buffer = (char*)malloc(bufsize + 1);
-			if (buffer == NULL) {
-				bufsize = 0;
-				return false;
-			}
-			kgl_memcpy(buffer, str, len);
-			buffer[bufsize] = '\0';
+			capacity = size;
 		}
-		bytes_in_buffer = bufsize;
+		kgl_memcpy(buffer + bytes_in_buffer, str, len);
+		bytes_in_buffer += len;
+		buffer[bytes_in_buffer] = '\0';
+		bufsize = bytes_in_buffer;
 		buf_begin = buffer;
 		return true;
 	}
@@ -62,6 +67,9 @@ public:
 	char* buf_begin;
 	int  bufsize;
 	int  bytes_in_buffer;
+	int  capacity = 0;
+	/* bytes from buf_begin already searched for boundary_next */
+	int  searched = 0;
 
 	/* boundary info */
 	char* boundary;
@@ -93,8 +101,8 @@ public:
 		return true;
 	}
 private:
-	bool match_body(bool& success);
-	char* parse_body(int* len, bool& all);
+	bool match_body(bool& success, bool isLast);
+	char* parse_body(int* len, bool& all, bool isLast);
 	kgl_parse_result parse_header();
 	bool match_file_content(const char* buf, int len);
 	KHttpHeaderManager hm;

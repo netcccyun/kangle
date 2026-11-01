@@ -299,6 +299,9 @@ void insert_via(KHttpRequest* rq, KWStream& s, char* old_via, size_t len) {
 inline KHttpHeader* build_know_header(KHttpHeader* head, KHttpHeader* header, kgl_header_type type, const char* val, size_t val_len) {
 	memset(header, 0, sizeof(KHttpHeader));
 	header->name_is_know = 1;
+	/* without this the type stayed 0 (Host) and local responses were
+	 * sent with "Host: kangle/x" instead of a Server header */
+	header->know_header = (uint16_t)type;
 	header->buf = (char*)val;
 	header->val_len = (uint16_t)val_len;
 	header->next = head;
@@ -377,6 +380,28 @@ bool push_redirect_header(KHttpRequest* rq, const char* url, int url_len, int co
 	timeLock.Lock();
 	rq->response_header(kgl_header_date, (char*)cachedDateTime, 29);
 	timeLock.Unlock();
+	/* Rewrite captures and other parts of the target can hold decoded bytes
+	 * from the request path. Send spaces and control bytes encoded, so the
+	 * Location stays one valid URL. */
+	int i = 0;
+	while (i < url_len && (unsigned char)url[i] > 0x20 && url[i] != 0x7f) {
+		i++;
+	}
+	if (i < url_len) {
+		static const char hex[] = "0123456789ABCDEF";
+		KStringBuf s(url_len + 16);
+		for (i = 0; i < url_len; i++) {
+			unsigned char c = (unsigned char)url[i];
+			if (c > 0x20 && c != 0x7f) {
+				s.write_all(url + i, 1);
+			} else {
+				char esc[3] = { '%', hex[c >> 4], hex[c & 15] };
+				s.write_all(esc, 3);
+			}
+		}
+		rq->response_header(kgl_expand_string("Location"), s.buf(), s.size());
+		return true;
+	}
 	rq->response_header(kgl_expand_string("Location"), url, url_len);
 	//rq->response_connection();
 	return true;

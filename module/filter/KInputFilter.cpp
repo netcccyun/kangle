@@ -1,3 +1,4 @@
+#include <limits.h>
 #include "KInputFilter.h"
 #include "KMultiPartInputFilter.h"
 #include "KHttpRequest.h"
@@ -67,57 +68,61 @@ bool KParamInputFilter::match_param_item(char* buf, int len)
 }
 bool KParamInputFilter::match(KInputFilterContext* rq, const char* str, int len, bool isLast)
 {
-	char* buf;
-	if (last_buf) {
-		int new_len = last_buf_len + len;
-		buf = (char*)malloc(new_len + 1);
-		if (buf) {
-			kgl_memcpy(buf, last_buf, last_buf_len);
-			kgl_memcpy(buf + last_buf_len, str, len);
-		}
-		len = new_len;
-		free(last_buf);
-		last_buf = NULL;
-	} else {
-		buf = (char*)malloc(len + 1);
-		if (buf) {
-			kgl_memcpy(buf, str, len);
-		}
-	}
-	if (buf == NULL) {
-		last_buf_len = 0;
+	/* Append to the parameter left from the last read. The buffer grows by
+	 * doubling and only the new bytes are searched for '&': copying and
+	 * scanning everything kept on each read made one long parameter cost
+	 * quadratic time. */
+	if (len < 0 || last_buf_len > INT_MAX - 1 - len) {
 		return false;
 	}
-	char* end = buf + len;
+	int need = last_buf_len + len + 1;
+	if (need > last_buf_size) {
+		int size = last_buf_size > 0 ? last_buf_size : 4096;
+		while (size < need) {
+			size = (size > INT_MAX / 2) ? need : size * 2;
+		}
+		char* nb = (char*)realloc(last_buf, size);
+		if (nb == NULL) {
+			free(last_buf);
+			last_buf = NULL;
+			last_buf_len = 0;
+			last_buf_size = 0;
+			return false;
+		}
+		last_buf = nb;
+		last_buf_size = size;
+	}
+	if (len > 0) {
+		kgl_memcpy(last_buf + last_buf_len, str, len);
+	}
+	char* scan = last_buf + last_buf_len;
+	last_buf_len += len;
+	char* end = last_buf + last_buf_len;
 	*end = '\0';
-	char* hot = buf;
+	char* hot = last_buf;
 	for (;;) {
-		char* p = (char*)memchr(hot, '&', end - hot);
+		char* p = (char*)memchr(scan, '&', end - scan);
 		if (p == NULL) {
 			break;
 		}
 		*p = '\0';
 		if (match_param_item(hot, (int)(p - hot))) {
-			free(buf);
+			last_buf_len = 0;
 			return true;
 		}
-		hot = p + 1;
+		hot = scan = p + 1;
 	}
-	last_buf_len = (int)(end - hot);
+	int left = (int)(end - hot);
 	if (isLast) {
-		auto ret = match_param_item(hot, last_buf_len);
-		free(buf);
+		auto ret = match_param_item(hot, left);
 		last_buf_len = 0;
 		return ret;
 	}
-	last_buf = (char*)malloc(last_buf_len + 1);
-	if (last_buf) {
-		kgl_memcpy(last_buf, hot, last_buf_len);
-		last_buf[last_buf_len] = '\0';
-	} else {
-		last_buf_len = 0;
+	if (hot != last_buf) {
+		memmove(last_buf, hot, left);
 	}
-	free(buf);
+	last_buf_len = left;
+	last_buf[left] = '\0';
 	return false;
 }
 void KInputFilterContext::tee_body(kgl_request_body* body) {
