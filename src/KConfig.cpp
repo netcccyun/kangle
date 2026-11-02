@@ -158,7 +158,8 @@ char* get_human_size(double size, char* buf, size_t buf_size) {
 	int i = 0;
 	const char* units[] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
 	while (size > 1024) {
-		if (i > 8) {
+		/* units has 9 entries: stop at the last one */
+		if (i >= 8) {
 			break;
 		}
 		size /= 1024;

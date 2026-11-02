@@ -1152,6 +1152,12 @@ namespace kconfig {
 				return true;
 			}
 		}
+		if (!xml && !last_modified.empty() && get_index() != 0) {
+			/* the file is there but did not load: keep its running config */
+			klog(KLOG_ERR, "cann't load config file [%s %s], keep its running config\n", name->data, filename->data);
+			this->last_modified = pre_last_modified;
+			return true;
+		}
 		update(std::move(xml));
 		return !last_modified.empty();
 	}
@@ -1240,6 +1246,14 @@ namespace kconfig {
 			}
 			if (cfg_file->last_modified != last_modified) {
 				auto xml = cfg_file->load();
+				if (!xml && cfg_file->get_index() != 0) {
+					/* A typo in config.xml used to remove every listen and
+					 * vhost, the admin port included. Keep what runs and
+					 * try again on the next reload. */
+					klog(KLOG_ERR, "cann't load config file [%s %s], keep its running config\n", name->data, filename->data);
+					cfg_file->set_remove_flag(false);
+					return;
+				}
 				cfg_file->set_last_modified(last_modified);
 				prepare_files.emplace(std::piecewise_construct,
 					std::forward_as_tuple(cfg_file->get_index()),
@@ -1286,6 +1300,24 @@ namespace kconfig {
 		kgl_ext_config_context ctx;
 		KConfigScanInfoProvider provider;
 		bool scanned[static_cast<int>(KConfigFileSource::Size)] = { false };
+		auto scan_source = [&provider](int i) {
+			provider.current_source = static_cast<KConfigFileSource>(i);
+			provider.scan_failed = false;
+			sources[i]->scan(&provider);
+			if (!provider.scan_failed) {
+				return;
+			}
+			/* e.g. the vhost database is down: removing all its vhosts
+			 * would take every site offline. Keep them until it is back. */
+			klog(KLOG_ERR, "cann't scan config source [%d], keep its running config\n", i);
+			config_files.iterator([](void* data, void* arg) {
+				KConfigFile* file = (KConfigFile*)data;
+				if (file->get_source() == *(KConfigFileSource*)arg) {
+					file->set_remove_flag(false);
+				}
+				return iterator_continue;
+				}, &provider.current_source);
+		};
 		config_files.iterator([](void* data, void* arg) {
 			KConfigFile* file = (KConfigFile*)data;
 			//printf("set file [%s] remove_flag\n", file->filename->data);
@@ -1300,8 +1332,7 @@ namespace kconfig {
 				// templates. Apply the ordinary config sources first so a reload
 				// cannot rebuild vhosts against the previous template generation.
 				if (i != static_cast<int>(KConfigFileSource::Db) && sources[i]->enable_scan()) {
-					provider.current_source = static_cast<KConfigFileSource>(i);
-					sources[i]->scan(&provider);
+					scan_source(i);
 					scanned[i] = true;
 				}
 			}
@@ -1318,8 +1349,7 @@ namespace kconfig {
 		// has been applied (for example, the virtual-host database driver).
 		for (int i = 0; i < static_cast<int>(KConfigFileSource::Size); ++i) {
 			if (!scanned[i] && sources[i] != nullptr && sources[i]->enable_scan()) {
-				provider.current_source = static_cast<KConfigFileSource>(i);
-				sources[i]->scan(&provider);
+				scan_source(i);
 				scanned[i] = true;
 			}
 		}

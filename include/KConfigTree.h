@@ -183,12 +183,19 @@ namespace kconfig {
 	public:
 		virtual ~KConfigFileScanInfo() {}
 		virtual void new_file(const kgl_ref_str_t* name, const kgl_ref_str_t* filename, const KFileModified& last_modified, bool is_default) = 0;
+		/* the source could not be listed (e.g. its database is down): keep
+		 * the files it had instead of removing them */
+		bool scan_failed = false;
 	};
 	class KConfigFileSourceDriver
 	{
 	public:
 		virtual ~KConfigFileSourceDriver() noexcept {}
 		virtual void scan(KConfigFileScanInfo* info) {}
+		/* nullptr with the file index left non-zero means the file could not
+		 * be loaded (syntax error, read error, database down): the running
+		 * config of the file is kept. A file switched off with <!--#stop-->
+		 * sets index 0 and returns nullptr: its config is removed. */
 		virtual khttpd::KSafeXmlNode load(KConfigFile* file) = 0;
 		virtual KFileModified get_last_modified(KConfigFile* file) = 0;
 		virtual bool enable_save() {
