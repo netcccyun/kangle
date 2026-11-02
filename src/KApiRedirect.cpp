@@ -102,9 +102,22 @@ static BOOL WINAPI apiServerSupportFunction(HCONN hConn, DWORD dwHSERequest,
 			if (command->env) {
 				env = new KCmdEnv;
 				kgl_command_env *ce = command->env;
+				bool env_ready = true;
 				while (ce) {
-					env->addEnv(ce->name,ce->val);
+					if (!env->addEnv(ce->name,ce->val)) {
+						env_ready = false;
+						break;
+					}
 					ce = ce->next;
+				}
+				// Finalize the environment before execve; otherwise dump_env()
+				// returns NULL and every API command loses its environment.
+				if (!env_ready || !env->addEnvEnd()) {
+					delete env;
+					if (token) {
+						KVirtualHost::closeToken(token);
+					}
+					return FALSE;
 				}
 			}
 			pid_t pid = createProcess(token,command->cmd,env,command->dir,&command->std);
