@@ -312,6 +312,9 @@ public:
 
 #ifndef _WIN32
 	int id[2];
+	/* user or group could not be resolved: id[] would be root, so start no
+	 * process for this vhost */
+	bool run_as_failed = false;
 #endif
 	/*
 	 * run user

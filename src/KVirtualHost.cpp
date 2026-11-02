@@ -286,7 +286,7 @@ Token_t KVirtualHost::createToken(bool& result) {
 		&token) == TRUE);
 	return token;
 #else
-	result = true;
+	result = !run_as_failed;
 	return (Token_t)&id;
 #endif
 }
@@ -318,24 +318,36 @@ bool KVirtualHost::setRunAs(const KString& user, const KString& group) {
 	}
 	return true;
 #else
+	/* id[] stays 0 (root) when a lookup fails. An empty user means run as
+	 * kangle itself; a user that is set but not found must not mean root. */
+	run_as_failed = false;
+	if (user.empty()) {
+		return true;
+	}
 	struct stat buf;
 	memset(&buf, 0, sizeof(buf));
 	if (user == "-" || group == "-") {
 		if (stat(doc_root.c_str(), &buf) != 0) {
-			klog(KLOG_ERR, "cann't stat doc_root [%s]\n", doc_root.c_str());
+			klog(KLOG_ERR, "vh [%s] cann't stat doc_root [%s] for its run user, no process will start\n", name.c_str(), doc_root.c_str());
+			run_as_failed = true;
+			return false;
 		}
 	}
 	if (user == "-") {
 		id[0] = buf.st_uid;
 	} else {
 		if (!name2uid(user.c_str(), id[0], id[1])) {
+			klog(KLOG_ERR, "vh [%s] run user [%s] not found, no process will start\n", name.c_str(), user.c_str());
+			run_as_failed = true;
 			return false;
 		}
 	}
 	if (group == "-") {
 		id[1] = buf.st_gid;
-	} else {
-		return name2gid(group.c_str(), id[1]);
+	} else if (!group.empty() && !name2gid(group.c_str(), id[1])) {
+		klog(KLOG_ERR, "vh [%s] run group [%s] not found, no process will start\n", name.c_str(), group.c_str());
+		run_as_failed = true;
+		return false;
 	}
 	return true;
 #endif

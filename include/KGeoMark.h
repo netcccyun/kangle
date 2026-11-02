@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "KLineFile.h"
 #include "kfiber_sync.h"
+#include "klog.h"
 
 struct geo_lable {
 	char *data;
@@ -70,7 +71,13 @@ public:
 			this->url = NULL;
 		}
 		if (!attr["url"].empty()) {
-			this->url = strdup(attr["url"].c_str());
+			if (isGlobal) {
+				this->url = strdup(attr["url"].c_str());
+			} else {
+				/* The download is saved to file as root, and a 404 deletes it:
+				 * a vhost's own rules could write or delete any file. */
+				klog(KLOG_ERR, "geo [%s]: url is only allowed in the global access config, ignored\n", this->name.c_str());
+			}
 		}
 		KString file;
 		if (isAbsolutePath(this->file.c_str())) {

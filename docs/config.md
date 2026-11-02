@@ -468,12 +468,12 @@ DSO 开发接口见 [dso.md](./dso.md)。
 | `browse` | 目录无首页时是否列目录，`0`/`1` 或 `off`/`on`。 |
 | `inherit` | 是否继承 `vhs`，`0`/`1` 或 `off`/`on`。 |
 | early_hints | 上游 103 Early Hints 转发，`0`/`1` 或 `off`/`on`/`h2` |
-| `access` | 独立访问控制文件路径。 |
+| `access` | 独立访问控制文件路径（相对路径基于 `doc_root`）。该文件通常在站点用户可写的目录里，只接受其中的 `<request>` 和 `<response>`，其他节点（如 `alias`、`map`、`error`、`env`）会被忽略并记录错误日志；文件中的 `%{env:名称}` 不会展开。 |
 | `htaccess` | htaccess 文件名/路径。解析结果会缓存，文件修改后下一个请求即生效；缓存总量约 64MB，超出时淘汰最久未用的文件。 |
 | `envs` | 虚拟主机环境变量列表，使用项目的环境变量格式。 |
 | `status` | `0` 为正常，非 `0` 为关闭。 |
 | `app`、`app_share`、`ip_hash` | 应用隔离、应用共享和哈希相关设置。 |
-| `user`、`group` | 虚拟主机运行身份；Windows 下 `group` 兼作用户密码。 |
+| `user`、`group` | 虚拟主机运行身份；Windows 下 `group` 兼作用户密码。Unix 下用户或用户组不存在（`-` 时为 `doc_root` 无法读取）时，该主机不会启动任何进程，相关请求返回错误。 |
 | `chroot` | Unix 下是否 chroot，`0`/`1` 或 `off`/`on`。 |
 | `speed_limit` | 主机总限速，支持大小单位。 |
 | `max_connect` | 主机最大连接数。 |

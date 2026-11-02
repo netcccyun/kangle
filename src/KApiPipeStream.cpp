@@ -209,6 +209,10 @@ bool KApiPipeStream::init(KVirtualHost* vh, int workType) {
 #ifdef ENABLE_VH_RUN_AS
 #ifndef _WIN32
 	if (my_uid == 0) {
+		if (vh->run_as_failed) {
+			/* id[] is root when the run user was not found */
+			return false;
+		}
 		if (vh->chroot) {
 			if (!chroot(vh->doc_root.c_str())) {
 				return false;

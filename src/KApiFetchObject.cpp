@@ -43,6 +43,11 @@ Token_t KApiFetchObject::getVhToken(const char* vh_name) {
 				bool result;
 				token = vh->createToken(result);
 				vh->release();
+				if (!result) {
+					/* its run user is unknown: not root either */
+					KVirtualHost::closeToken(token);
+					token = NULL;
+				}
 				return token;
 			}
 		}
@@ -61,6 +66,10 @@ Token_t KApiFetchObject::getToken() {
 		if (rq && rq->sink->data.opaque) {
 			bool result;
 			token = kangle::get_virtual_host(rq)->vh->createToken(result);
+			if (!result) {
+				KVirtualHost::closeToken(token);
+				token = NULL;
+			}
 		} else {
 #ifndef _WIN32
 			token = (Token_t)&id;

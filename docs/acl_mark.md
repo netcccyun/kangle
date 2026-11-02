@@ -337,7 +337,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | `black_list` | 请求 | `enable`、`time_out` | 把客户端加入黑名单；需黑名单功能。 |
 | `check_black_list` | 请求 | `enable` | 检查黑名单；需黑名单功能。 |
 | `ip_url_rate` | 请求 | `request`、`second`、`block_time` | 速率超限后按 IP/URL 处理；需黑名单功能。 |
-| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量。`flush_time` 是从 `url` 重新下载的间隔（秒），未设置或不大于 0 时为 86400。 |
+| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量。`flush_time` 是从 `url` 重新下载的间隔（秒），未设置或不大于 0 时为 86400。`url` 只在全局访问控制中生效，虚拟主机自己的访问控制文件里会被忽略（下载以 root 身份写入 `file`）。 |
 | `white_list` | 请求/响应 | `host`、`flush` | 更新白名单状态；企业/Fatboy 功能。 |
 
 认证示例：

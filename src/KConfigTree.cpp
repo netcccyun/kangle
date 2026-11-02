@@ -45,10 +45,25 @@ namespace kconfig {
 #endif
 		return config_dir + CONFIG_FILE;
 	}
+	/* A vhost access file is written by the site user: it must not read
+	 * kangle's environment through %{env:NAME}. */
+	class KVhAccessDynamicString : public KExtConfigDynamicString
+	{
+	public:
+		KVhAccessDynamicString(const char* file) : KExtConfigDynamicString(file) {
+		}
+		bool buildValue(const char* name, KWStream* s) override {
+			return strncasecmp(name, "env:", 4) == 0;
+		}
+	};
 	class KDefaultConfigFileDriver : public KConfigFileSourceDriver
 	{
 	public:
 		khttpd::KSafeXmlNode load(KConfigFile* file) override {
+			return load_file(file, false);
+		}
+	protected:
+		khttpd::KSafeXmlNode load_file(KConfigFile* file, bool site_file) {
 			auto fp = kfiber_file_open(file->get_filename()->data, fileRead, KFILE_ASYNC);
 			if (!fp) {
 				klog(KLOG_ERR, "ERROR! cann't open config file [%s] for read\n", file->get_filename()->data);
@@ -97,20 +112,26 @@ namespace kconfig {
 				/* only first time can set_index */
 				file->set_index(id);
 			}
-			KExtConfigDynamicString ds(file->get_filename()->data);
-			ds.dimModel = false;
-			ds.blockModel = false;
-			ds.envChar = '%';
-			auto content = ds.parseDirect(buf.get());
+			std::unique_ptr<KExtConfigDynamicString> ds(site_file ?
+				new KVhAccessDynamicString(file->get_filename()->data) :
+				new KExtConfigDynamicString(file->get_filename()->data));
+			ds->dimModel = false;
+			ds->blockModel = false;
+			ds->envChar = '%';
+			auto content = ds->parseDirect(buf.get());
 			return parse_xml(content.get());
 		}
+	public:
 		KFileModified get_last_modified(KConfigFile* file) override {
 			return file->get_filename()->data;
 		}
 		bool save(KConfigFile* f, khttpd::KXmlNode* nodes) override {
 			KString tmpfile = f->get_filename()->data;
 			tmpfile += KString(_KS(".tmp"));
-			auto fp = kfiber_file_open(tmpfile.c_str(), fileWrite, 0);
+			/* A vhost access file sits in the site's own directory. Never
+			 * write through whatever the site user left at the temp name. */
+			unlink(tmpfile.c_str());
+			auto fp = kfiber_file_open(tmpfile.c_str(), fileWrite, KFILE_NOFOLLOW);
 			if (!fp) {
 				return false;
 			}
@@ -248,7 +269,25 @@ namespace kconfig {
 	{
 	public:
 		khttpd::KSafeXmlNode load(KConfigFile* file) override {
-			auto xml = KDefaultConfigFileDriver::load(file);
+			auto xml = load_file(file, true);
+			if (xml) {
+				/* The file is mounted under the vhost, so an <alias>, <map>,
+				 * <error> or <env> in it would change the vhost itself, e.g.
+				 * alias / to read any file as root. The site may only add its
+				 * own access rules. */
+				auto root = xml->get_first();
+				std::vector<khttpd::KXmlNode*> drop;
+				for (auto child : root->childs) {
+					if (!child->is_tag(_KS("request")) && !child->is_tag(_KS("response"))) {
+						drop.push_back(child);
+					}
+				}
+				for (auto child : drop) {
+					klog(KLOG_ERR, "ignore <%s> in vhost access file [%s], only <request> and <response> are allowed\n",
+						child->get_tag().c_str(), file->get_filename()->data);
+					root->remove_child(&child->key);
+				}
+			}
 			if (!xml) {
 				// A vhost may enable access.xml before the file exists. Treat that
 				// state as an empty config so the first WHM rule can create the file.
