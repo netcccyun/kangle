@@ -61,6 +61,10 @@ public:
 		this->file = attr["file"];
 		this->name = attr["name"];
 		this->flush_time = atoi(attr["flush_time"].c_str());
+		if (this->flush_time <= 0) {
+			/* 0 downloaded the file again on every 2 second tick */
+			this->flush_time = 86400;
+		}
 		if (this->url) {
 			xfree(this->url);
 			this->url = NULL;

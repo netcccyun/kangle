@@ -63,7 +63,7 @@ ACL 是条件匹配模块，Mark 是命中规则时执行的处理模块。它�
 </request>
 ```
 
-命名 ACL 与命名 Mark 的 `name` 在各自规则作用域内必须唯一。引用节点只应写 `ref`、`or`、`revers`；模块参数应放在定义处，避免意外修改共享实例。
+命名 ACL 与命名 Mark 的 `name` 在各自规则作用域内必须唯一。引用节点只应写 `ref`、`or`、`revers`；模块参数应放在定义处，避免意外修改共享实例。修改命名模块的配置会在原实例上生效；`param`、`post_file`、`content`、`replace_content`、`replace_url` 这类需要在读取请求体或发送响应体时继续使用规则的模块，正在处理的请求沿用开始时的规则，新请求使用新规则。
 
 ## 通用参数约定
 
@@ -173,7 +173,7 @@ Header 正则可以写在 `val` 属性或元素文本中：
 | --- | --- | --- | --- |
 | `mark` | 请求/响应 | `op`、`v` | 比较请求的数值 mark；`op` 为 `eq`、`lt`、`gt`。 |
 | `work_model` | 请求/响应 | `ssl`、`tcp` | 匹配连接工作模式。 |
-| `ip_rate` | 请求 | `request`、`second` | 按 IP 请求速率匹配。 |
+| `ip_rate` | 请求 | `request`、`second` | 按 IP 请求速率匹配。每条规则最多同时记录 20 万个 IP，超出时淘汰最久未访问的记录（该记录的计数清零）。`ip_url_rate`、`url_rate` 同样有此上限。 |
 | `ip_url_rate` | 请求/响应 | `request`、`second` | 按 IP 与 URL 速率匹配；黑名单功能。 |
 | `url_rate` | 请求/响应 | `request`、`second` | 按 URL 速率匹配；黑名单功能。 |
 | `cloud_ip` | 请求/响应 | `url`、`flush_time` | 从远程数据维护云 IP 集合；模拟 HTTP 功能。 |
@@ -337,7 +337,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 | `black_list` | 请求 | `enable`、`time_out` | 把客户端加入黑名单；需黑名单功能。 |
 | `check_black_list` | 请求 | `enable` | 检查黑名单；需黑名单功能。 |
 | `ip_url_rate` | 请求 | `request`、`second`、`block_time` | 速率超限后按 IP/URL 处理；需黑名单功能。 |
-| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量。 |
+| `geo` | 请求 | `name`、`file`、`url`、`flush_time` | 载入地理数据并设置相关变量。`flush_time` 是从 `url` 重新下载的间隔（秒），未设置或不大于 0 时为 86400。 |
 | `white_list` | 请求/响应 | `host`、`flush` | 更新白名单状态；企业/Fatboy 功能。 |
 
 认证示例：
@@ -371,7 +371,7 @@ Header 名应使用标准 HTTP 字段名。`remove_header@val` 是忽略大小�
 
 | 模块 | 阶段 | 主要参数 | 用途 |
 | --- | --- | --- | --- |
-| `replace_content` | 响应 | `content`、`replace`、`nc`、`charset`、`buffer`、`mark_acl`、`mark_mark`、`replaced_stop` | 正则替换响应正文，支持捕获组和请求变量展开。 |
+| `replace_content` | 响应 | `content`、`replace`、`nc`、`charset`、`buffer`、`mark_acl`、`mark_mark`、`replaced_stop` | 正则替换响应正文，支持捕获组和请求变量展开。正文按块到达时，只保留可能与下一块拼成匹配的末尾部分（从部分匹配的起点开始），之前的内容立即发送；保留部分超过 `buffer`（默认 1M，最大 16M）时，本响应剩余部分不再替换。 |
 | `content` | 响应 | `content`/元素文本、`charset`、`buffer` | 正则扫描响应正文；命中后执行所在链的动作。旧源码类名为 `KRegContentMark`，配置模块名一直是 `content`。 |
 | `replace_url` | 响应 | `src`、`dst`、`nc`、`location` | 改写 HTML 标签中的 URL；默认同时改写 3xx `Location`。 |
 | `fix_header` | 响应 | `header` | 对起点大于 0 的 Range 响应，在正文前补充 URL 编码的字节串。 |

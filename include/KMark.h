@@ -22,6 +22,32 @@
 #define 	MARK_CONTEXT		"mark"
 class KHttpRequest;
 class KHttpObject;
+#include "katom.h"
+#include "KSharedObj.h"
+/*
+ * Settings a mark hands to a body filter that keeps running after the
+ * rules are checked. A named mark is re-parsed in place on reload, while
+ * filters of running requests use it without the access lock. Such
+ * settings live in a state object: parse_config builds a new one and
+ * replaces it, a filter keeps a reference to the one it started with.
+ */
+class KMarkState {
+public:
+	KMarkState* add_ref() {
+		katom_inc((void*)&ref);
+		return this;
+	}
+	void release() {
+		if (katom_dec((void*)&ref) == 0) {
+			delete this;
+		}
+	}
+protected:
+	virtual ~KMarkState() {
+	}
+private:
+	volatile int32_t ref = 1;
+};
 class KMark : public KModel
 {
 public:

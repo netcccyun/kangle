@@ -4,6 +4,24 @@
 #include "KMark.h"
 #include "KReg.h"
 
+/* what a replace_content body filter uses, fixed once built */
+class KReplaceContentState final : public KMarkState {
+public:
+	int match(const char* data, int length, kgl_pcre_match_data* match_data);
+	KStringStream* make_replacement(KHttpRequest* rq, const char* data,
+		kgl_pcre_match_data* match_data, int matched) const;
+	bool should_process(KHttpRequest* rq) const;
+	void update_mark(KHttpRequest* rq) const;
+
+	KReg content;
+	KString replace;
+	int mark_acl = 0;
+	int mark_mark = 0;
+	bool replaced_stop = false;
+	size_t buffer = 0;
+	bool valid = false;
+};
+
 class KReplaceContentMark final : public KMark {
 public:
 	KReplaceContentMark();
@@ -14,26 +32,28 @@ public:
 	void get_html(KWStream& s) override;
 	void parse_config(const khttpd::KXmlNodeBody* xml) override;
 
-	int match(const char* data, int length, kgl_pcre_match_data* match_data);
-	KStringStream* make_replacement(KHttpRequest* rq, const char* data,
-		kgl_pcre_match_data* match_data, int matched) const;
-	bool should_process(KHttpRequest* rq) const;
-	void update_mark(KHttpRequest* rq) const;
-	size_t max_pending() const;
-	bool stop_after_replace() const;
-
 private:
-	KReg content;
+	KSharedObj<KReplaceContentState> state;
 	KString content_text;
 	KString replace_text;
 	KString charset;
-	KString charset_replace;
 	int mark_acl;
 	int mark_mark;
 	bool nc;
 	bool replaced_stop;
 	size_t buffer;
-	bool valid;
+};
+
+/* what a content body filter uses, fixed once built */
+class KRegContentState final : public KMarkState {
+public:
+	KReg* select_reg(const char* response_charset);
+
+	KReg utf8_reg;
+	KReg local_reg;
+	size_t buffer = 0;
+	bool utf8_valid = false;
+	bool local_valid = false;
 };
 
 class KRegContentMark final : public KMark {
@@ -48,17 +68,21 @@ public:
 	void get_html(KWStream& s) override;
 	void parse_config(const khttpd::KXmlNodeBody* xml) override;
 
-	KReg* select_reg(const char* response_charset);
-	size_t max_pending() const;
-
 private:
-	KReg utf8_reg;
-	KReg local_reg;
+	KSharedObj<KRegContentState> state;
 	KString expression;
 	KString charset;
 	size_t buffer;
-	bool utf8_valid;
-	bool local_valid;
+};
+
+/* what a replace_url body filter uses, fixed once built */
+class KReplaceUrlState final : public KMarkState {
+public:
+	KStringStream* replace(KHttpRequest* rq, const char* url, int length);
+
+	KReg src;
+	KString dst;
+	bool valid = false;
 };
 
 class KReplaceUrlMark final : public KMark {
@@ -71,16 +95,12 @@ public:
 	void get_html(KWStream& s) override;
 	void parse_config(const khttpd::KXmlNodeBody* xml) override;
 
-	KStringStream* replace(KHttpRequest* rq, const char* url, int length);
-	bool is_valid() const;
-
 private:
-	KReg src;
+	KSharedObj<KReplaceUrlState> state;
 	KString src_text;
 	KString dst;
 	bool nc;
 	bool location;
-	bool valid;
 };
 
 class KFixHeaderMark final : public KMark {

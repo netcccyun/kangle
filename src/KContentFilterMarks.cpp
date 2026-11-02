@@ -170,9 +170,8 @@ void register_body_filter(KHttpRequest* rq, BodyFilter* ctx) {
 
 class ReplaceContentFilter final : public BodyFilter {
 public:
-	ReplaceContentFilter(KHttpRequest* rq, KReplaceContentMark* mark)
-		: rq(rq), mark(static_cast<KReplaceContentMark*>(mark->add_ref())) {}
-	~ReplaceContentFilter() override { mark->release(); }
+	ReplaceContentFilter(KHttpRequest* rq, KSharedObj<KReplaceContentState> state)
+		: rq(rq), state(std::move(state)) {}
 
 	KGL_RESULT write(const char* data, int length) override {
 		if (stopped) {
@@ -195,65 +194,81 @@ public:
 	void abort_pending() override { pending.clear(); }
 
 private:
+	/* Data before pos is done. Moving an offset instead of erasing the
+	 * front of pending after each match, collecting the output and writing
+	 * it down once, and one match buffer per call keep many matches cheap:
+	 * 400k one-byte matches took over two minutes before. */
 	KGL_RESULT process(bool final) {
-		while (!pending.empty()) {
-			MatchData match_data;
-			int matched = mark->match(pending.data(), (int)pending.size(), match_data.get());
+		size_t pos = 0;
+		std::string out;
+		MatchData match_data;
+		while (pos < pending.size()) {
+			const char* data = pending.data() + pos;
+			int left = (int)(pending.size() - pos);
+			int matched = state->match(data, left, match_data.get());
+			auto* offsets = match_data.vector();
 			if (matched > 0) {
-				auto* offsets = match_data.vector();
 				if (match_data.count() < 1 || offsets[1] <= offsets[0]) {
 					disabled = true;
 					break;
 				}
-				auto* replacement = mark->make_replacement(
-					rq, pending.data(), match_data.get(), matched);
+				auto* replacement = state->make_replacement(rq, data, match_data.get(), matched);
 				if (!replacement) {
 					return KGL_ENO_MEMORY;
 				}
-				mark->update_mark(rq);
-				if (mark->stop_after_replace()) {
+				state->update_mark(rq);
+				if (state->replaced_stop) {
 					pending.clear();
 					stopped = true;
-					KGL_RESULT result = write_down(down, replacement->c_str(), replacement->size());
+					out.append(replacement->c_str(), replacement->size());
 					delete replacement;
-					return result;
+					return write_down(down, out.data(), out.size());
 				}
-				KGL_RESULT result = write_down(down, pending.data(), (size_t)offsets[0]);
-				if (result == KGL_OK) {
-					result = write_down(down, replacement->c_str(), replacement->size());
-				}
+				out.append(data, (size_t)offsets[0]);
+				out.append(replacement->c_str(), replacement->size());
 				delete replacement;
-				if (result != KGL_OK) {
-					return result;
-				}
-				pending.erase(0, (size_t)offsets[1]);
+				pos += (size_t)offsets[1];
 				continue;
 			}
 			if (!final && is_partial_result(matched)) {
-				if (pending.size() <= mark->max_pending()) {
-					return KGL_OK;
+				/* Only the tail from where the partial match starts can
+				 * still change: send what is before it. Keeping everything
+				 * until the buffer limit stopped all later replacements
+				 * once the limit was hit. */
+				size_t start = match_data.count() >= 1 ? (size_t)offsets[0] : 0;
+				if (start > (size_t)left) {
+					start = 0;
+				}
+				out.append(data, start);
+				pos += start;
+				if (pending.size() - pos <= state->buffer) {
+					pending.erase(0, pos);
+					return write_down(down, out.data(), out.size());
 				}
 				klog(KLOG_WARNING, "replace_content partial match exceeded buffer limit\n");
 				disabled = true;
 				break;
 			}
-			if (!final && mark->stop_after_replace()) {
-				if (pending.size() <= mark->max_pending()) {
-					return KGL_OK;
+			if (!final && state->replaced_stop) {
+				if (pending.size() - pos <= state->buffer) {
+					pending.erase(0, pos);
+					return write_down(down, out.data(), out.size());
 				}
-				KGL_RESULT result = write_down(down, pending.data(), pending.size());
+				out.append(data, (size_t)left);
 				pending.clear();
-				return result;
+				return write_down(down, out.data(), out.size());
 			}
 			break;
 		}
-		KGL_RESULT result = write_down(down, pending.data(), pending.size());
+		if (pos < pending.size()) {
+			out.append(pending.data() + pos, pending.size() - pos);
+		}
 		pending.clear();
-		return result;
+		return write_down(down, out.data(), out.size());
 	}
 
 	KHttpRequest* rq;
-	KReplaceContentMark* mark;
+	KSharedObj<KReplaceContentState> state;
 	std::string pending;
 	bool stopped{ false };
 	bool disabled{ false };
@@ -261,11 +276,9 @@ private:
 
 class RegContentFilter final : public BodyFilter {
 public:
-	RegContentFilter(KHttpRequest* rq, KRegContentMark* mark, KReg* reg,
+	RegContentFilter(KHttpRequest* rq, KSharedObj<KRegContentState> state, KReg* reg,
 		kgl_jump_type action)
-		: rq(rq), mark(static_cast<KRegContentMark*>(mark->add_ref())),
-		  reg(reg), action(action) {}
-	~RegContentFilter() override { mark->release(); }
+		: rq(rq), state(std::move(state)), reg(reg), action(action) {}
 
 	KGL_RESULT write(const char* data, int length) override {
 		if (disabled) {
@@ -304,7 +317,19 @@ private:
 			return result;
 		}
 		if (!final && is_partial_result(matched)) {
-			if (pending.size() <= mark->max_pending()) {
+			/* send what is before the partial match, keep only its tail */
+			size_t start = match_data.count() >= 1 ? (size_t)match_data.vector()[0] : 0;
+			if (start > pending.size()) {
+				start = 0;
+			}
+			if (start > 0) {
+				KGL_RESULT result = write_down(down, pending.data(), start);
+				if (result != KGL_OK) {
+					return result;
+				}
+				pending.erase(0, start);
+			}
+			if (pending.size() <= state->buffer) {
 				return KGL_OK;
 			}
 			klog(KLOG_WARNING, "content partial match exceeded buffer limit\n");
@@ -315,7 +340,8 @@ private:
 	}
 
 	KHttpRequest* rq;
-	KRegContentMark* mark;
+	/* keeps reg alive */
+	KSharedObj<KRegContentState> state;
 	KReg* reg;
 	kgl_jump_type action;
 	std::string pending;
@@ -353,7 +379,7 @@ const char* url_attribute(const std::string& tag, size_t offset, size_t length) 
 	return nullptr;
 }
 
-std::string rewrite_html_tag(KHttpRequest* rq, KReplaceUrlMark* mark,
+std::string rewrite_html_tag(KHttpRequest* rq, KReplaceUrlState* mark,
 	const std::string& tag) {
 	if (tag.size() < 3 || tag.front() != '<' || tag.back() != '>') {
 		return tag;
@@ -417,9 +443,8 @@ std::string rewrite_html_tag(KHttpRequest* rq, KReplaceUrlMark* mark,
 
 class ReplaceUrlFilter final : public BodyFilter {
 public:
-	ReplaceUrlFilter(KHttpRequest* rq, KReplaceUrlMark* mark)
-		: rq(rq), mark(static_cast<KReplaceUrlMark*>(mark->add_ref())) {}
-	~ReplaceUrlFilter() override { mark->release(); }
+	ReplaceUrlFilter(KHttpRequest* rq, KSharedObj<KReplaceUrlState> state)
+		: rq(rq), state(std::move(state)) {}
 
 	KGL_RESULT write(const char* data, int length) override {
 		pending.append(data, (size_t)length);
@@ -455,7 +480,7 @@ private:
 				return result;
 			}
 			std::string tag = pending.substr(open, close - open + 1);
-			std::string rewritten = rewrite_html_tag(rq, mark, tag);
+			std::string rewritten = rewrite_html_tag(rq, state.get(), tag);
 			result = write_down(down, rewritten.data(), rewritten.size());
 			if (result != KGL_OK) return result;
 			consumed = close + 1;
@@ -467,7 +492,7 @@ private:
 	}
 
 	KHttpRequest* rq;
-	KReplaceUrlMark* mark;
+	KSharedObj<KReplaceUrlState> state;
 	std::string pending;
 };
 
@@ -510,14 +535,15 @@ void replace_header_value(KHttpHeader* header, const KStringStream& value) {
 
 KReplaceContentMark::KReplaceContentMark()
 	: mark_acl(0), mark_mark(0), nc(true), replaced_stop(false),
-	  buffer(kDefaultFilterBuffer), valid(false) {}
+	  buffer(kDefaultFilterBuffer) {}
 
 KMark* KReplaceContentMark::new_instance() { return new KReplaceContentMark; }
 const char* KReplaceContentMark::get_module() const { return "replace_content"; }
 
 uint32_t KReplaceContentMark::process(KHttpRequest* rq, KHttpObject*, KSafeSource&) {
-	if (!valid || !should_process(rq)) return KF_STATUS_REQ_FALSE;
-	register_body_filter(rq, new ReplaceContentFilter(rq, this));
+	KSharedObj<KReplaceContentState> st = state;
+	if (!st || !st->valid || !st->should_process(rq)) return KF_STATUS_REQ_FALSE;
+	register_body_filter(rq, new ReplaceContentFilter(rq, std::move(st)));
 	return KF_STATUS_REQ_TRUE;
 }
 
@@ -547,8 +573,13 @@ void KReplaceContentMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 	nc = attr["nc"].empty() || attr["nc"] == "1";
 	replaced_stop = attr["replaced_stop"] == "1";
 	buffer = parse_filter_buffer(attr["buffer"].c_str());
+	KSharedObj<KReplaceContentState> st(new KReplaceContentState);
+	st->mark_acl = mark_acl;
+	st->mark_mark = mark_mark;
+	st->replaced_stop = replaced_stop;
+	st->buffer = buffer;
 	KString pattern = content_text;
-	charset_replace = replace_text;
+	st->replace = replace_text;
 	if (!charset.empty() && strcasecmp(charset.c_str(), "utf-8") != 0) {
 		char* converted = utf82charset(pattern.c_str(), pattern.size(), charset.c_str());
 		if (converted) {
@@ -557,43 +588,41 @@ void KReplaceContentMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 		}
 		converted = utf82charset(replace_text.c_str(), replace_text.size(), charset.c_str());
 		if (converted) {
-			charset_replace = converted;
+			st->replace = converted;
 			free(converted);
 		}
 	}
-	valid = content.setModel(pattern.c_str(), nc ? KGL_PCRE_CASELESS : 0);
+	st->valid = st->content.setModel(pattern.c_str(), nc ? KGL_PCRE_CASELESS : 0);
+	state = std::move(st);
 }
 
-int KReplaceContentMark::match(const char* data, int length,
+int KReplaceContentState::match(const char* data, int length,
 	kgl_pcre_match_data* match_data) {
 	return content.match(data, length, partial_flag(), match_data);
 }
 
-KStringStream* KReplaceContentMark::make_replacement(KHttpRequest* rq,
+KStringStream* KReplaceContentState::make_replacement(KHttpRequest* rq,
 	const char* data, kgl_pcre_match_data* match_data, int matched) const {
 	KRegSubString* substring = KReg::makeSubString(data, match_data, matched);
-	auto* result = KRewriteMarkEx::getString(nullptr, charset_replace.c_str(),
+	auto* result = KRewriteMarkEx::getString(nullptr, replace.c_str(),
 		rq, substring, substring);
 	delete substring;
 	return result;
 }
 
-bool KReplaceContentMark::should_process(KHttpRequest* rq) const {
+bool KReplaceContentState::should_process(KHttpRequest* rq) const {
 	if (mark_acl > 0) return (int)rq->sink->data.mark == mark_acl;
 	if (mark_acl < 0) return KBIT_TEST(rq->sink->data.mark, -mark_acl);
 	return true;
 }
 
-void KReplaceContentMark::update_mark(KHttpRequest* rq) const {
+void KReplaceContentState::update_mark(KHttpRequest* rq) const {
 	if (mark_mark > 0) rq->sink->data.mark = (uint32_t)mark_mark;
 	else if (mark_mark < 0) KBIT_SET(rq->sink->data.mark, -mark_mark);
 }
 
-size_t KReplaceContentMark::max_pending() const { return buffer; }
-bool KReplaceContentMark::stop_after_replace() const { return replaced_stop; }
-
 KRegContentMark::KRegContentMark()
-	: buffer(kDefaultFilterBuffer), utf8_valid(false), local_valid(false) {}
+	: buffer(kDefaultFilterBuffer) {}
 KMark* KRegContentMark::new_instance() { return new KRegContentMark; }
 const char* KRegContentMark::get_module() const { return "content"; }
 uint32_t KRegContentMark::process(KHttpRequest*, KHttpObject*, KSafeSource&) {
@@ -602,11 +631,13 @@ uint32_t KRegContentMark::process(KHttpRequest*, KHttpObject*, KSafeSource&) {
 
 uint32_t KRegContentMark::process_with_chain(KHttpRequest* rq, KHttpObject* obj,
 	KSafeSource&, kgl_jump_type action) {
+	KSharedObj<KRegContentState> st = state;
+	if (!st) return KF_STATUS_REQ_FALSE;
 	char* response_charset = obj ? obj->getCharset() : nullptr;
-	KReg* reg = select_reg(response_charset);
+	KReg* reg = st->select_reg(response_charset);
 	if (response_charset) xfree(response_charset);
 	if (!reg) return KF_STATUS_REQ_FALSE;
-	register_body_filter(rq, new RegContentFilter(rq, this, reg, action));
+	register_body_filter(rq, new RegContentFilter(rq, std::move(st), reg, action));
 	return KF_STATUS_REQ_TRUE | KF_STATUS_REQ_DEFERRED;
 }
 
@@ -626,37 +657,38 @@ void KRegContentMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 	if (expression.empty()) expression = xml->get_text();
 	charset = attr["charset"];
 	buffer = parse_filter_buffer(attr["buffer"].c_str());
-	utf8_valid = utf8_reg.setModel(expression.c_str(), 0);
-	local_valid = false;
+	KSharedObj<KRegContentState> st(new KRegContentState);
+	st->buffer = buffer;
+	st->utf8_valid = st->utf8_reg.setModel(expression.c_str(), 0);
 	if (!charset.empty() && strcasecmp(charset.c_str(), "utf-8") != 0) {
 		char* converted = utf82charset(expression.c_str(), expression.size(), charset.c_str());
 		if (converted) {
-			local_valid = local_reg.setModel(converted, 0);
+			st->local_valid = st->local_reg.setModel(converted, 0);
 			free(converted);
 		}
 	}
+	state = std::move(st);
 }
 
-KReg* KRegContentMark::select_reg(const char* response_charset) {
+KReg* KRegContentState::select_reg(const char* response_charset) {
 	if (local_valid && (!response_charset || strcasecmp(response_charset, "utf-8") != 0)) {
 		return &local_reg;
 	}
 	return utf8_valid ? &utf8_reg : nullptr;
 }
-size_t KRegContentMark::max_pending() const { return buffer; }
 
 KReplaceUrlMark::KReplaceUrlMark()
-	: nc(true), location(true), valid(false) {}
+	: nc(true), location(true) {}
 KMark* KReplaceUrlMark::new_instance() { return new KReplaceUrlMark; }
 const char* KReplaceUrlMark::get_module() const { return "replace_url"; }
 
 uint32_t KReplaceUrlMark::process(KHttpRequest* rq, KHttpObject* obj, KSafeSource&) {
-	if (!valid) return KF_STATUS_REQ_FALSE;
-	register_body_filter(rq, new ReplaceUrlFilter(rq, this));
+	KSharedObj<KReplaceUrlState> st = state;
+	if (!st || !st->valid) return KF_STATUS_REQ_FALSE;
 	if (location && obj && obj->data->i.status_code >= 300 && obj->data->i.status_code < 400) {
 		for (KHttpHeader* header = obj->data->headers; header; header = header->next) {
 			if (!kgl_is_attr(header, _KS("Location"))) continue;
-			auto* value = replace(rq, header->buf + header->val_offset, header->val_len);
+			auto* value = st->replace(rq, header->buf + header->val_offset, header->val_len);
 			if (value) {
 				replace_header_value(header, *value);
 				delete value;
@@ -664,6 +696,7 @@ uint32_t KReplaceUrlMark::process(KHttpRequest* rq, KHttpObject* obj, KSafeSourc
 			break;
 		}
 	}
+	register_body_filter(rq, new ReplaceUrlFilter(rq, std::move(st)));
 	return KF_STATUS_REQ_TRUE;
 }
 
@@ -686,17 +719,19 @@ void KReplaceUrlMark::parse_config(const khttpd::KXmlNodeBody* xml) {
 	dst = attr["dst"];
 	nc = attr["nc"].empty() || attr["nc"] == "1";
 	location = attr["location"].empty() || attr["location"] == "1";
-	valid = src.setModel(src_text.c_str(), nc ? KGL_PCRE_CASELESS : 0);
+	KSharedObj<KReplaceUrlState> st(new KReplaceUrlState);
+	st->dst = dst;
+	st->valid = st->src.setModel(src_text.c_str(), nc ? KGL_PCRE_CASELESS : 0);
+	state = std::move(st);
 }
 
-KStringStream* KReplaceUrlMark::replace(KHttpRequest* rq, const char* url, int length) {
+KStringStream* KReplaceUrlState::replace(KHttpRequest* rq, const char* url, int length) {
 	KRegSubString* substring = src.matchSubString(url, length, 0);
 	if (!substring) return nullptr;
 	auto* result = KRewriteMarkEx::getString(nullptr, dst.c_str(), rq, nullptr, substring);
 	delete substring;
 	return result;
 }
-bool KReplaceUrlMark::is_valid() const { return valid; }
 
 KFixHeaderMark::KFixHeaderMark() = default;
 KMark* KFixHeaderMark::new_instance() { return new KFixHeaderMark; }
