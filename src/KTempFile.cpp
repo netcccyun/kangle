@@ -29,7 +29,10 @@ KTempFile::KTempFile() {
 	read_offset = 0;
 	fp = NULL;
 	wait_read = NULL;
+	mem = NULL;
+	mem_size = 0;
 	write_is_end = false;
+	closed = true;
 	lock = kfiber_mutex_init();
 }
 void KTempFile::Close() {
@@ -40,6 +43,7 @@ void KTempFile::Close() {
 		tunlink(file.c_str());
 		fp = NULL;
 	}
+	closed = true;
 	write_is_end = true;
 	fiber = wait_read;
 	wait_read = NULL;
@@ -50,6 +54,9 @@ void KTempFile::Close() {
 }
 KTempFile::~KTempFile() {
 	Close();
+	if (mem) {
+		xfree(mem);
+	}
 	kfiber_mutex_destroy(lock);
 	assert(wait_read == NULL);
 }
@@ -60,12 +67,22 @@ bool KTempFile::Init() {
 	if (fp) {
 		kfiber_file_close(fp);
 		tunlink(file.c_str());
+		fp = NULL;
 	}
+	// the file is created when the data outgrows the memory buffer
+	closed = false;
+	return true;
+}
+bool KTempFile::open_file() {
 	KStringBuf s;
 	s << conf.tmppath << "krf" << m_ppid << "_" << m_pid << "_" << (uint64_t)this;
 	s.str().swap(file);
 	fp = kfiber_file_open(file.c_str(), fileWriteRead, KFILE_TEMP_MODEL);
-	return fp != NULL;
+	if (fp == NULL) {
+		klog(KLOG_ERR, "cann't open tmp file [%s]\n", file.c_str());
+		return false;
+	}
+	return true;
 }
 bool KTempFile::write_all(const char* buf, int len) {
 	while (len > 0) {
@@ -92,13 +109,38 @@ void KTempFile::WriteEnd() {
 }
 int KTempFile::Write(const char* buf, int len) {
 	kfiber_mutex_lock(lock);
-	if (fp == NULL) {
+	if (closed) {
 		kfiber_mutex_unlock(lock);
 		return -1;
 	}
 	int got = -1;
-	if (kfiber_file_seek(fp, seekBegin, write_offset) == 0) {
-		got = kfiber_file_write(fp, buf, len);
+	if (write_offset < TEMPFILE_MEMORY_SIZE) {
+		int need = (int)write_offset + KGL_MIN(len, TEMPFILE_MEMORY_SIZE - (int)write_offset);
+		if (need > mem_size) {
+			// grow by doubling, so small responses use little memory
+			int new_size = KGL_MAX(mem_size * 2, 4096);
+			while (new_size < need) {
+				new_size *= 2;
+			}
+			new_size = KGL_MIN(new_size, TEMPFILE_MEMORY_SIZE);
+			char* new_mem = (char*)xmalloc(new_size);
+			if (new_mem) {
+				if (mem) {
+					kgl_memcpy(new_mem, mem, (size_t)write_offset);
+					xfree(mem);
+				}
+				mem = new_mem;
+				mem_size = new_size;
+			}
+		}
+		if (need <= mem_size) {
+			got = need - (int)write_offset;
+			kgl_memcpy(mem + write_offset, buf, got);
+		}
+	} else if (fp != NULL || open_file()) {
+		if (kfiber_file_seek(fp, seekBegin, write_offset - TEMPFILE_MEMORY_SIZE) == 0) {
+			got = kfiber_file_write(fp, buf, len);
+		}
 	}
 	kfiber* fiber = NULL;
 	if (got > 0) {
@@ -117,7 +159,7 @@ int KTempFile::Write(const char* buf, int len) {
 int KTempFile::Read(char* buf, int len) {
 	for (;;) {
 		kfiber_mutex_lock(lock);
-		if (fp == NULL || wait_read) {
+		if (closed || wait_read) {
 			kfiber_mutex_unlock(lock);
 			return -1;
 		}
@@ -137,7 +179,10 @@ int KTempFile::Read(char* buf, int len) {
 		assert(wait_read == NULL);
 		len = (int)KGL_MIN((int64_t)len, have_data);
 		int got = -1;
-		if (kfiber_file_seek(fp, seekBegin, read_offset) == 0) {
+		if (read_offset < TEMPFILE_MEMORY_SIZE) {
+			got = KGL_MIN(len, TEMPFILE_MEMORY_SIZE - (int)read_offset);
+			kgl_memcpy(buf, mem + read_offset, got);
+		} else if (fp != NULL && kfiber_file_seek(fp, seekBegin, read_offset - TEMPFILE_MEMORY_SIZE) == 0) {
 			got = kfiber_file_read(fp, buf, len);
 		}
 		if (got > 0) {

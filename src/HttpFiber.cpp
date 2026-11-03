@@ -752,11 +752,7 @@ KGL_RESULT response_cache_object(KHttpRequest* rq, KHttpObject* obj) {
 			result = rq->ctx.body.f->sendfile(rq->ctx.body.ctx, file, &rq->ctx.left_read);
 			break;
 		}
-		if (!kasync_file_direct(file, true)) {
-			klog(KLOG_ERR, "cann't turn on file direct_on\n");
-			result = KGL_EIO;
-			break;
-		}
+		// buffered read, so cached disk objects come from the page cache
 		kgl_auto_aio_buffer buffer((char*)aio_alloc_buffer(buf_size));
 		if (!buffer) {
 			result = KGL_ENO_MEMORY;

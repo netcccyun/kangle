@@ -129,10 +129,8 @@ KGL_RESULT KStaticFetchObject::InternalProcess(KHttpRequest* rq, kgl_input_strea
 	if (body.f->support_sendfile(body.ctx)) {
 		return body.f->close(body.ctx, body.f->sendfile(body.ctx, (KASYNC_FILE)fp, &rq->ctx.left_read));
 	}
-	if (!kasync_file_direct(fp, true)) {
-		klog(KLOG_ERR, "cann't turn on file direct_on\n");
-		return body.f->close(body.ctx, KGL_EIO);
-	}
+	// Buffered reads: O_DIRECT would bypass the page cache and read the disk
+	// every time, which capped TLS file transfer at the disk's throughput.
 	int buf_size = conf.io_buffer;
 	kgl_auto_aio_buffer buf((char *)aio_alloc_buffer(buf_size));
 	if (!buf) {

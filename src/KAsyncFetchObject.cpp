@@ -415,7 +415,11 @@ KGL_RESULT KAsyncFetchObject::SendHeader(KHttpRequest* rq) {
 	if (buffer->startRead() == 0) {
 		return KGL_OK;
 	}
-	if (!pop_header.grpc) client->set_delay();
+	// Cork only when request body data follows, so the header and body share
+	// packets. A bodyless request is one write and needs no setsockopt calls.
+	if (!pop_header.grpc && (in->f->body.get_left(in->body_ctx) != 0 || rq->sink->need_request_end())) {
+		client->set_delay();
+	}
 	int length = buffer->getLen();
 	int result = client->write_all(buffer->getHead(), length);
 	if (result != 0) {
