@@ -609,6 +609,17 @@ void sigcatch(int sig) {
 	}
 #endif
 }
+#if !defined(_WIN32)
+/* Stop at a fatal startup error. The error log is flushed first, then the
+ * process ends without running static destructors: the configuration is
+ * still loaded at this point, and tearing it down here trips debug checks. */
+static void fatal_exit(int code) {
+	errorLogger.startLog();
+	errorLogger.endLog(true);
+	fflush(NULL);
+	_exit(code);
+}
+#endif
 void set_user() {
 #if	!defined(_WIN32)
 	if (!conf.run_user.empty()) {
@@ -619,13 +630,13 @@ void set_user() {
 		bool result = name2uid(conf.run_user.c_str(), uid, gid);
 		if (!result) {
 			klog(KLOG_ERR, "cann't find run_as user [%s]\n", conf.run_user.c_str());
-			exit(127);
+			fatal_exit(127);
 		}
 		if (result && !conf.run_group.empty()) {
 			result = name2gid(conf.run_group.c_str(), gid);
 			if (!result) {
 				klog(KLOG_ERR, "cann't find run_as group [%s]\n", conf.run_group.c_str());
-				exit(127);
+				fatal_exit(127);
 			}
 		}
 		if (result) {
@@ -635,15 +646,15 @@ void set_user() {
 			gid_t groups_gid = (gid_t)gid;
 			if (getuid() == 0 && setgroups(1, &groups_gid) != 0) {
 				klog(KLOG_ERR, "setgroups to [%d] error\n", gid);
-				exit(127);
+				fatal_exit(127);
 			}
 			if (setgid(gid)!=0) {
 				klog(KLOG_ERR,"setgid to [%d] error\n",gid);
-				exit(127);
+				fatal_exit(127);
 			}
 			if (setuid(uid)!=0) {
 				klog(KLOG_ERR,"setuid to [%d] error\n",uid);
-				exit(127);
+				fatal_exit(127);
 			}
 		}
 

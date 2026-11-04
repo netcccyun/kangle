@@ -288,63 +288,104 @@ void test_url_decode() {
 	//printf("buf=[%s]\n",buf2);
 	assert(buf2[2] == '\0');
 }
+/* Feed one buffer to the engine and return the result; piece_length starts at max_piece. */
+static KDechunkResult dechunk_feed(KDechunkEngine* engine, const char** buf, const char* end, const char** piece, int* piece_length, int max_piece = KHTTPD_MAX_CHUNK_SIZE) {
+	*piece_length = max_piece;
+	return engine->dechunk(buf, end, piece, piece_length);
+}
 static void test_dechunk2() {
-	//printf("sizeof(KDechunkEngine2)=[%d],sizeof(KDechunkEngine)=[%d]\n", sizeof(KDechunkEngine2), sizeof(KDechunkEngine));
+	// A whole body in one buffer, taken 5 bytes at a time.
 	KDechunkEngine engine;
 	ks_buffer* buffer = ks_buffer_new(512);
-	ks_write_str(buffer, kgl_expand_string("9\n123456789\n0\n\n"));
+	ks_write_str(buffer, kgl_expand_string("9\r\n123456789\r\n0\r\n\r\n"));
 	const char* hot = buffer->buf;
-	int len = buffer->used;
+	const char* end = buffer->buf + buffer->used;
+	std::string body;
 	for (;;) {
 		const char* piece = NULL;
-		int piece_len = 5;
-		if (engine.dechunk(&hot, len, &piece, &piece_len) == KDechunkResult::End) {
-			assert(hot == buffer->buf + len);
+		int piece_len;
+		KDechunkResult result = dechunk_feed(&engine, &hot, end, &piece, &piece_len, 5);
+		if (result == KDechunkResult::End) {
 			break;
 		}
+		assert(result == KDechunkResult::Success);
+		if (result != KDechunkResult::Success) {
+			break;
+		}
+		assert(piece_len > 0 && piece_len <= 5);
+		body.append(piece, piece_len);
 	}
+	assert(hot == end);
+	assert(body == "123456789");
 	ks_buffer_destroy(buffer);
+}
+static void test_dechunk_rejects(const char* input) {
+	// Chunked framing needs CRLF everywhere: bare LF or CR must fail, not be guessed.
+	KDechunkEngine engine;
+	const char* buf = input;
+	const char* end = buf + strlen(buf);
+	const char* piece;
+	int piece_length;
+	KDechunkResult result;
+	do {
+		result = dechunk_feed(&engine, &buf, end, &piece, &piece_length);
+	} while (result == KDechunkResult::Success && buf < end);
+	assert(result == KDechunkResult::Failed);
+	assert(dechunk_feed(&engine, &buf, end, &piece, &piece_length) == KDechunkResult::Failed);
 }
 void test_dechunk() {
 	KDechunkEngine* engine = new KDechunkEngine;
 	const char* piece;
-	int piece_length = KHTTPD_MAX_CHUNK_SIZE;
-	/*
-	* 1\r\n
-	* a\r\n
-	* 10\r\n
-	* 0123456789abcdef\r\n
-	* 10\raaa\n
-	* x
+	int piece_length;
+	/* The body arrives in pieces:
+	* 1\r\n a\r\n               one byte chunk
+	* 1 | 0\r\n012345 | 6789abcdef   16 byte chunk, size line split across reads
+	* \r\n5\r\nhello            5 byte chunk read 2 bytes at a time
+	* \r\n0\r\n\r\n             last chunk
 	*/
 	const char* buf = "1\r\na\r\n";
 	const char* end = buf + strlen(buf);
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_success);
-	assert(strncmp(piece, "a", piece_length) == 0);
-	piece_length = KHTTPD_MAX_CHUNK_SIZE;
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_continue);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_success);
+	assert(piece_length == 1 && strncmp(piece, "a", piece_length) == 0);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_continue);
+	assert(buf == end);
 	buf = "1";
 	end = buf + strlen(buf);
-	piece_length = KHTTPD_MAX_CHUNK_SIZE;
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_continue);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_continue);
 	buf = "0\r\n012345";
 	end = buf + strlen(buf);
-	piece_length = KHTTPD_MAX_CHUNK_SIZE;
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_success);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_success);
 	assert(piece_length == 6 && strncmp(piece, "012345", piece_length) == 0);
 	buf = "6789abcdef";
 	end = buf + strlen(buf);
-	piece_length = KHTTPD_MAX_CHUNK_SIZE;
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_success);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_success);
 	assert(piece_length == 10 && strncmp(piece, "6789abcdef", piece_length) == 0);
-	buf = "\r\na\r";
+	buf = "\r\n5\r\nhello";
 	end = buf + strlen(buf);
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_continue);
-	buf = "aaa\nx";
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length, 2) == dechunk_success);
+	assert(piece_length == 2 && strncmp(piece, "he", piece_length) == 0);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_success);
+	assert(piece_length == 3 && strncmp(piece, "llo", piece_length) == 0);
+	buf = "\r\n0\r\n\r\n";
 	end = buf + strlen(buf);
-	assert(engine->dechunk(&buf, end, &piece, &piece_length) == dechunk_success);
-	assert(piece_length == 1 && strncmp(piece, "x", piece_length) == 0);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_end);
+	assert(buf == end);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_end);
 	delete engine;
+
+	// A trailer field is returned before the end.
+	engine = new KDechunkEngine;
+	buf = "0\r\nX-Test: v\r\n\r\n";
+	end = buf + strlen(buf);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == KDechunkResult::Trailer);
+	assert(piece_length == 9 && strncmp(piece, "X-Test: v", 9) == 0);
+	assert(dechunk_feed(engine, &buf, end, &piece, &piece_length) == dechunk_end);
+	delete engine;
+
+	test_dechunk_rejects("1\na\r\n");        // bare LF after the size
+	test_dechunk_rejects("10\raaa\n");       // CR not followed by LF
+	test_dechunk_rejects("1\r\naX");         // data not followed by CRLF
+	test_dechunk_rejects("9\n123456789\n0\n\n");
 }
 void test_white_list() {
 #ifdef ENABLE_BLACK_LIST
