@@ -75,6 +75,8 @@
 volatile uint32_t kgl_log_count = 0;
 using namespace std;
 unsigned total_connect = 0;
+/* idle connections closed at once when connect max is reached (as nginx does) */
+#define KGL_IDLE_CLOSE_COUNT 32
 namespace kangle {
 	typedef std::map<ip_addr, unsigned> intmap;
 	intmap m_ip;
@@ -178,9 +180,20 @@ namespace kangle {
 		ip_addr ip;
 		ip_lock.Lock();
 		if (max > 0 && total_connect >= max) {
-			//printf("total_connect=%d,max=%d\n",total_connect,max);
 			ip_lock.Unlock();
-			return kgl_connection_too_many;
+			/* Close idle keep-alive connections instead of refusing this one.
+			 * Their slots come back as soon as they finish closing, so the
+			 * count may pass max by the connections still closing. */
+			int closed = kselector_manager_close_idle(KGL_IDLE_CLOSE_COUNT);
+			static volatile time_t last_log_sec = 0;
+			if (last_log_sec != kgl_current_sec) {
+				last_log_sec = kgl_current_sec;
+				klog(KLOG_WARNING, "connect max [%u] reached, closed %d idle connections\n", max, closed);
+			}
+			if (closed <= 0) {
+				return kgl_connection_too_many;
+			}
+			ip_lock.Lock();
 		}
 		kgl_connection_result success_result = kgl_connection_success;
 		if (conf.keep_alive_count > 0 && total_connect >= conf.keep_alive_count) {
