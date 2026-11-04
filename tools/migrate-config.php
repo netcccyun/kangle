@@ -962,8 +962,23 @@ function ensureCoreConfiguration($doc, $root, $templateDoc, $options, $modules, 
     }
 }
 
+function migrateLegacyVirtualHostContainers($doc, &$stats)
+{
+    $root = $doc->documentElement;
+    foreach (directElements($root, 'vhs') as $container) {
+        foreach (directElements($container, 'vh') as $host) {
+            $root->insertBefore($host, $container);
+            bump($stats, 'moved legacy virtual hosts to config root', 1);
+        }
+        if (!$container->hasAttributes() && count(directElements($container, null)) === 0) {
+            $root->removeChild($container);
+        }
+    }
+}
+
 function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$stats, &$warnings)
 {
+    migrateLegacyVirtualHostContainers($doc, $stats);
     $root = $doc->documentElement;
     $modules = $externalModules;
     migrateRequestVhsActions($doc, $stats);
@@ -983,6 +998,7 @@ function migrateMainDocument($doc, $templateDoc, $options, $externalModules, &$s
 
 function migrateAccessDocument($doc, &$stats, &$warnings, &$modules)
 {
+    migrateLegacyVirtualHostContainers($doc, $stats);
     migrateRequestVhsActions($doc, $stats);
     normalizeRuleModules($doc, $stats, $warnings, $modules);
     removeLegacyCaptchaProxyMarks($doc, $stats);
@@ -1382,6 +1398,10 @@ function prepareTemporaryFile($target, $content, $sourceForMetadata)
         }
     }
     return $temporary;
+}
+
+if (defined('KANGLE_MIGRATION_LIBRARY_ONLY') && KANGLE_MIGRATION_LIBRARY_ONLY) {
+    return;
 }
 
 $options = parseArguments($argv);

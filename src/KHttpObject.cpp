@@ -135,11 +135,22 @@ bool KHttpObject::is_same_precondition(KHttpObject* obj) 	{
 	return true;
 }
 bool KHttpObject::precondition_time(time_t time) {
-	if (!data || !data->etag || !data->i.condition_is_time) {
-		// Without a valid Last-Modified, ignore If-Modified-Since (send 200).
+	if (!data) {
 		return true;
 	}
-	return data->last_modified > time;
+	time_t modified;
+	if (data->etag && data->i.condition_is_time) {
+		modified = data->last_modified;
+	} else {
+		// ETag occupies the validator union; retain the second validator in
+		// the header list so a date-only request can still use it.
+		auto header = find_header(_KS("Last-Modified"));
+		if (!header || kgl_parse_value_time(header->buf + header->val_offset,
+			header->val_len, &modified) != 0) {
+			return true;
+		}
+	}
+	return modified > time;
 }
 bool KHttpObject::match_if_range(const char* entity, size_t len) 	{
 	if (!data || !data->etag || data->i.condition_is_time) {

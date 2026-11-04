@@ -32,6 +32,8 @@ CASES = {
     'valid-then-invalid': ([('Last-Modified', VALID), ('Last-Modified', 'invalid')], VALID, None),
     'etag-first': ([('ETag', '"good"'), ('Last-Modified', 'invalid')], None, '"good"'),
     'etag-last': ([('Last-Modified', 'invalid'), ('ETag', '"good"')], None, '"good"'),
+    'etag-before-date': ([('ETag', '"good"'), ('Last-Modified', VALID)], VALID, '"good"'),
+    'date-before-etag': ([('Last-Modified', VALID), ('ETag', '"good"')], VALID, '"good"'),
     'invalid-date': ([('Date', 'invalid'), ('Last-Modified', VALID)], VALID, None),
     'invalid-expires': ([('Expires', '0'), ('Last-Modified', VALID)], VALID, None),
     'valid-expires': ([('Expires', 'Thu, 01 Jan 2037 00:00:00 GMT'), ('Last-Modified', VALID)], VALID, None),
@@ -165,9 +167,16 @@ def run(binary):
                     if etag:
                         status, _, body = request(path, headers={'If-None-Match': etag})
                         check(status == 304 and not body, '%s %s ETag conditional' % (protocol, name))
-                    elif modified and name != 'invalid-expires':
+                    if modified and name != 'invalid-expires':
                         status, _, body = request(path, headers={'If-Modified-Since': modified})
                         check(status == 304 and not body, '%s %s time conditional' % (protocol, name))
+                        if etag:
+                            status, _, body = request(path, headers={
+                                'If-None-Match': '"different"', 'If-Modified-Since': modified})
+                            check(status == 200 and body, '%s %s mismatched ETag takes precedence' % (protocol, name))
+                            status, _, body = request(path, headers={
+                                'If-None-Match': etag, 'If-Modified-Since': 'Sat, 01 Jan 1994 00:00:00 GMT'})
+                            check(status == 304 and not body, '%s %s matching ETag takes precedence' % (protocol, name))
                     elif not modified:
                         status, _, body = request(path, headers={'If-Modified-Since': VALID})
                         check(status == 200 and body, '%s %s invalid time is not a validator' % (protocol, name))

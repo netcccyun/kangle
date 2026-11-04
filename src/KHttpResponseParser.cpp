@@ -12,8 +12,17 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 	assert(!rq->ctx.obj->in_cache);
 	switch (attr) {
 	case kgl_header_etag:
+	{
+		if (obj->data->etag && obj->data->i.condition_is_time) {
+			char value[40];
+			char* finish = make_http_time(obj->data->last_modified, value, sizeof(value));
+			if (!add_header(kgl_header_last_modified, value, (int)(finish - value))) {
+				return false;
+			}
+		}
 		obj->data->set_etag(val, val_len);
 		return true;
+	}
 	case kgl_header_content_range:
 	{
 		if (val_len == KGL_HEADER_VALUE_INT64) {
@@ -46,6 +55,9 @@ bool KHttpResponseParser::parse_header(KHttpRequest* rq, kgl_header_type attr, c
 		if (kgl_parse_value_time(val, val_len, &last_modified) != 0) {
 			// An invalid optional validator must not fail an otherwise valid body.
 			return true;
+		}
+		if (obj->data->etag && !obj->data->i.condition_is_time) {
+			return add_header(attr, val, val_len);
 		}
 		obj->data->set_last_modified(last_modified);
 		return true;

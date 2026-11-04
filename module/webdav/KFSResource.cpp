@@ -257,10 +257,13 @@ bool KFSResource::rename(const char* newName)
 		xfree(wname);
 		return false;
 	}
-	int ret = _wrename(wname, wnewName);
+	// Match POSIX rename: PUT commits its completed temporary file over the
+	// existing destination. CRT _wrename rejects an existing Windows target.
+	// Keep _wrename's MOVEFILE_COPY_ALLOWED so MOVE across volumes still works.
+	BOOL ret = MoveFileExW(wname, wnewName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
 	xfree(wname);
 	xfree(wnewName);
-	return ret == 0;
+	return ret != FALSE;
 #else
 	return ::rename(name, newName) == 0;
 #endif
