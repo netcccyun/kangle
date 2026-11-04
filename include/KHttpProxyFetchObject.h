@@ -30,6 +30,10 @@
 #include "KHttpResponseParser.h"
 #include "KHttpEnv.h"
 #include "KPushGate.h"
+#include <string>
+/* WebSocket handshake translation between HTTP/2 extended CONNECT (RFC 8441) and HTTP/1.1 Upgrade */
+#define KGL_WS_TO_H1 1  /* HTTP/2 client, HTTP/1.1 origin */
+#define KGL_WS_TO_H2 2  /* HTTP/1.1 client, HTTP/2 origin */
 class KHttpProxyFetchObject : public KAsyncFetchObject
 {
 public:
@@ -39,6 +43,7 @@ public:
 	virtual ~KHttpProxyFetchObject()
 	{
 	}
+	bool push_upstream_header(KHttpRequest* rq, const char* attr, int attr_len, const char* val, int val_len, bool request_line);
 protected:
 	bool build_http_header(KHttpRequest* rq);
 	KGL_RESULT buildHead(KHttpRequest* rq) override;
@@ -68,6 +73,9 @@ protected:
 		return result;
 	}
 private:
+	uint8_t ws_translate = 0;
+	/* the HTTP/1.1 client's Sec-WebSocket-Key (KGL_WS_TO_H2) */
+	std::string ws_key;
 };
 
 #endif /* KHTTPPROXYFETCHOBJECT_H_ */

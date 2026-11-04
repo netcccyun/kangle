@@ -15,6 +15,12 @@
 #include "kmalloc.h"
 #include "KSimulateRequest.h"
 #include "KHttpFieldValue.h"
+#include "KHttpValidation.h"
+#include "KHttpLib.h"
+#ifdef KSOCKET_SSL
+#include <openssl/rand.h>
+#include <openssl/sha.h>
+#endif
 
 static bool is_connection_option(KHttpRequest* rq, const kgl_str_t& attr)
 {
@@ -41,11 +47,34 @@ static bool is_connection_option(KHttpRequest* rq, const kgl_str_t& attr)
 bool http2_header_callback(KUpstream *us, void *arg, const char *attr, int attr_len, const char *val, int val_len,bool flag)
 {
 	KHttpRequest *rq = (KHttpRequest *)arg;
-	KAsyncFetchObject *fo = (KAsyncFetchObject *)us->GetOpaque();
+	/* only KHttpProxyFetchObject::buildHead installs this callback */
+	KHttpProxyFetchObject *fo = static_cast<KHttpProxyFetchObject *>((KAsyncFetchObject *)us->GetOpaque());
 	assert(kselector_is_same_thread(rq->sink->get_selector()));
-	if (KGL_OK != fo->PushHeader(rq, attr, attr_len, val, val_len, flag)) {
+	return fo->push_upstream_header(rq, attr, attr_len, val, val_len, flag);
+}
+bool KHttpProxyFetchObject::push_upstream_header(KHttpRequest* rq, const char* attr, int attr_len, const char* val, int val_len, bool request_line)
+{
+	if (ws_translate == KGL_WS_TO_H1 && khttp_field_equal(attr, attr_len, "sec-websocket-accept")) {
+		/* HTTP/2 WebSockets do not use it (RFC 8441 section 5) */
+		return true;
+	}
+	if (KGL_OK != PushHeader(rq, attr, attr_len, val, val_len, request_line)) {
 		return false;
 	}
+#ifdef KSOCKET_SSL
+	/* KHttp2 adds Upgrade only when the origin accepted the extended CONNECT */
+	if (ws_translate == KGL_WS_TO_H2 && !ws_key.empty() && khttp_field_equal(attr, attr_len, "upgrade")) {
+		static const char guid[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+		std::string src = ws_key + guid;
+		unsigned char digest[SHA_DIGEST_LENGTH];
+		SHA1((const unsigned char*)src.data(), src.size(), digest);
+		std::string accept = b64encode(digest, (int)sizeof(digest));
+		ws_key.clear();
+		if (KGL_OK != PushHeader(rq, _KS("Sec-WebSocket-Accept"), accept.c_str(), (int)accept.size(), false)) {
+			return false;
+		}
+	}
+#endif
 	return true;
 }
 bool upstream_sign_request(KHttpRequest *rq, KHttpEnv *s)
@@ -167,6 +196,25 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 	}
 #endif	
 	KHttpHeader* av = rq->sink->data.get_header();
+	ws_translate = 0;
+	ws_key.clear();
+#ifdef KSOCKET_SSL
+	if (KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) &&
+		(rq->sink->data.http_version >= 0x200) != client->IsMultiStream()) {
+		/* client and origin speak different WebSocket handshakes */
+		bool websocket = false;
+		for (auto h = av; h; h = h->next) {
+			if (kgl_is_attr(h, _KS("Upgrade"))) {
+				websocket = kgl_mem_case_same(h->buf + h->val_offset, h->val_len, _KS("websocket"));
+			} else if (kgl_is_attr(h, _KS("Sec-WebSocket-Key"))) {
+				ws_key.assign(h->buf + h->val_offset, h->val_len);
+			}
+		}
+		if (websocket) {
+			ws_translate = client->IsMultiStream() ? KGL_WS_TO_H2 : KGL_WS_TO_H1;
+		}
+	}
+#endif
 	if (client->IsMultiStream() && KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE)) {
 		for (auto h=av; h; h=h->next) {
 			if (kgl_is_attr(h, _KS("Upgrade")) && !client->send_header(kgl_header_upgrade,h->buf+h->val_offset,h->val_len)) return false;
@@ -185,7 +233,8 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 			(!KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && kgl_is_attr(av, _KS("Upgrade"))) ||
 			(is_connection_option(rq, attr) &&
 				!(KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE) && kgl_is_attr(av, _KS("Upgrade")))) ||
-			(!av->name_is_know && *(av->buf)==':')) {
+			(!av->name_is_know && *(av->buf)==':') ||
+			(ws_translate == KGL_WS_TO_H2 && kgl_is_attr(av, _KS("Sec-WebSocket-Key")))) {
 			goto do_not_insert;
 		}
 #ifdef HTTP_PROXY
@@ -318,6 +367,15 @@ bool KHttpProxyFetchObject::build_http_header(KHttpRequest* rq)
 		if (!client->send_header(kgl_expand_string("User-Agent"), kgl_expand_string(PROGRAM_NAME "/" VERSION))) return false;
 	}
 	if (KBIT_TEST(rq->sink->data.flags, RQ_HAS_CONNECTION_UPGRADE)) {
+#ifdef KSOCKET_SSL
+		if (ws_translate == KGL_WS_TO_H1 && ws_key.empty()) {
+			/* HTTP/2 clients send no key, but HTTP/1.1 origins require one */
+			unsigned char nonce[16];
+			if (RAND_bytes(nonce, sizeof(nonce)) != 1) return false;
+			std::string key = b64encode(nonce, (int)sizeof(nonce));
+			if (!client->send_header(_KS("Sec-WebSocket-Key"), key.c_str(), (hlen_t)key.size())) return false;
+		}
+#endif
 		if (!client->send_connection(kgl_expand_string("upgrade"))) return false;
 	} else if (KBIT_TEST(rq->ctx.filter_flags, RF_UPSTREAM_NOKA) || client->GetLifeTime() <= 0) {
 		if (!client->send_connection(kgl_expand_string("close"))) return false;
