@@ -48,7 +48,7 @@ bool KMultiAcserver::on_config_event(kconfig::KConfigTree* tree, kconfig::KConfi
 				break;
 			}
 			KSockPoolHelper* node = new KSockPoolHelper;
-			if (node->parse(body->attributes)) {
+			if (node->parse(body->attributes, default_life_time())) {
 				addNode(node);
 			} else {
 				node->release();
@@ -340,7 +340,7 @@ unsigned KMultiAcserver::getPoolSize() {
 }
 bool KMultiAcserver::addNode(const KXmlAttribute& attr) {
 	KSockPoolHelper* sockHelper = new KSockPoolHelper;
-	if (!sockHelper->parse(attr)) {
+	if (!sockHelper->parse(attr, default_life_time())) {
 		delete sockHelper;
 		return false;
 	}
@@ -396,7 +396,7 @@ bool KMultiAcserver::editNode(KXmlAttribute& attr) {
 		KSockPoolHelper* node = getIndexNode(id);
 		if (node) {
 			node->weight = atoi(attr["weight"].c_str());
-			node->parse(attr);
+			node->parse(attr, default_life_time());
 			buildVNode();
 		}
 		lock.Unlock();
@@ -453,7 +453,11 @@ void  KMultiAcserver::nodeForm(KWStream& s, const KString &name, KMultiAcserver*
 		s << helper->get_port();
 	}
 	s << "'><br>";
-	s << klang["lang_life_time"] << ": <input name='life_time' size=6 value='" << (helper ? helper->getLifeTime() : 0) << "'><br>";
+	s << klang["lang_life_time"] << ": <input name='life_time' size=6 value='";
+	if (helper) {
+		s << helper->getLifeTime();
+	}
+	s << "'><br>";
 
 #ifdef HTTP_PROXY
 	s << LANG_USER << ": <input name='auth_user' value='"

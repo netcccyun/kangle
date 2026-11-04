@@ -743,7 +743,11 @@ void KAcserverManager::acserverList(KWStream& s, const KString& name) {
 	if (m_a) {
 		s << "<input type=hidden name=namefrom value='" << m_a->name << "'>\n";
 	}
-	s << "<br>" << klang["lang_life_time"] << "<input name='life_time' size=5 value=" << (m_a ? m_a->sockHelper->getLifeTime() : 0) << ">";
+	s << "<br>" << klang["lang_life_time"] << "<input name='life_time' size=5 value='";
+	if (m_a) {
+		s << m_a->sockHelper->getLifeTime();
+	}
+	s << "'>";
 	s << klang["lang_life_time_notice"] << "<br>";
 	kgl_refs_string* param = NULL;
 	if (m_a) {

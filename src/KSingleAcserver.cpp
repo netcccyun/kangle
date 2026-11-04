@@ -23,7 +23,7 @@ bool KSingleAcserver::parse_config(const khttpd::KXmlNode* node) {
 	if (!KPoolableRedirect::parse_config(node)) {
 		return false;
 	}
-	return sockHelper->parse(node->attributes());
+	return sockHelper->parse(node->attributes(), default_life_time());
 }
 void KSingleAcserver::set_proto(Proto_t proto)
 {
