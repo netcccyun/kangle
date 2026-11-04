@@ -280,7 +280,12 @@ int shutdown_fiber(void* arg, int got) {
 	 *  malloc debug model. do not exit right now.
 	 *  program will free all know memory and log leak memory.
 	 * */
-	exit(0);
+	/* Other threads may still be finishing requests and writing logs.
+	 * exit() would run global destructors (errorLogger's path among them)
+	 * under them and crash, so leave without running them: everything that
+	 * must be saved is saved above, and log files are written unbuffered. */
+	fflush(NULL);
+	_exit(0);
 #endif
 	return 0;
 }
