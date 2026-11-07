@@ -176,7 +176,17 @@ list(APPEND KANGLE_INCLUDE_DIR ${KHTTPD_INCLUDE_DIR})
 list(APPEND KANGLE_LIBS ${KHTTPD_LIBS})
 
 ############## sqlite3 ################
-find_package(SQLite3)
+if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(KANGLE_SQLITE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite" CACHE PATH
+        "Windows x64 shared SQLite SDK")
+endif()
+if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND EXISTS "${KANGLE_SQLITE_ROOT}/SQLite3Config.cmake")
+    set(SQLite3_DIR "${KANGLE_SQLITE_ROOT}")
+    find_package(SQLite3 CONFIG REQUIRED)
+    set(KANGLE_SHARED_SQLITE ON)
+else()
+    find_package(SQLite3)
+endif()
 if (SQLite3_FOUND)
     list(APPEND KANGLE_LIBS SQLite::SQLite3)
     set(SQLITE3_LIB SQLite::SQLite3)
@@ -204,6 +214,13 @@ if (NOT (CMAKE_SYSTEM_NAME MATCHES "Windows"))
 endif()
 #message(STATUS "kangle link libs ${KANGLE_LIBS} http_libs ${KHTTPD_LIBS} ${KASYNC_LIBS}")
 target_link_libraries(kangle ${KANGLE_LIBS})
+if(KANGLE_SHARED_SQLITE)
+    add_custom_command(TARGET kangle POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:SQLite::SQLite3>" "$<TARGET_FILE_DIR:kangle>"
+        VERBATIM)
+    install(FILES "$<TARGET_FILE:SQLite::SQLite3>" DESTINATION bin)
+endif()
 if (NOT HTTP_PROXY) 
     add_executable(extworker ${EXTWORKER_SOURCE_FILES})
     add_library(vhs_sqlite MODULE  ${VHS_SQLITE_SOURCE_FILES})
