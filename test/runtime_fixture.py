@@ -39,7 +39,8 @@ def stop_server(proc, binary, timeout=10):
 
 
 def copy_runtime(binary, bindir):
-    for name in ('libstdc++.so.6', 'libgcc_s.so.1'):
+    libraries = ('sqlite3.dll',) if os.name == 'nt' else ('libstdc++.so.6', 'libgcc_s.so.1')
+    for name in libraries:
         source = os.path.join(os.path.dirname(binary), name)
         if os.path.isfile(source):
             shutil.copy2(source, os.path.join(bindir, name))

@@ -173,6 +173,16 @@ void KVirtualHostManage::updateTemplateIndex(const khttpd::KXmlNode* xml, bool a
 		++vh_templates[group][sub];
 		auto& info = vh_template_config[name];
 		info.attributes = xml->attributes();
+		info.maps.clear();
+		for (const auto& child : xml->get_first()->child_order) {
+			if (child.node->is_tag(_KS("map")) || child.node->is_tag(_KS("map_path"))) {
+				info.maps.push_back(child.body->attr());
+			} else if (child.node->is_tag(_KS("map_file"))) {
+				auto attributes = child.body->attr();
+				attributes.emplace("file_ext", attributes["ext"]);
+				info.maps.push_back(std::move(attributes));
+			}
+		}
 		info.init_events.clear();
 		info.update_events.clear();
 		info.destroy_events.clear();
@@ -238,7 +248,7 @@ void KVirtualHostManage::getTemplateEvents(const KXmlAttribute& attributes,
 	}
 }
 
-void KVirtualHostManage::inheritTemplateAttributes(KXmlAttribute& attributes) {
+void KVirtualHostManage::inheritTemplate(KXmlAttribute& attributes, std::vector<KXmlAttribute>& maps) {
 	KString current = attributes["templete"];
 	if (!current.empty() && !attributes["subtemplete"].empty()) {
 		current += ":";
@@ -257,7 +267,13 @@ void KVirtualHostManage::inheritTemplateAttributes(KXmlAttribute& attributes) {
 			// std::map::insert leaves an existing value unchanged.
 			attributes.insert(attribute);
 		}
+		maps.insert(maps.end(), it->second.maps.begin(), it->second.maps.end());
 		current = (*it).second.attributes["templete"];
+		const auto& sub = it->second.attributes["subtemplete"];
+		if (!current.empty() && !sub.empty()) {
+			current += ":";
+			current += sub;
+		}
 	}
 }
 

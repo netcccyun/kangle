@@ -381,6 +381,7 @@ public:
 #endif
 private:
 	~KVirtualHost();
+	std::unique_ptr<KBaseVirtualHost> template_maps;
 #ifdef ENABLE_VH_RS_LIMIT
 	//当前带宽信息
 	KSpeedLimit* sl;

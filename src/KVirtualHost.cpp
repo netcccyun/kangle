@@ -180,6 +180,9 @@ kgl_auto_cstr KVirtualHost::alias(bool internal, const char* path) {
 }
 KBaseRedirect* KVirtualHost::refsPathRedirect(const char* path, int path_len) {
 	auto rd = refs_path_redirect(path, path_len);
+	if (!rd && template_maps) {
+		rd = template_maps->refs_path_redirect(path, path_len);
+	}
 	if (rd != nullptr || !inherit) {
 		return rd;
 	}
@@ -188,6 +191,9 @@ KBaseRedirect* KVirtualHost::refsPathRedirect(const char* path, int path_len) {
 KFetchObject* KVirtualHost::findPathRedirect(KHttpRequest* rq, KFileName* file, const char* path, bool fileExsit, bool& result) {
 	auto path_len = strlen(path);
 	auto fo = find_path_redirect(rq, file, path, path_len, fileExsit, result);
+	if (!result && template_maps) {
+		fo = template_maps->find_path_redirect(rq, file, path, path_len, fileExsit, result);
+	}
 	if (result || !inherit) {
 		return fo;
 	}
@@ -196,6 +202,9 @@ KFetchObject* KVirtualHost::findPathRedirect(KHttpRequest* rq, KFileName* file, 
 KFetchObject* KVirtualHost::findFileExtRedirect(KHttpRequest* rq, KFileName* file, bool fileExsit, bool& result) {
 	char* file_ext = (char*)file->getExt();
 	auto fo = find_file_redirect(rq, file, file_ext, fileExsit, result);
+	if (!result && template_maps) {
+		fo = template_maps->find_file_redirect(rq, file, file_ext, fileExsit, result);
+	}
 	if (result || !inherit) {
 		return fo;
 	}
@@ -477,20 +486,22 @@ void KVirtualHost::copy_to(KVirtualHost* vh) {
 #endif
 }
 bool KVirtualHost::loadApiRedirect(KApiPipeStream* st, int workType) {
-	lock.Lock();
-	for (auto it = pathRedirects.begin(); it != pathRedirects.end(); it++) {
-		if (!loadApiRedirect((*it)->rd, st, workType)) {
-			lock.Unlock();
-			return false;
+	for (auto maps : {static_cast<KBaseVirtualHost*>(this), template_maps.get()}) {
+		if (!maps) {
+			continue;
+		}
+		auto locker = maps->get_locker();
+		for (auto map : maps->pathRedirects) {
+			if (!loadApiRedirect(map->rd, st, workType)) {
+				return false;
+			}
+		}
+		for (const auto& map : maps->redirects) {
+			if (!loadApiRedirect(map.second->rd, st, workType)) {
+				return false;
+			}
 		}
 	}
-	for (auto it2 = redirects.begin(); it2 != redirects.end(); it2++) {
-		if (!loadApiRedirect((*it2).second->rd, st, workType)) {
-			lock.Unlock();
-			return false;
-		}
-	}
-	lock.Unlock();
 	return true;
 }
 bool KVirtualHost::loadApiRedirect(KRedirect* rd, KApiPipeStream* st,
@@ -670,7 +681,27 @@ bool KVirtualHost::parse_xml(const khttpd::KXmlNodeBody* body, KVirtualHost* ov)
 	auto attr = body->attr();
 	conf.gvm->getTemplateEvents(attr, template_init_events,
 		template_update_events, template_destroy_events);
-	conf.gvm->inheritTemplateAttributes(attr);
+	std::vector<KXmlAttribute> inherited_maps;
+	conf.gvm->inheritTemplate(attr, inherited_maps);
+	if (!inherited_maps.empty()) {
+		// Keep site maps separate so their config updates and removals cannot
+		// replace inherited maps. A reload rebuilds these from the template chain.
+		template_maps.reset(new KBaseVirtualHost());
+		for (const auto& attributes : inherited_maps) {
+			const auto& ext = attributes["file_ext"];
+			if (!ext.empty()) {
+				if (template_maps->redirects.find(ext) == template_maps->redirects.end()) {
+					if (auto map = parse_file_map(attributes)) {
+						template_maps->redirects.emplace(ext, map);
+					}
+				}
+			} else if (!attributes["path"].empty()) {
+				if (auto map = parse_path_map(attributes)) {
+					template_maps->pathRedirects.push_back(map);
+				}
+			}
+		}
+	}
 	envs.clear();
 	parseEnv(attr("envs"));
 	setDocRoot(attr["doc_root"]);

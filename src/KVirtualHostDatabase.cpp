@@ -391,6 +391,7 @@ void KVirtualHostDatabase::scan(kconfig::KConfigFileScanInfo* info) {
 	query_param.vhm = &vhm;
 	query_param.st = rs;
 	query_param.data = &vd;
+	const auto modified = KFileModified(time(NULL), conf.gvm->getTemplateGeneration());
 	int result;
 	for (;;) {
 		if (kfiber_thread_call(thread_vhd_query, &query_param, 1, &result) != 0) {
@@ -406,7 +407,7 @@ void KVirtualHostDatabase::scan(kconfig::KConfigFileScanInfo* info) {
 		name << "@vhd|" << attr("name");
 		auto name2 = name.reset();
 		KString vh_name(attr("name"));
-		info->new_file(name2.data(), vh_name.data(), KFileModified(time(NULL),0), false);
+		info->new_file(name2.data(), vh_name.data(), modified, false);
 		body->clear();
 	}
 
@@ -501,7 +502,7 @@ KFileModified KVirtualHostDatabase::get_last_modified(kconfig::KConfigFile* file
 	// Database-backed configuration has no filesystem mtime.  Return a
 	// non-empty generation so a forced single-vhost reload is treated as a
 	// successful load instead of clearing the config file after updating it.
-	return KFileModified(time(NULL), 0);
+	return KFileModified(time(NULL), conf.gvm->getTemplateGeneration());
 }
 void KVirtualHostDatabase::freeConnection(kgl_vh_connection cn) {
 	if (vhm.freeConnection) {

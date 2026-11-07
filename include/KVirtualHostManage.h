@@ -98,7 +98,7 @@ public:
 	void getAllVh(std::list<KString>& vhs, bool status, bool onlydb);
 	void getAllGroupTemplete(std::list<KString>& templates);
 	bool getAllTempleteVh(const char* group_template, std::list<KString>& templates);
-	void inheritTemplateAttributes(KXmlAttribute& attributes);
+	void inheritTemplate(KXmlAttribute& attributes, std::vector<KXmlAttribute>& maps);
 	void getTemplateEvents(const KXmlAttribute& attributes,
 		std::vector<KString>& init_events,
 		std::vector<KString>& update_events,
@@ -142,6 +142,7 @@ private:
 	std::map<KString, std::map<KString, unsigned int> > vh_templates;
 	struct KVhTemplateCompatInfo {
 		KXmlAttribute attributes;
+		std::vector<KXmlAttribute> maps;
 		std::vector<KString> init_events;
 		std::vector<KString> update_events;
 		std::vector<KString> destroy_events;
