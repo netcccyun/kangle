@@ -38,6 +38,9 @@ KRedirect* KCdnContainer::refsRedirect(const char* ip, const char* host, int por
 		s << ssl;
 	}
 	s << "_" << (int)proto;
+	/* life_time is part of the pool identity: when a synced CDN domain
+	 * changes life_time, a busy pool under the old key never idles out. */
+	s << "_" << life_time;
 	lock.Lock();
 	KRedirect* rd = findRedirect(s.c_str());
 	if (rd) {
