@@ -530,7 +530,7 @@ void KAcserverManager::apiList(KWStream& s, const KString& name) {
 	s << klang["file"] << ": <input name='file' size='80' value='" << (m_a ? m_a->apiFile
 		: "") << "'><br>\n";
 	if (m_a && m_a->type == WORK_TYPE_MT) {
-		s << "<input type=hidden name='mt' value='1'>";
+		s << "<input type=hidden name='type' value='mt'>";
 	}
 	s << "<input type='submit' value='" << LANG_SUBMIT << "'>";
 	s << "</form>";

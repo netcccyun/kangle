@@ -207,6 +207,9 @@ bool KApiRedirect::parse_config(const khttpd::KXmlNode* node) {
 		auto type = attr("type", nullptr);
 		if (type != nullptr) {
 			this->type = KApiRedirect::getTypeValue(type);
+		} else if (strcmp(attr("mt"), "1") == 0) {
+			// Written by the API admin form before it used type='mt'.
+			this->type = WORK_TYPE_MT;
 		}
 		this->setFile(attr["file"]);
 	}

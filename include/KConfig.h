@@ -127,6 +127,10 @@ public:
 };
 
 inline kgl_auto_cstr getPath(const char* file) {
+	// Windows API commands (KGL_REQ_COMMAND) have no application path.
+	if (file == nullptr) {
+		return kgl_auto_cstr(nullptr);
+	}
 	char* path = strdup(file);
 	char* e = path + strlen(path);
 	while (e > path) {
