@@ -6,8 +6,6 @@
 #ifdef ENABLE_SQLITE_DISK_INDEX
 #ifndef _WIN32
 #include <unistd.h>
-#else
-#pragma comment(lib,"sqlite3.lib")
 #endif
 #define CREATE_SQL "CREATE TABLE [cache] ([f1] INTEGER  NULL,[f2] INTEGER  NULL,[url] VARCHAR(1024)  NULL,[data] BLOB  NULL,PRIMARY KEY ([f1],[f2]))"
 //#define CREATE_INDEX_SQL "CREATE INDEX [IDX_CACHE_T] ON [cache] ([t]  DESC )"

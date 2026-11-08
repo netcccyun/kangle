@@ -187,7 +187,7 @@ func Prepare(kangle_path string, only_prepare bool) {
 	common.CopyFile(kangle_path+"/vhs_sqlite"+common.DllExtendFile(), config.Cfg.BasePath+"/bin/vhs_sqlite"+common.DllExtendFile())
 	common.CopyFile(kangle_path+"/webdav"+common.DllExtendFile(), config.Cfg.BasePath+"/bin/webdav"+common.DllExtendFile())
 	common.CopyFile(kangle_path+"/webdav_client_example"+common.ExeExtendFile(), config.Cfg.BasePath+"/bin/webdav_client_example"+common.ExeExtendFile())
-	for _, name := range []string{"libstdc++.so.6", "libgcc_s.so.1"} {
+	for _, name := range []string{"libstdc++.so.6", "libgcc_s.so.1", "sqlite3.dll"} {
 		source := kangle_path + "/" + name
 		if _, err := os.Stat(source); err == nil {
 			common.CopyFile(source, config.Cfg.BasePath+"/bin/"+name)

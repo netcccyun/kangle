@@ -3,6 +3,10 @@
 适用于 Windows x64 + Visual Studio 2022（MSVC v143）。下文命令都在 PowerShell 中、
 从 Kangle 源码目录执行；kwaf、kwebp、auth_sqlite 需与 `kangle` 放在同一父目录下。
 
+Windows Release 构建统一使用动态 VC 运行库（`/MD`）。安装程序需要安装与 MSVC 14.44
+兼容的 Microsoft Visual C++ x64 Redistributable。此要求也适用于 `vhs_sqlite`、`kwaf`、
+`kwebp`、`auth_sqlite`、`vhost`、`linxftp` 和 `runas`。
+
 ## 1. 准备工具
 
 安装 Git 和 VS 2022 Build Tools 的 C++ 桌面开发工作负载（含 Windows SDK 和 CMake）：
@@ -91,10 +95,4 @@ PHP FastCGI 与压测（需 Python 3 + `pip install h2`、OpenSSL 命令行和 p
 go build -C test/test_framework -o $out/kangle-bench.exe ./benchmark
 $env:KANGLE_TEST_OPENSSL = 'C:/Program Files/Git/usr/bin/openssl.exe'
 python test/php_fastcgi_integration.py $bin/kangle.exe <php-cgi.exe 路径> --benchmark $out/kangle-bench.exe
-```
-
-旧版 EasyPanel WHM `vhost.dll` 回归（需要实际的旧模块）：
-
-```powershell
-python test/whm_legacy_windows_regression.py $bin/kangle.exe <vhost.dll 路径>
 ```
