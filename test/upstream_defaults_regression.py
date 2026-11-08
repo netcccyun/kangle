@@ -6,6 +6,8 @@
 2. A close-delimited HTTPS response that ends without TLS close_notify is
    treated as truncated: it is not cached. The same response ended with
    close_notify is complete and is cached.
+3. A <host dir='http://origin/'> CDN binding without life_time also keeps
+   the origin connection alive; ?life_time=0 still opens one per request.
 
 Usage: python3 test/upstream_defaults_regression.py /absolute/path/to/kangle
 Uses an isolated prefix and does not change the installed configuration.
@@ -110,6 +112,24 @@ def fetch(port, path):
         conn.close()
 
 
+def fetch_host(port, host, path):
+    conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+    try:
+        conn.request('GET', path, headers={'Host': host})
+        res = conn.getresponse()
+        return res.status, res.read()
+    finally:
+        conn.close()
+
+
+def origin_connections(plain, port, host, tag):
+    before = plain.connections
+    for i in range(5):
+        status, body = fetch_host(port, host, '/%s/%d?nocache=%d' % (tag, i, time.time() * 1000))
+        assert status == 200 and body == b'keepalive', (host, status, body)
+    return plain.connections - before
+
+
 def free_port():
     s = socket.socket()
     s.bind(('127.0.0.1', 0))
@@ -134,6 +154,11 @@ def run(binary):
         plain.daemon_threads = True
         plain.connections = 0
         threading.Thread(target=plain.serve_forever, daemon=True).start()
+        # life_time is not part of the CDN pool key, so ?life_time=0 gets its own origin port
+        plain0 = type(plain)(('127.0.0.1', 0), KeepAliveOrigin)
+        plain0.daemon_threads = True
+        plain0.connections = 0
+        threading.Thread(target=plain0.serve_forever, daemon=True).start()
         tls = TlsOrigin(cert, key)
         tls.start()
 
@@ -149,6 +174,11 @@ def run(binary):
         cfg += "<map path='/ka/' extend='server:plain' confirm_file='0' allow_method='*'/>"
         cfg += "<map path='/clean' extend='server:tls' confirm_file='0' allow_method='*'/>"
         cfg += "<map path='/cut' extend='server:tls' confirm_file='0' allow_method='*'/>"
+        cfg += "</vh>"
+        origin = 'http://127.0.0.1:%d/' % plain.server_port
+        cfg += "<vh name='cdn' doc_root='www' inherit='on'>"
+        cfg += "<host dir='%s'>cdn.test</host>" % origin
+        cfg += "<host dir='http://127.0.0.1:%d/?life_time=0'>cdn0.test</host>" % plain0.server_port
         cfg += "</vh></config>"
         with open(root + '/etc/config.xml', 'w') as f:
             f.write(cfg)
@@ -173,6 +203,11 @@ def run(binary):
         fetch(port, '/cut')
         fetch(port, '/cut')
         assert tls.requests.get('/cut') == 2, 'truncated response was cached: %r' % tls.requests
+        # 3. http:// CDN bindings use the same default as <server>
+        got = origin_connections(plain, port, 'cdn.test', 'cdn')
+        assert got == 1, 'http:// without life_time: %d origin connections (expected 1)' % got
+        got = origin_connections(plain0, port, 'cdn0.test', 'cdn0')
+        assert got == 5, 'http:// with life_time=0: %d origin connections (expected 5)' % got
         print('upstream defaults regression passed')
     finally:
         if proc is not None:

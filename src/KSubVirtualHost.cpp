@@ -213,6 +213,9 @@ void KSubVirtualHost::set_doc_root(const char* doc_root, const char* dir) {
 			klog(KLOG_ERR, "cann't parse url [%s]\n", this->dir);
 			return;
 		}
+		/* Same default as an HTTP <server> without life_time;
+		 * an explicit life_time=0 still disables reuse. */
+		http->life_time = KGL_HTTP_UPSTREAM_LIFE_TIME;
 		if (http->dst->param) {
 			char* t = strstr(http->dst->param, "life_time=");
 			if (t) {
