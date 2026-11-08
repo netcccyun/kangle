@@ -84,6 +84,9 @@ public:
 	void initEvent(KVirtualHostEvent* ctx) const;
 	void updateEvent(KVirtualHostEvent* ctx) const;
 	void destroyEvent(KVirtualHostEvent* ctx) const;
+#ifdef _WIN32
+	bool prepareDirectoryRemoval();
+#endif
 	bool on_config_event(kconfig::KConfigTree* tree, kconfig::KConfigEvent* ev) override;
 	kconfig::KConfigEventFlag config_flag() const override {
 		return kconfig::ev_subdir;

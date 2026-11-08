@@ -93,6 +93,12 @@ static BOOL globalWhmServerSupportFunction(int request, void* buffer, int* size,
 }
 static BOOL whmServerSupportFunction(void* param, int request, void* buffer, int* size, int* dataType) {
 	WhmContext* ctx = (WhmContext*)param;
+#ifdef _WIN32
+	if (request == WHM_REQUEST_PREPARE_VH_DELETE) {
+		KVirtualHost* vh = ctx->getVh();
+		return ctx->trusted && vh && vh->prepareDirectoryRemoval() ? TRUE : FALSE;
+	}
+#endif
 	if (request == WHM_REQUEST_CMD) {
 		return whmCreateProcess((WhmContext*)param, (WHM_CMD_DATA*)buffer);
 	}

@@ -49,6 +49,8 @@ extern "C" {
 #define WHM_COMMAND_FAILED   503
 #define WHM_REQUEST_CMD      100
 #define WHM_REQUEST_MAPFILE  101
+// Windows: stop this vhost's applications and retire its access log before rmdir.
+#define WHM_REQUEST_PREPARE_VH_DELETE 102
 #define CURRENT_WHM_VERSION  2
 struct WHM_CMD_DATA
 {

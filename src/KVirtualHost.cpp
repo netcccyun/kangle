@@ -78,6 +78,42 @@ KVirtualHost::KVirtualHost(const KString& name) {
 	ssl_ctx = NULL;
 #endif
 }
+#ifdef _WIN32
+bool KVirtualHost::prepareDirectoryRemoval() {
+#ifdef ENABLE_VH_LOG_FILE
+	{
+		// Keep the logger alive for requests already holding this vhost. Retire
+		// it under the same locks as logger lookup and writes, so late access
+		// records cannot reopen the file while the directory is being removed.
+		auto guard = logManage.get_locker();
+		if (logger) {
+			auto it = logManage.logs.find(logger->path);
+			if (it != logManage.logs.end() && it->second == logger) {
+				// One reference belongs to the map, one to this vhost. Never
+				// disable a logger still shared by a different vhost instance.
+				if (logger->getRef() > 2) {
+					return false;
+				}
+				logger->startLog();
+				logger->place = LOG_NONE;
+				logger->close();
+				logger->endLog();
+				logManage.logs.erase(it);
+				logger->release();
+			}
+		}
+	}
+#endif
+	{
+		auto guard = get_locker();
+		closed = true;
+	}
+	// Kangle owns the application pools and knows which belong to this site.
+	// Do not enumerate/kill unrelated php-cgi processes by executable name.
+	killProcess(this);
+	return true;
+}
+#endif
 KVirtualHost::~KVirtualHost() {
 #ifdef ENABLE_VH_RUN_AS
 #ifdef _WIN32
