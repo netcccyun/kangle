@@ -247,6 +247,12 @@ void checkMemoryLeak() {
 int shutdown_fiber(void* arg, int got) {
 	quit_program_flag = PROGRAM_QUIT_IMMEDIATE;
 	//dso_shutdown_callback();
+#ifdef ENABLE_VH_RUN_AS
+	/* Stop every php-cgi and other child before the config is cleared:
+	 * clearing it removes the <cmd> entries, and the later
+	 * conf.gam->shutdown() could no longer reach their processes. */
+	conf.gam->killAllProcess(NULL);
+#endif
 	kconfig::shutdown();
 	cache.shutdown_disk(true);
 	//conf.gvm->UnBindGlobalListens(conf.service);

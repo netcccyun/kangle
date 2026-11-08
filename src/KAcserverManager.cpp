@@ -138,6 +138,10 @@ void KAcserverManager::on_cmd_event(kconfig::KConfigTree* tree, const khttpd::KX
 			klog(KLOG_ERR, "not found cmd [%s]\n", name.c_str());
 			return;
 		}
+		// Virtual hosts and running requests may still hold the command, so
+		// release() alone does not destroy it.  Stop its processes now, or
+		// they outlive kangle (a config clear at shutdown removes every cmd).
+		(*it).second->shutdown();
 		(*it).second->release();
 		cmds.erase(it);
 		break;
