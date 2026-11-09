@@ -49,6 +49,8 @@ public:
 	//返回头长度,-1表示出错
 	int internal_start_response_body(int64_t body_size, bool is_100_continue) override
 	{
+		/* lets write_end and ~KSimulateSink tell a full body from a cut one */
+		response_left = body_size;
 		if (header_finish) {
 			return header_finish(arg, status_code, body_size);
 		}
@@ -104,7 +106,8 @@ public:
 	}
 	void shutdown() override
 	{
-
+		/* write_end shuts the sink down when the body was cut short */
+		body_broken = true;
 	}
 	void set_time_out(int tmo_count) override
 	{
@@ -137,6 +140,7 @@ public:
 	uint16_t status_code;
 	int life_time;
 	void *arg;
+	bool body_broken = false;
 protected:
 	void SetReadDelay(bool delay_flag)
 	{
