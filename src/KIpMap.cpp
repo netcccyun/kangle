@@ -332,10 +332,8 @@ bool KIpMap::add_range_addr(struct dns_range_addr *range_addr,void *bind_data)
 	return true;
 }
 
-bool KIpMap::add_min_max_addr(const char *min_addr,const char *max_addr,void *view)
+static bool parse_min_max_addr(const char *min_addr, const char *max_addr, ip_addr *min, ip_addr *max)
 {
-	struct dns_range_addr range_addr;
-	memset(&range_addr,0,sizeof(range_addr));
 	bool include_min_addr = true;
 	if (*min_addr == '_') {
 		include_min_addr = false;
@@ -346,17 +344,55 @@ bool KIpMap::add_min_max_addr(const char *min_addr,const char *max_addr,void *vi
 		include_max_addr = false;
 		max_addr++;
 	}
-	if (!get_local_addr(min_addr,&range_addr.min_addr)) {
+	if (!get_local_addr(min_addr, min)) {
 		return false;
 	}
 	if (!include_min_addr) {
-		addr_add(&range_addr.min_addr, 1);
+		addr_add(min, 1);
 	}
-	if (!get_local_addr(max_addr,&range_addr.max_addr)) {
+	if (!get_local_addr(max_addr, max)) {
 		return false;
 	}
 	if (!include_max_addr) {
-		addr_sub(&range_addr.max_addr, 1);
+		addr_sub(max, 1);
+	}
+	return true;
+}
+bool kgl_parse_ip_range(char *addr, ip_addr *min_addr, ip_addr *max_addr)
+{
+	memset(min_addr, 0, sizeof(ip_addr));
+	memset(max_addr, 0, sizeof(ip_addr));
+	char *prefix = strchr(addr, '/');
+	if (prefix) {
+		*prefix = '\0';
+		int bits = atoi(prefix + 1);
+		if (!build_cidr_addr(addr, bits, min_addr, max_addr)) {
+			klog(KLOG_ERR, "cann't build cidr_addr [%s/%d]\n", addr, bits);
+			return false;
+		}
+		return true;
+	}
+	prefix = strchr(addr, '-');
+	if (prefix) {
+		*prefix = '\0';
+		return parse_min_max_addr(addr, prefix + 1, min_addr, max_addr);
+	}
+	return parse_min_max_addr(addr, addr, min_addr, max_addr);
+}
+bool KIpMap::add_range(const ip_addr *min_addr, const ip_addr *max_addr, void *bind_data)
+{
+	struct dns_range_addr range_addr;
+	memset(&range_addr, 0, sizeof(range_addr));
+	kgl_memcpy(&range_addr.min_addr, min_addr, sizeof(ip_addr));
+	kgl_memcpy(&range_addr.max_addr, max_addr, sizeof(ip_addr));
+	return add_range_addr(&range_addr, bind_data);
+}
+bool KIpMap::add_min_max_addr(const char *min_addr,const char *max_addr,void *view)
+{
+	struct dns_range_addr range_addr;
+	memset(&range_addr,0,sizeof(range_addr));
+	if (!parse_min_max_addr(min_addr, max_addr, &range_addr.min_addr, &range_addr.max_addr)) {
+		return false;
 	}
 	return add_range_addr(&range_addr,view);
 }
