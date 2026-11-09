@@ -325,6 +325,12 @@ KGeoData *KGeoData::load(const char *file, time_t last_modified)
 			if (line == NULL) {
 				break;
 			}
+			/* CRLF files (edited on Windows) kept "\r" in labels and
+			 * failed to parse single addresses and min-max ranges */
+			char *end = line + strlen(line);
+			while (end > line && (end[-1] == '\r' || end[-1] == ' ' || end[-1] == '\t')) {
+				*--end = '\0';
+			}
 			if (*line == '*') {
 				lables.push_back(d->build_lable(line + 1));
 				d->total_item++;
