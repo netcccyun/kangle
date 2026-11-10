@@ -122,7 +122,16 @@ bool KLogElement::open() {
 			}
 			p--;
 		}
-		mkdir(str, 0755);
+		int dir_mode = 0755;
+#ifndef _WIN32
+		// 系统全局日志目录(uid、gid 均为 0，如 /vhs/kangle/var)收紧为 0700，
+		// 防止以站点 uid 运行的 PHP 读取 access/server 日志(含 API 签名、明文密码)；
+		// 虚拟主机自身日志目录保持 0755，不影响站点查看自己的日志。
+		if (uid == 0 && gid == 0) {
+			dir_mode = 0700;
+		}
+#endif
+		mkdir(str, dir_mode);
 		xfree(str);
 		fp.open(path.c_str(), fileAppend, flag);
 		if (!fp.opened()) {

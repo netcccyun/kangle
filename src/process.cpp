@@ -1572,6 +1572,24 @@ void append_cmd_arg(KStringBuf &s , const char *arg)
 		s << "\\";
 	}
 }
+// 构造写入日志的命令行：把 mysql/mysqldump/7z 等的 -p<密码> 脱敏为 -p***，
+// 仅影响 server.log 里的内容，不改变真正传给进程的参数（"-p" 单独出现如 mkdir -p 不脱敏）。
+static void build_log_cmdline(KStringBuf &s, char * args[])
+{
+	for (int i = 0; args[i] != NULL; i++) {
+		if (i > 0) {
+			s << " ";
+		}
+		s << "\"";
+		const char *a = args[i];
+		if (a[0] == '-' && a[1] == 'p' && a[2] != '\0') {
+			append_cmd_arg(s, "-p***");
+		} else {
+			append_cmd_arg(s, a);
+		}
+		s << "\"";
+	}
+}
 
 bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *curdir,PIPE_T in,PIPE_T out,PIPE_T err,pid_t &pid)
 {
@@ -1593,7 +1611,9 @@ bool createProcess(Token_t token, char * args[],KCmdEnv *envs,char *curdir,PIPE_
 		append_cmd_arg(arg,args[i]);
 		arg << "\"";
 	}
-	klog(KLOG_NOTICE,"now create process [%s]\n",arg.c_str());
+	KStringBuf log_arg(512);
+	build_log_cmdline(log_arg, args);
+	klog(KLOG_NOTICE,"now create process [%s]\n",log_arg.c_str());
 	//{{ent
 #ifdef _WIN32
 	kgl_process_std std;
@@ -1690,7 +1710,9 @@ bool createProcess(KPipeStream *st, Token_t token, char * args[],KCmdEnv *envs, 
 		append_cmd_arg(arg,args[i]);
 		arg << "\"";
 	}
-	klog(KLOG_NOTICE,"now create process [%s]\n",arg.c_str());
+	KStringBuf log_arg(512);
+	build_log_cmdline(log_arg, args);
+	klog(KLOG_NOTICE,"now create process [%s]\n",log_arg.c_str());
 	//{{ent
 #ifdef _WIN32
 	if(!StartInteractiveClientProcess(token, args[0], (char *)arg.c_str(),st,rdstd,(char *)(envs?envs->dump_env():NULL))) {
