@@ -38,6 +38,21 @@ KGL_RESULT process_upstream_no_body(KHttpRequest* rq, kgl_input_stream* in, kgl_
 
 /* merge obj precondition to sub_request */
 void merge_precondition(KHttpRequest* rq, KHttpObject* obj);
+/**
+* rq->ctx.obj is the body-less response upstream sent for a revalidation of
+* old_obj. return true if it validates old_obj, false if it must be forwarded
+* to the client (a 304 for the client's own validator, or a changed entity).
+*/
+inline bool kgl_revalidated_304_matches(KHttpRequest* rq, KHttpObject* old_obj) {
+	kgl_precondition_flag flag;
+	if (rq->ctx.obj->data->i.status_code == STATUS_NOT_MODIFIED && !rq->sink->get_precondition(&flag)) {
+		/* only old_obj's validator went upstream, so the 304 is about old_obj.
+		* never send a 304 to a client that did not ask for one.
+		*/
+		return true;
+	}
+	return !rq->ctx.obj->data->etag || rq->ctx.obj->is_same_precondition(old_obj);
+}
 /* return true 200/206 false 304/412 */
 inline bool kgl_request_precondition(KHttpRequest* rq, KHttpObject* obj) {
 	kgl_precondition_flag flag;

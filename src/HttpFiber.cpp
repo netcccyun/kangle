@@ -667,7 +667,7 @@ KGL_RESULT load_object_from_source(KHttpRequest* rq) {
 	if (!rq->ctx.old_obj || rq->ctx.obj->data->i.status_code != STATUS_NOT_MODIFIED) {
 		goto done;
 	}
-	if (rq->ctx.obj->data->etag && !rq->ctx.obj->is_same_precondition(rq->ctx.old_obj)) {
+	if (!kgl_revalidated_304_matches(rq, rq->ctx.old_obj)) {
 		goto done;
 	}
 	if (!kgl_request_precondition(rq, rq->ctx.old_obj)) {

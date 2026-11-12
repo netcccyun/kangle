@@ -204,7 +204,7 @@ bool KBigObjectContext::verifiy_object(bool match_if_range,KGL_RESULT *result)
 		rq->dead_old_obj();
 		return false;
 	}
-	if (rq->ctx.obj->data->etag && !rq->ctx.obj->is_same_precondition(obj)) {
+	if (!kgl_revalidated_304_matches(rq, obj)) {
 		rq->dead_old_obj();
 		*result = process_upstream_no_body(rq, &in, &out);
 		return false;

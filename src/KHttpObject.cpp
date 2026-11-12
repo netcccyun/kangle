@@ -129,8 +129,25 @@ bool KHttpObject::is_same_precondition(KHttpObject* obj) 	{
 	if (data->i.condition_is_time) {
 		return data->last_modified == obj->data->last_modified;
 	}
-	if (data->etag) {		
-		return kgl_mem_same(data->etag->data,data->etag->len, obj->data->etag->data,obj->data->etag->len);
+	if (data->etag) {
+		/*
+		* rfc9110 8.8.3.2: a 304 is matched to the stored response with the
+		* weak comparison. nginx, for example, stores W/"x" for a gzip 200 but
+		* answers the revalidation 304 with "x".
+		*/
+		const char* a = data->etag->data;
+		size_t a_len = data->etag->len;
+		const char* b = obj->data->etag->data;
+		size_t b_len = obj->data->etag->len;
+		if (a_len > 2 && a[0] == 'W' && a[1] == '/') {
+			a += 2;
+			a_len -= 2;
+		}
+		if (b_len > 2 && b[0] == 'W' && b[1] == '/') {
+			b += 2;
+			b_len -= 2;
+		}
+		return kgl_mem_same(a, a_len, b, b_len);
 	}
 	return true;
 }
