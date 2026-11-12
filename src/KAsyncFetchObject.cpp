@@ -610,7 +610,12 @@ KGL_RESULT KAsyncFetchObject::on_read_head_success(KHttpRequest* rq, kfiber** po
 	}
 #endif
 	if (KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE)) {
+		/* On Linux set_no_delay(false) removes the TCP_CORK taken while the
+		 * request head was parsed. TCP_NODELAY alone does not override it, so
+		 * every tunnel write would wait for the 200ms cork ceiling. */
+		rq->sink->set_no_delay(false);
 		rq->sink->set_no_delay(true);
+		client->set_no_delay(false);
 		client->set_no_delay(true);
 		int tmo = rq->sink->get_time_out();
 		if (tmo < 5) {
