@@ -37,7 +37,8 @@ int process_post_fiber(void* arg, int got) {
 	delete[]args;
 	int result = (int)fo->ProcessPost(rq);
 	fo->pop_header.post_finished = 1;
-	if (fo->client && (!fo->pop_header.grpc || result != KGL_END)) {
+	/* gRPC and a half-closed tunnel still read the response after KGL_END */
+	if (fo->client && result != KGL_END) {
 		fo->client->shutdown();
 	}
 	return result;
@@ -126,6 +127,49 @@ void KAsyncFetchObject::on_readhup(KHttpRequest* rq) {
 		client->shutdown();
 	}
 	return;
+}
+#ifdef KSOCKET_SSL
+static bool tls_eof_without_notify(kconnection* cn) {
+	return cn && cn->st.ssl && cn->st.ssl->eof_without_notify;
+}
+#else
+static bool tls_eof_without_notify(void*) {
+	return false;
+}
+#endif
+bool KAsyncFetchObject::tunnel_write_end() {
+	if (client->IsMultiStream()) {
+		/* HTTP/2 or HTTP/3 stream: END_STREAM */
+		client->write_end();
+		return true;
+	}
+	kconnection* cn = client->get_connection();
+	if (cn == nullptr) {
+		return false;
+	}
+#ifdef KSOCKET_SSL
+	if (cn->st.ssl) {
+#ifdef ENABLE_KSSL_BIO
+		/* close_notify would wait in the memory BIO for a write */
+		return false;
+#else
+		if (cn->st.base.selector != kgl_get_tls_selector()) {
+			/* the SSL object belongs to another thread */
+			return false;
+		}
+		/* Send close_notify once. The response reader keeps using SSL_read;
+		 * marking the session shut down stops the close path from waiting
+		 * for the origin's close_notify. Without an end the origin would
+		 * wait for more data, and an idle WebSocket tunnel never times out. */
+		ERR_clear_error();
+		SSL_shutdown(cn->st.ssl->ssl);
+		ERR_clear_error();
+		cn->st.ssl->shutdown = 1;
+#endif
+	}
+#endif
+	ksocket_shutdown(cn->st.fd, SHUT_WR);
+	return true;
 }
 void KAsyncFetchObject::ResetBuffer() {
 	free_header_list(early_headers.steal_header());
@@ -308,6 +352,12 @@ KGL_RESULT KAsyncFetchObject::ReadBody(KHttpRequest* rq) {
 		}
 		char* buf = (char*)getUpstreamBuffer(&len);
 		int got = client->read(buf, len);
+		if (got < 0 && KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE) && !client->IsMultiStream() &&
+			tls_eof_without_notify(client->get_connection())) {
+			/* Many TLS origins close a tunnel without close_notify. Treat it as
+			 * the FIN it is, so the client stream ends instead of being reset. */
+			got = 0;
+		}
 		if (got == 0) {
 			expectDone(rq);
 			KHttpHeader* header = client->get_trailer();
@@ -482,6 +532,14 @@ KGL_RESULT KAsyncFetchObject::PostResult(KHttpRequest* rq, int got) {
 		KBIT_SET(rq->sink->data.flags, RQ_CONNECTION_CLOSE);
 		KGL_RESULT result = send_error2(rq, STATUS_FORBIDEN, "denied by request body filter");
 		return result == KGL_OK ? KGL_EHAS_SEND_HEADER : result;
+	}
+	if (got == 0 && KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE) && !pop_header.post_canceled &&
+		tunnel_write_end()) {
+		/* The client ended its side of the tunnel (HTTP/2 END_STREAM or a
+		 * TCP close). The end was passed on; keep relaying what the origin
+		 * still sends, such as its WebSocket close frame. */
+		pop_header.post_ended = 1;
+		return KGL_END;
 	}
 	if (got <= 0) {
 		if (!pop_header.post_canceled) rq->sink->shutdown();

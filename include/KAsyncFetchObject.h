@@ -54,7 +54,8 @@ public:
 	void Close(KHttpRequest *rq)
 	{
 		if (client) {
-			if (KBIT_TEST(rq->ctx.filter_flags,RF_UPSTREAM_NOKA) 
+			if (KBIT_TEST(rq->ctx.filter_flags,RF_UPSTREAM_NOKA)
+				|| KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE)
 				|| !rq->ctx.upstream_connection_keep_alive
 				|| !rq->ctx.upstream_expected_done) {
 				pop_header.keep_alive_time_out = -1;
@@ -89,7 +90,9 @@ public:
 	{
 		if (!pop_header.post_finished && !pop_header.post_ended) {
 			pop_header.post_canceled = 1;
-			if (pop_header.grpc) rq->sink->cancel_read();
+			/* A tunnel whose origin closed cleanly must end the client stream
+			 * (HTTP/2 END_STREAM) after the relayed data, not reset it. */
+			if (pop_header.grpc || (KBIT_TEST(rq->sink->data.flags, RQ_CONNECTION_UPGRADE) && rq->ctx.upstream_expected_done)) rq->sink->cancel_read();
 			else rq->sink->shutdown();
 			if (client) client->shutdown();
 		}
@@ -97,6 +100,7 @@ public:
 		kfiber_join(post_fiber, &retval);
 	}
 	void on_readhup(KHttpRequest* rq) override;
+	bool tunnel_write_end();
 	virtual KGL_RESULT read_body_end(KHttpRequest* rq, KGL_RESULT result)
 	{
 		return result;
